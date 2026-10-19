@@ -1,0 +1,23 @@
+{
+  "name": "lodge-crm-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "15.5.28",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.1",
+    "@types/react": "18.3.3",
+    "typescript": "5.5.4"
+  },
+  "overrides": {
+    "postcss": "8.5.31"
+  }
+}

@@ -1,0 +1,136 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lodge_crm}
+      POSTGRES_USER: ${POSTGRES_USER:-lodge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lodge_dev_password}
+    volumes: ["postgres_production_foundation:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-lodge} -d ${POSTGRES_DB:-lodge_crm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","yes"]
+    volumes: ["redis_production_foundation:/data"]
+  minio:
+    build:
+      context: ./minio
+    command: ["server","/data","--console-address",":9001"]
+    environment:
+      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY:-lodgecrm}
+      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_KEY:-change-this-object-storage-secret}
+      # Current MinIO community builds configure API CORS at server level.
+      # Use a comma-separated list for multiple allowed browser origins.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${FRONTEND_ORIGINS:-http://localhost:3000}
+    ports: ["9000:9000","9001:9001"]
+    volumes: ["minio_production:/data"]
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS http://localhost:9000/minio/health/live >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 5s
+  minio-init:
+    build: ../apps/api
+    depends_on:
+      minio: {condition: service_healthy}
+    environment:
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-lodgecrm}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change-this-object-storage-secret}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-lodge-crm-media}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+    command: ["python","-m","app.init_object_storage"]
+    restart: "no"
+  migrate:
+    build: ../apps/api
+    environment:
+      DATABASE_URL: ${DATABASE_ADMIN_URL:-postgresql+psycopg://lodge:lodge_dev_password@postgres:5432/lodge_crm}
+    command: ["alembic","upgrade","head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+  db-grants:
+    build: ../apps/api
+    environment:
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-postgresql+psycopg://lodge:lodge_dev_password@postgres:5432/lodge_crm}
+      APP_DATABASE_ROLE: ${APP_DATABASE_ROLE:-lodge_app}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:-lodge_app_dev_password}
+    command: ["python","-m","app.bootstrap_db_role"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: "no"
+  api:
+    build: ../apps/api
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      APP_ENV: ${APP_ENV:-production}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: ${OBJECT_STORAGE_PUBLIC_ENDPOINT:-http://localhost:9000}
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-lodgecrm}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change-this-object-storage-secret}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-lodge-crm-media}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-30}
+    depends_on:
+      db-grants: {condition: service_completed_successfully}
+      redis: {condition: service_started}
+      minio-init: {condition: service_completed_successfully}
+  worker:
+    build: ../apps/api
+    command: ["celery","-A","app.celery_app.celery_app","worker","--include=app.worker","--loglevel=INFO","--concurrency=2"]
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      APP_ENV: ${APP_ENV:-production}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+    depends_on:
+      db-grants: {condition: service_completed_successfully}
+      redis: {condition: service_started}
+    restart: unless-stopped
+  beat:
+    build: ../apps/api
+    command: ["celery","-A","app.celery_app.celery_app","beat","--loglevel=INFO"]
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      APP_ENV: ${APP_ENV:-production}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+    depends_on:
+      db-grants: {condition: service_completed_successfully}
+      redis: {condition: service_started}
+    restart: unless-stopped
+  web:
+    build: ../apps/web
+    ports: ["3000:3000"]
+    depends_on: [api]
+volumes:
+  postgres_production_foundation:
+  redis_production_foundation:
+  minio_production:

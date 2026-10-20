@@ -3,7 +3,7 @@
 Apply the shared warm-neutral, translucent design system to every new or edited screen. Read `../../docs/UI_UX_DESIGN_SYSTEM.md` before introducing a new visual pattern.
 
 - Use the exact owner-supplied beige `#FCF6EC`, gray `#F3EDE2`, brown `#27221A`, and orange `#D2942D` palette. Orange buttons always have brown text. Never use orange as small text on beige; use the semantic reading tokens. The shared low-opacity mesh may use orange, beige, and lighter brown only.
-- Use Archivo Narrow 600 for headings and Archivo for body/UI. Fraunces is the display fallback for hero titles and large figures; do not use it for ordinary headings or controls. No Swizzy Trial license was provided.
+- Match the supplied visual reference: default cream/light canvas, dark brown reading text, bold Archivo 600 sans-serif headings and figures, Archivo UI, and Archivo Narrow uppercase labels. Do not reintroduce serif hero or number styling. Preserve explicit saved theme preferences and keep dark mode available.
 - Reuse the shared radius, typography, and transition tokens; keep glass blur at 24px and saturation at 160%.
 - Use the semantic tokens in `app/design-system.css` and `tailwind.config.ts`. Do not introduce another palette or hardcode opaque backgrounds in page components. Reading text must use accessible reading tokens rather than decorative muted/accent swatches.
 - Reuse `components/ui`, `Drawer`, `WorkspaceCommand`, `DataViz`, and the existing guarded shells. Extend shared components when a new pattern is needed so both themes and other screens inherit it.

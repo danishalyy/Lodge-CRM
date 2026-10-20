@@ -177,11 +177,12 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
  try{
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(39, 34, 26)');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(252, 246, 236)');
+  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(39, 34, 26)');
   const primary=page.getByRole('button',{name:/Register lodge/});
   assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(210, 148, 45)',text:'rgb(39, 34, 26)'});
-  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/Archivo Narrow/);
+  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Archivo"?(?:,|$)/);
   assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Archivo/);
 
   assert.equal(await page.locator('.sidebar').evaluate(el=>Math.round(el.getBoundingClientRect().left)),16);
@@ -189,12 +190,12 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
   assert.equal(await page.locator('html').getAttribute('data-sidebar'),'collapsed');
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Toggle light and dark theme'}).click();
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(252, 246, 236)');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(39, 34, 26)');
   assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(210, 148, 45)',text:'rgb(39, 34, 26)'});
 
   await page.reload();await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('navigation',{name:'Quick navigation'}).waitFor({state:'visible'});
   await page.getByRole('button',{name:'More',exact:true}).click();
@@ -220,7 +221,9 @@ test('command palette supports keyboard search and hides unauthorized modules',a
 });
 
 test('branding validates inline, reduced motion is respected, and glass screenshots render',async()=>{
- const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});const page=await context.newPage();page.setDefaultTimeout(10000);
+ const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+ await context.addInitScript(()=>{if(!localStorage.getItem('theme'))localStorage.setItem('theme','dark')});
+ const page=await context.newPage();page.setDefaultTimeout(10000);
  await context.addCookies([{name:'lodge_session',value:'ui-only',url:base}]);
  const lodge={id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',name:'Acacia Lodge',location:'Maasai Mara, Kenya',subscription_status:'Active',subscription:{package:'Premium',expiry_date:'2027-10-20'},branding:{display_name:'Acacia Lodge',logo_url:null}};
  await page.route('**/api/**',route=>route.fulfill({json:route.request().url().endsWith('/auth/me')?{id:'owner',full_name:'Platform Owner',is_super_admin:true,mfa_enabled:true,memberships:[]}:route.request().url().includes('/platform/lodges')?[lodge]:[]}));
@@ -240,7 +243,6 @@ test('branding validates inline, reduced motion is respected, and glass screensh
   await page.getByRole('button',{name:'Toggle light and dark theme'}).click();await capture('safarios-lodges-light.png');
   const lightAudit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(lightAudit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
   await page.setViewportSize({width:390,height:844});await capture('safarios-lodges-mobile.png');
-  await page.getByRole('button',{name:'Toggle light and dark theme'}).click();
   await page.goto(base+'/login');await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();await capture('safarios-login-mobile.png');
   await page.setViewportSize({width:1440,height:1000});await capture('safarios-login.png');
   const loginAudit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(loginAudit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);

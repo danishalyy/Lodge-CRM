@@ -93,7 +93,7 @@ This build fixes the API startup NameError caused by workflow request schemas be
 
 ## v1.7 Premium UI / UX refresh
 
-The current web application uses the SafariOS brand system: exact beige/brown/orange palette, translucent blur, solid orange actions with brown text, Archivo controls, Archivo Narrow headings, Fraunces display figures, and a persisted light theme. Dashboards use real operational data. See [the shared design system](docs/UI_UX_DESIGN_SYSTEM.md) for component APIs and current screenshots.
+The current web application uses the SafariOS brand system: exact beige/brown/orange palette, translucent blur, solid orange actions with brown text, Archivo controls and bold sans-serif headings/figures, Archivo Narrow labels, and a cream light theme by default with saved dark-mode support. Dashboards use real operational data. See [the shared design system](docs/UI_UX_DESIGN_SYSTEM.md) for component APIs and current screenshots.
 
 Key UX additions:
 - responsive premium navigation with mobile drawer

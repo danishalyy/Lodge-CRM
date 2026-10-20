@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 export default function ThemeToggle() {
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(false);
   useEffect(() => {
-    setDark(document.documentElement.dataset.theme !== "light");
+    setDark(document.documentElement.dataset.theme === "dark");
   }, []);
   function toggle() {
     const d = !dark;

@@ -6,8 +6,9 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Archivo", "-apple-system", "sans-serif"],
-        heading: ["Archivo Narrow", "Archivo", "sans-serif"],
-        display: ["Fraunces", "Georgia", "serif"],
+        heading: ["Archivo", "-apple-system", "sans-serif"],
+        label: ["Archivo Narrow", "Archivo", "sans-serif"],
+        display: ["Archivo", "-apple-system", "sans-serif"],
       },
       colors: {
         beige: "var(--color-beige)",

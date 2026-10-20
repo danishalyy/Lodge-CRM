@@ -2,7 +2,7 @@
 
 A co-branded lodge operations platform with a beige, brown, and orange translucent interface with dark and light themes. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
 
-Start with [LOCAL_SETUP.md](LOCAL_SETUP.md). See [the new design and screenshots](docs/UI_UX_DESIGN_SYSTEM.md) and [commercial release scope](docs/COMMERCIAL_RELEASE_PLAN.md).
+Start with [LOCAL_SETUP.md](LOCAL_SETUP.md). Read the [application requirements review](docs/REQUIREMENTS_REVIEW.md) for the documented product scope and remaining functional gaps. See [the new design and screenshots](docs/UI_UX_DESIGN_SYSTEM.md) and [commercial release scope](docs/COMMERCIAL_RELEASE_PLAN.md).
 
 ---
 

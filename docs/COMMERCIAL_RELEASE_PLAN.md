@@ -1,5 +1,7 @@
 # Commercial web release
 
+See [the latest requirements review](REQUIREMENTS_REVIEW.md) for the three-document scope reconciliation, role/workflow matrix, and source findings against revision `2e75970`. Historical milestone evidence below is not a current feature-completion certificate.
+
 ## Agreed product boundaries
 
 The owner confirmed a web application first, external payment collection, and Hostinger VPS as the future deployment target. Hosting provisioning is deferred. Super Admin manually controls package, activation, suspension and subscription dates; no payment integration is required.

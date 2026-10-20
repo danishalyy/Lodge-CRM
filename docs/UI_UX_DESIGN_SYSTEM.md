@@ -1,16 +1,18 @@
-# SafariOS Liquid Glass
+# SafariOS — warm neutrals and translucent surfaces
 
-SafariOS uses a calm glass interface with a midnight background, restrained indigo/violet/teal ambient mesh, champagne identity accents, and Geist typography. Lodge names and private logos remain visible alongside SafariOS. This is a visual system; account and tenant authorization remain enforced by the existing API and guarded shells.
+SafariOS uses warm charcoal, ivory, and stone with translucent blurred surfaces. Page titles use Cormorant Garamond; navigation, forms, tables, and operational labels use Manrope. Primary actions are solid colors. There are no purple accents, colored background meshes, or decorative gradients. Lodge names and private logos remain visible alongside SafariOS.
+
+The user supplied Fitosauna as a visual reference. That domain was blocked by the execution environment, so this palette and font pairing are an implementation of the requested neutral direction, rather than a verified match to the reference. A reference screenshot is needed to match its exact colors and typography.
 
 ## Foundations
 
 `apps/web/app/design-system.css` is the shared visual source. `tailwind.config.ts` exposes the same semantic CSS variables to Tailwind. Both existing operational classes and new components inherit theme changes. The legacy `globals.css` provides structural compatibility; do not add another palette there.
 
-Dark is the default. An early layout script reads the saved `theme` preference before painting; `ThemeToggle` persists changes. Fonts ship locally through `geist`, without a runtime Google Fonts request. Theme colors use `--bg-base`, `--surface-glass`, `--text-primary`, `--text-secondary`, `--text-muted`, `--accent`, `--accent-hover`, `--premium`, and semantic status tokens.
+Dark is the default; the saved light preference is restored before paint. Fonts are bundled locally through `@fontsource`, with no runtime third-party font request. The semantic CSS variables are exposed to Tailwind, including font families `sans` and `serif`.
 
-The requested dark muted swatch `#6B7280` is retained as a palette token. Reading text uses the brighter `--tx3` instead, because the original muted swatch does not meet AA on these surfaces. Light mode uses darker status text and champagne text. Primary buttons layer a subtle dark overlay on the requested indigo/violet gradient for white-label contrast. Reserve raw palette swatches for decorative elements; use reading tokens for text. Check actual composited colors when introducing a new transparent surface.
+Dark: base `#191C18`, text `#F0EDE5`, stone accent `#C8BDAA`, and glass `rgba(237,231,219,.055)`. Light: base `#EEEAE1`, text `#292E26`, charcoal accent `#424C3B`, and glass `rgba(255,253,247,.62)`. Reading text uses the theme's secondary and muted tokens. Status colors use restrained sage, ochre, clay, and gray-green, with darker versions in light mode. Primary buttons use the contrasting `--acText` color.
 
-Glass uses blur 24px, saturation 180%, a translucent border, inner top highlight, and a soft shadow. Browsers without backdrop filtering receive opaque dark/light surfaces. Cards use 24px corners, dialogs 28px, fields 14px, and action buttons/chips pill corners. Space on an 8px grid with 24–32px card padding. Typography uses 12/14/16/20/28/40px, weight 600 headings, and tight heading tracking.
+Translucent surfaces use blur 24px, saturation 110%, fine neutral borders, a restrained inner highlight, and soft shadows. Static neutral background planes give the glass depth without colored gradients or moving blobs. Browsers without blur use solid theme surfaces. Cards retain 24px corners, dialogs 28px, fields 14px, and pill actions. Page headings are editorial serif; dense data and component titles remain sans serif. Motion stays subtle and respects reduced-motion preferences.
 
 ## Components and future screens
 

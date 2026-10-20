@@ -4,6 +4,10 @@ export default {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Manrope", "-apple-system", "sans-serif"],
+        serif: ["Cormorant Garamond", "Georgia", "serif"],
+      },
       colors: {
         "bg-base": "var(--bg-base)",
         "surface-glass": "var(--surface-glass)",

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Providers from "@/components/Providers";
-import { GeistSans } from "geist/font/sans";
+import "@fontsource/manrope/400.css";
+import "@fontsource/manrope/500.css";
+import "@fontsource/manrope/600.css";
+import "@fontsource/cormorant-garamond/500.css";
 import "./globals.css";
 import "./design-system.css";
 
@@ -16,12 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      data-theme="dark"
-      className={GeistSans.className}
-      suppressHydrationWarning
-    >
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

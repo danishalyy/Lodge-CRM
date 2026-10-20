@@ -7,8 +7,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       reducedMotion="user"
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
-      <div className="ambientMesh" aria-hidden="true">
-        <i />
+      <div className="surfaceBackdrop" aria-hidden="true">
         <i />
         <i />
       </div>

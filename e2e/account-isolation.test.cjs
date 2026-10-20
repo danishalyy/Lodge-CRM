@@ -217,7 +217,7 @@ test('branding validates inline, reduced motion is respected, and glass screensh
  await page.route('**/api/**',route=>route.fulfill({json:route.request().url().endsWith('/auth/me')?{id:'owner',full_name:'Platform Owner',is_super_admin:true,mfa_enabled:true,memberships:[]}:route.request().url().includes('/platform/lodges')?[lodge]:[]}));
  try{
   await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Acacia Lodge',exact:true}).waitFor();
-  assert.equal(await page.locator('.ambientMesh i').first().evaluate(el=>getComputedStyle(el).animationName),'none');
+  assert.equal(await page.locator('.surfaceBackdrop i').first().evaluate(el=>getComputedStyle(el).animationName),'none');
   fs.mkdirSync(path.resolve(__dirname,'../docs/screenshots'),{recursive:true});
   const capture=async name=>{await page.waitForTimeout(200);await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots',name),fullPage:true,animations:'disabled'})};
   await capture('safarios-lodges.png');

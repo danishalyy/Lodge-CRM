@@ -1,6 +1,6 @@
 # SafariOS — Lodge operations
 
-A co-branded lodge operations platform with a Liquid Glass interface with dark and light themes. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
+A co-branded lodge operations platform with a warm-neutral translucent interface with dark and light themes. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
 
 Start with [LOCAL_SETUP.md](LOCAL_SETUP.md). See [the new design and screenshots](docs/UI_UX_DESIGN_SYSTEM.md) and [commercial release scope](docs/COMMERCIAL_RELEASE_PLAN.md).
 
@@ -93,7 +93,7 @@ This build fixes the API startup NameError caused by workflow request schemas be
 
 ## v1.7 Premium UI / UX refresh
 
-The current web application uses the SafariOS Liquid Glass system: midnight glass surfaces, subtle ambient gradients, champagne identity accents, Geist typography, and a persisted light theme. Dashboards use real operational data. See [the shared design system](docs/UI_UX_DESIGN_SYSTEM.md) for component APIs and current screenshots.
+The current web application uses the SafariOS warm-neutral system: charcoal and ivory surfaces, subtle translucent blur, solid stone actions, Manrope controls, editorial serif page headings, and a persisted light theme. Dashboards use real operational data. See [the shared design system](docs/UI_UX_DESIGN_SYSTEM.md) for component APIs and current screenshots.
 
 Key UX additions:
 - responsive premium navigation with mobile drawer

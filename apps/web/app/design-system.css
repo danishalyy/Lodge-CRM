@@ -1446,61 +1446,76 @@ button {
   display: grid;
   place-items: center;
 }
-/* SafariOS Liquid Glass. Shared tokens apply to existing and future screens. */
+/* SafariOS warm stone and charcoal. Shared across every screen and theme. */
 :root {
-  --bg-base: #0b0d17;
-  --surface-glass: rgba(255, 255, 255, 0.07);
-  --text-primary: #f5f5f7;
-  --text-secondary: #a1a1aa;
-  --text-muted: #6b7280;
-  --accent: #6c63ff;
-  --accent-hover: #7c75ff;
-  --premium: #d4b483;
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --info: #60a5fa;
+  --bg-base: #191c18;
+  --surface-glass: rgba(237, 231, 219, 0.055);
+  --text-primary: #f0ede5;
+  --text-secondary: #c5c4ba;
+  --text-muted: #a5a79b;
+  --accent: #c8bdaa;
+  --accent-hover: #e1d7c5;
+  --premium: #c8bdaa;
+  --success: #b1c6aa;
+  --warning: #d8bd8c;
+  --danger: #e0a69a;
+  --info: #afc2bd;
   --bg: var(--bg-base);
-  --side: rgba(17, 20, 35, 0.83);
-  --card: rgba(255, 255, 255, 0.07);
-  --sec: rgba(255, 255, 255, 0.06);
-  --hov: rgba(255, 255, 255, 0.12);
-  --bd: rgba(255, 255, 255, 0.14);
-  --tx: var(--text-primary);
-  --tx2: #b5b5c2;
-  --tx3: #a1a1af;
-  --ac: var(--accent);
-  --ac2: var(--accent-hover);
-  --acText: #fff;
-  --red: var(--danger);
-  --amb: var(--warning);
-  --ok: var(--success);
-  --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.18);
-  color-scheme: dark;
-}
-:root[data-theme="light"] {
-  --bg-base: #f5f5f7;
-  --surface-glass: rgba(255, 255, 255, 0.65);
-  --text-primary: #191b2a;
-  --text-secondary: #525263;
-  --text-muted: #606272;
-  --bg: var(--bg-base);
-  --side: rgba(255, 255, 255, 0.8);
+  --side: rgba(32, 36, 30, 0.78);
   --card: var(--surface-glass);
-  --sec: rgba(30, 30, 70, 0.045);
-  --hov: rgba(50, 45, 100, 0.08);
-  --bd: rgba(30, 30, 70, 0.14);
+  --sec: rgba(237, 231, 219, 0.055);
+  --hov: rgba(237, 231, 219, 0.1);
+  --bd: rgba(228, 224, 211, 0.14);
   --tx: var(--text-primary);
   --tx2: var(--text-secondary);
   --tx3: var(--text-muted);
-  --red: #b42332;
-  --amb: #815600;
-  --ok: #087950;
-  --premium: #785626;
-  --shadow: 0 20px 60px rgba(25, 25, 60, 0.09);
+  --ac: var(--accent);
+  --ac2: var(--accent-hover);
+  --acText: #24281f;
+  --red: var(--danger);
+  --amb: var(--warning);
+  --ok: var(--success);
+  --selection: rgba(200, 189, 170, 0.12);
+  --focus-glow: rgba(200, 189, 170, 0.2);
+  --glass-fallback: #272b24;
+  --shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.1);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg-base: #eeeae1;
+  --surface-glass: rgba(255, 253, 247, 0.62);
+  --text-primary: #292e26;
+  --text-secondary: #51574c;
+  --text-muted: #62685d;
+  --accent: #424c3b;
+  --accent-hover: #30392b;
+  --premium: #59624c;
+  --success: #426340;
+  --warning: #7d591e;
+  --danger: #a63e32;
+  --info: #3b625a;
+  --bg: var(--bg-base);
+  --side: rgba(250, 248, 241, 0.78);
+  --card: var(--surface-glass);
+  --sec: rgba(54, 61, 44, 0.045);
+  --hov: rgba(54, 61, 44, 0.075);
+  --bd: rgba(54, 61, 44, 0.15);
+  --tx: var(--text-primary);
+  --tx2: var(--text-secondary);
+  --tx3: var(--text-muted);
+  --acText: #fcfaf3;
+  --red: var(--danger);
+  --amb: var(--warning);
+  --ok: var(--success);
+  --selection: rgba(66, 76, 59, 0.09);
+  --focus-glow: rgba(66, 76, 59, 0.14);
+  --glass-fallback: #f8f5ed;
+  --shadow: 0 16px 48px rgba(44, 49, 37, 0.07);
+  --shadow-sm: 0 8px 24px rgba(44, 49, 37, 0.04);
   color-scheme: light;
 }
+
 body {
   font-family: inherit;
   line-height: 1.6;
@@ -1544,40 +1559,35 @@ textarea:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--accent-hover);
   outline-offset: 4px;
-  box-shadow: 0 0 0 6px rgba(108, 99, 255, 0.16);
+  box-shadow: 0 0 0 6px var(--focus-glow);
 }
-.ambientMesh {
+.surfaceBackdrop {
   position: fixed;
   inset: 0;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+  background: var(--bg-base);
 }
-.ambientMesh i {
+.surfaceBackdrop i {
   position: absolute;
-  width: 55vw;
+  background: var(--sec);
+  border: 1px solid var(--bd);
+  width: 48vw;
+  height: 88vh;
+  border-radius: 160px;
+  right: -24vw;
+  top: 8vh;
+  transform: rotate(24deg);
+  opacity: 0.45;
+}
+.surfaceBackdrop i:nth-child(2) {
+  width: 42vw;
   height: 65vh;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.12;
-  background: #6c63ff;
-  animation: meshFloat 24s ease-in-out infinite alternate;
-}
-.ambientMesh i:nth-child(1) {
-  left: -15%;
-  top: -20%;
-}
-.ambientMesh i:nth-child(2) {
-  right: -20%;
-  top: 10%;
-  background: #8b5cf6;
-  animation-delay: -8s;
-}
-.ambientMesh i:nth-child(3) {
-  left: 25%;
-  bottom: -40%;
-  background: #14b8a6;
-  animation-delay: -16s;
+  left: -30vw;
+  top: 48vh;
+  transform: rotate(-18deg);
+  opacity: 0.35;
 }
 .grain {
   position: fixed;
@@ -1604,7 +1614,7 @@ select:focus-visible {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
 }
 .mainArea {
   background: transparent;
@@ -1646,11 +1656,11 @@ select:focus-visible {
 }
 .navItem.active {
   color: var(--tx);
-  background: rgba(108, 99, 255, 0.16);
+  background: var(--selection);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.09);
 }
 .navItem.active .navIcon {
-  color: #b7b2ff;
+  color: var(--ac2);
 }
 .navSection {
   font-size: 12px;
@@ -1694,7 +1704,7 @@ select:focus-visible {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
   transition:
     transform 0.2s ease,
     background 0.2s ease;
@@ -1730,10 +1740,10 @@ button.primary,
 .button.primary,
 .primaryButton,
 button.primary {
-  background: linear-gradient(135deg, #6c63ff, #8b5cf6);
-  color: white;
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 6px 20px rgba(108, 99, 255, 0.18);
+  background: var(--accent);
+  color: var(--acText);
+  border-color: transparent;
+  box-shadow: none;
 }
 .button.primary:hover {
   filter: brightness(1.1);
@@ -1796,7 +1806,7 @@ label {
   border-radius: 24px;
   background: var(--surface-glass);
   overflow: auto;
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
 }
 .dataTable {
   background: transparent;
@@ -1830,7 +1840,7 @@ label {
   padding: 24px 32px;
 }
 .premiumChart .chartBar {
-  background: linear-gradient(#8b5cf6, #6c63ff);
+  background: var(--accent);
   border-radius: 8px 8px 0 0;
 }
 .ringValue {
@@ -1853,7 +1863,7 @@ label {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
   outline: none;
 }
 .glassDialog {
@@ -1989,7 +1999,7 @@ label {
   .glassDrawer,
   .tableWrap,
   .bottomTabs {
-    background: #191d2d;
+    background: var(--glass-fallback);
   }
   :root[data-theme="light"] .panel,
   :root[data-theme="light"] .sidebar,
@@ -1997,7 +2007,7 @@ label {
   :root[data-theme="light"] .glassDrawer,
   :root[data-theme="light"] .tableWrap,
   :root[data-theme="light"] .bottomTabs {
-    background: #fafafd;
+    background: var(--glass-fallback);
   }
 }
 @keyframes meshFloat {
@@ -2065,7 +2075,7 @@ label {
     right: 16px;
     z-index: 50;
     background: var(--side);
-    backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(110%);
     border: 1px solid var(--bd);
     border-radius: 24px;
     padding: 8px;
@@ -2092,7 +2102,7 @@ label {
   }
   .bottomTabs [aria-current="page"] {
     color: var(--tx);
-    background: rgba(108, 99, 255, 0.2);
+    background: var(--selection);
   }
   .pageHeader h1 {
     font-size: 28px;
@@ -2138,7 +2148,7 @@ label {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
   padding: 28px;
   transition:
     transform 0.2s,
@@ -2224,7 +2234,7 @@ label {
   border-radius: 28px;
   overflow: hidden;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
 }
 .authShell {
   background: transparent;
@@ -2240,7 +2250,7 @@ label {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2) !important;
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
   padding: 32px !important;
 }
 .authStoryInner {
@@ -2258,7 +2268,7 @@ label {
   border: 1px solid var(--bd);
   border-radius: 24px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(110%);
 }
 .panelHead,
 .panelHeader,
@@ -2362,9 +2372,7 @@ label {
 .button.primary,
 .primaryButton,
 button.primary {
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12)),
-    linear-gradient(135deg, #6c63ff, #8b5cf6);
+  background-image: none;
 }
 .badge {
   display: inline-flex;
@@ -2419,7 +2427,7 @@ small,
   letter-spacing: -0.02em !important;
 }
 .authLinks a {
-  color: #c0baff;
+  color: var(--ac2);
 }
 .authSignals span,
 .authStoryInner .authFoot {
@@ -2435,7 +2443,7 @@ small,
   font-size: 14px;
 }
 :root[data-theme="light"] .authLinks a {
-  color: #5144c8;
+  color: var(--ac2);
 }
 .dashboardSkeleton > div {
   background: linear-gradient(90deg, var(--sec), var(--hov), var(--sec));
@@ -2476,10 +2484,8 @@ small,
   (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
 ) {
   :root {
-    --glass-fallback: #191d2d;
   }
   :root[data-theme="light"] {
-    --glass-fallback: #fafafd;
   }
   .panel,
   .statCard,
@@ -2571,7 +2577,7 @@ small,
   font-size: 28px;
 }
 :root[data-theme="light"] .navItem.active .navIcon {
-  color: #5144c8;
+  color: var(--ac2);
 }
 .glassDialog {
   transform: translate(-50%, -50%);
@@ -2582,4 +2588,116 @@ small,
     visibility: hidden;
   }
 }
-.glassCalendar .rdp-root{--rdp-accent-color:var(--accent);--rdp-day_button-border-radius:14px;--rdp-selected-border:2px solid var(--accent)}.glassCalendar .rdp-today:not(.rdp-selected){color:#c0baff}:root[data-theme=light] .glassCalendar .rdp-today:not(.rdp-selected){color:#5144c8}
+.glassCalendar .rdp-root {
+  --rdp-accent-color: var(--accent);
+  --rdp-day_button-border-radius: 14px;
+  --rdp-selected-border: 2px solid var(--accent);
+}
+.glassCalendar .rdp-today:not(.rdp-selected) {
+  color: var(--ac2);
+}
+:root[data-theme="light"] .glassCalendar .rdp-today:not(.rdp-selected) {
+  color: var(--ac2);
+}
+
+/* Editorial typography, with compact operational labels in the UI font. */
+html {
+  font-family:
+    "Manrope",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+h1,
+h2,
+h3 {
+  font-family:
+    "Manrope",
+    -apple-system,
+    sans-serif;
+}
+.pageHeader h1,
+.authStatement h1,
+.authCard h1,
+.drawerHead h1,
+.confirmationDialog h2 {
+  font-family: "Cormorant Garamond", Georgia, serif !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.025em !important;
+}
+.pageHeader h1 {
+  font-size: 48px;
+}
+.authStatement h1 {
+  font-size: 56px !important;
+  line-height: 1.05 !important;
+  max-width: 560px;
+}
+.authCard h1 {
+  font-size: 36px;
+}
+.drawerHead h1 {
+  font-size: 36px;
+}
+.safariBrand strong {
+  font-weight: 500;
+  letter-spacing: -0.05em;
+}
+.safariMark,
+.safariBrand strong span {
+  color: var(--tx);
+}
+.metricCard strong {
+  color: var(--tx);
+  font-weight: 500;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--tx2);
+}
+.panel,
+.metricCard,
+.propertyCard,
+.sidebar,
+.authCard,
+.glassDialog,
+.glassDrawer {
+  box-shadow:
+    var(--shadow),
+    inset 0 1px rgba(255, 255, 255, 0.08);
+}
+.button.primary:hover,
+.primaryButton:hover {
+  background: var(--accent-hover);
+  filter: none;
+}
+.okText {
+  color: var(--ok) !important;
+}
+.grain {
+  opacity: 0.018;
+}
+.authStory {
+  border-right: 1px solid var(--bd);
+}
+.authStatement p {
+  max-width: 440px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.authSignals {
+  border-color: var(--bd);
+}
+@media (max-width: 640px) {
+  .pageHeader h1 {
+    font-size: 40px;
+  }
+  .authStatement h1 {
+    font-size: 40px !important;
+  }
+  .authCard h1 {
+    font-size: 32px;
+  }
+}

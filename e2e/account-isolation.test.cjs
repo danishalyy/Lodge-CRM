@@ -178,12 +178,21 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(39, 34, 26)');
+  const primary=page.getByRole('button',{name:/Register lodge/});
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(210, 148, 45)',text:'rgb(39, 34, 26)'});
+  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/Archivo Narrow/);
+  assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Archivo/);
+
   assert.equal(await page.locator('.sidebar').evaluate(el=>Math.round(el.getBoundingClientRect().left)),16);
   await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
   assert.equal(await page.locator('html').getAttribute('data-sidebar'),'collapsed');
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Toggle light and dark theme'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(252, 246, 236)');
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(210, 148, 45)',text:'rgb(39, 34, 26)'});
+
   await page.reload();await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
   await page.setViewportSize({width:390,height:844});

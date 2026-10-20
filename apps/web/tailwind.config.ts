@@ -5,10 +5,17 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Manrope", "-apple-system", "sans-serif"],
-        serif: ["Cormorant Garamond", "Georgia", "serif"],
+        sans: ["Archivo", "-apple-system", "sans-serif"],
+        heading: ["Archivo Narrow", "Archivo", "sans-serif"],
+        display: ["Fraunces", "Georgia", "serif"],
       },
       colors: {
+        beige: "var(--color-beige)",
+        gray: "var(--color-gray)",
+        brown: "var(--color-brown)",
+        orange: "var(--color-orange)",
+        "brown-20": "var(--color-brown-20)",
+        "beige-20": "var(--color-beige-20)",
         "bg-base": "var(--bg-base)",
         "surface-glass": "var(--surface-glass)",
         "text-primary": "var(--text-primary)",
@@ -22,7 +29,18 @@ export default {
         danger: "var(--danger)",
         info: "var(--info)",
       },
-      borderRadius: { card: "24px", modal: "28px", input: "14px" },
+      borderRadius: {
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        pill: "var(--radius-pill)",
+        card: "var(--radius-lg)",
+        modal: "var(--radius-xl)",
+        input: "var(--radius-md)",
+      },
+      transitionDuration: { fast: "200ms", base: "300ms", slow: "500ms" },
+      transitionTimingFunction: { DEFAULT: "ease" },
       fontSize: {
         xs: "12px",
         sm: "14px",
@@ -30,6 +48,7 @@ export default {
         lg: "20px",
         xl: "28px",
         "2xl": "40px",
+        "3xl": "56px",
       },
     },
   },

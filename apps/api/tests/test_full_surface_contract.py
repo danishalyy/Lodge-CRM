@@ -179,7 +179,8 @@ def test_web_api_has_csrf_header_support_and_credentials():
 
 def test_ui_has_glass_design_tokens_and_reduced_motion():
     css=(WEB/'app'/'design-system.css').read_text().lower()
-    assert '--bg-base: #191c18' in css
+    assert '--color-brown: #27221a' in css
+    assert '--bg-base: var(--color-brown)' in css
     assert '--surface-glass:' in css and 'backdrop-filter:' in css
     assert '@supports not' in css and 'data-theme="light"' in css
     assert 'prefers-reduced-motion' in css

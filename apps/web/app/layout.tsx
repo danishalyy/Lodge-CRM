@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Providers from "@/components/Providers";
-import "@fontsource/manrope/400.css";
-import "@fontsource/manrope/500.css";
-import "@fontsource/manrope/600.css";
-import "@fontsource/cormorant-garamond/500.css";
+import "@fontsource/archivo/400.css";
+import "@fontsource/archivo/500.css";
+import "@fontsource/archivo/600.css";
+import "@fontsource/archivo-narrow/600.css";
+import "@fontsource/fraunces/600.css";
 import "./globals.css";
 import "./design-system.css";
 

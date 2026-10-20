@@ -1,18 +1,33 @@
-# SafariOS — warm neutrals and translucent surfaces
+# SafariOS brand and translucent design system
 
-SafariOS uses warm charcoal, ivory, and stone with translucent blurred surfaces. Page titles use Cormorant Garamond; navigation, forms, tables, and operational labels use Manrope. Primary actions are solid colors. There are no purple accents, colored background meshes, or decorative gradients. Lodge names and private logos remain visible alongside SafariOS.
-
-The user supplied Fitosauna as a visual reference. That domain was blocked by the execution environment, so this palette and font pairing are an implementation of the requested neutral direction, rather than a verified match to the reference. A reference screenshot is needed to match its exact colors and typography.
+The owner-supplied palette is the source of truth for every screen and future component. Lodge identity remains visible alongside SafariOS; role and tenant permissions are unchanged.
 
 ## Foundations
 
-`apps/web/app/design-system.css` is the shared visual source. `tailwind.config.ts` exposes the same semantic CSS variables to Tailwind. Both existing operational classes and new components inherit theme changes. The legacy `globals.css` provides structural compatibility; do not add another palette there.
+`apps/web/app/design-system.css` defines the shared CSS tokens; `tailwind.config.ts` exposes the same palette, fonts, radius, duration, and type scale. Legacy operational classes inherit these semantic tokens. Do not create a second palette in a page or in `globals.css`.
 
-Dark is the default; the saved light preference is restored before paint. Fonts are bundled locally through `@fontsource`, with no runtime third-party font request. The semantic CSS variables are exposed to Tailwind, including font families `sans` and `serif`.
+| CSS token | Exact value | Tailwind color |
+| --- | --- | --- |
+| `--color-beige` | `#FCF6EC` | `beige` |
+| `--color-gray` | `#F3EDE2` | `gray` |
+| `--color-brown` | `#27221A` | `brown` |
+| `--color-orange` | `#D2942D` | `orange` |
+| `--color-brown-20` | `rgba(39,34,26,0.2)` | `brown-20` |
+| `--color-beige-20` | `rgba(252,246,236,0.2)` | `beige-20` |
 
-Dark: base `#191C18`, text `#F0EDE5`, stone accent `#C8BDAA`, and glass `rgba(237,231,219,.055)`. Light: base `#EEEAE1`, text `#292E26`, charcoal accent `#424C3B`, and glass `rgba(255,253,247,.62)`. Reading text uses the theme's secondary and muted tokens. Status colors use restrained sage, ochre, clay, and gray-green, with darker versions in light mode. Primary buttons use the contrasting `--acText` color.
+Dark mode uses brown background, beige text, glass `rgba(252,246,236,.08)`, and beige-20 borders. Light uses beige background, brown text, glass `rgba(252,246,236,.6)`, and brown-20 borders. Both use blur 24px and saturation 160%. The saved theme is restored before paint; dark remains the default.
 
-Translucent surfaces use blur 24px, saturation 110%, fine neutral borders, a restrained inner highlight, and soft shadows. Static neutral background planes give the glass depth without colored gradients or moving blobs. Browsers without blur use solid theme surfaces. Cards retain 24px corners, dialogs 28px, fields 14px, and pill actions. Page headings are editorial serif; dense data and component titles remain sans serif. Motion stays subtle and respects reduced-motion preferences.
+Primary buttons are solid orange with brown text in both themes. Active selections, focus glow, chart accents, and numerical highlights use orange. Small text on beige must remain brown. Reading accents therefore use `--text-accent` (orange in dark mode, brown in light); large figures retain an orange underline in light mode to preserve contrast. Muted success, warning, danger, and info colors use sage, ochre, clay, and gray-green, with darker text variants in light mode. Evaluate contrast against the composited surface, not just the background token.
+
+A low-opacity, heavily blurred mesh uses orange, beige, and a lighter brown. Reduced-motion preferences disable its drift. Browsers without backdrop filtering receive solid theme surfaces. Avoid unrelated colored glows or purple gradients.
+
+## Typography and shape
+
+Headings: Archivo Narrow, weight 600, tracking -0.02em. Body and controls: Archivo, weights 400/500/600. Display: Fraunces 600 only for hero titles and large numbers. No licensed Swizzy Trial font was provided, so the requested Fraunces fallback is bundled locally. Fonts do not require a third-party runtime request.
+
+Section labels and tags use uppercase text and tracking 0.08em. The shared scale is 12/14/16/20/28/40/56px. CSS font tokens are `--font-body`, `--font-heading`, `--font-display`; Tailwind families are `font-sans`, `font-heading`, `font-display`.
+
+Radius tokens are sm 12px, md 16px, lg 24px for cards, xl 28px for dialogs, and pill 9999px for buttons/chips. CSS uses `--radius-*`; Tailwind exposes the same names plus semantic aliases `card`, `modal`, and `input`. Transitions use fast 0.2s ease, base 0.3s ease, slow 0.5s ease. Framer Motion supplies springs for larger page/dialog movements and honors reduced motion.
 
 ## Components and future screens
 

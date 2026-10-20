@@ -10,6 +10,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <div className="surfaceBackdrop" aria-hidden="true">
         <i />
         <i />
+        <i />
       </div>
       <div className="grain" aria-hidden="true" />
       {children}

@@ -75,7 +75,7 @@ button {
   height: 100%;
 }
 .safariBrand strong {
-  font-size: 23px;
+  font-size: 20px;
   line-height: 1.1;
   font-weight: 650;
   letter-spacing: -1px;
@@ -86,7 +86,7 @@ button {
 }
 .safariBrand small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 0.18em;
   color: var(--tx3);
   margin-top: 5px;
@@ -95,17 +95,17 @@ button {
   gap: 4px;
 }
 .navSection {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   font-weight: 600;
   padding: 20px 12px 8px;
   color: var(--tx3);
 }
 .navItem {
-  font-size: 13px;
+  font-size: 14px;
   padding: 11px 13px;
   gap: 13px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   min-height: 43px;
   font-weight: 450;
 }
@@ -139,7 +139,7 @@ button {
   border: 0;
 }
 .roleBox label {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tx3);
   letter-spacing: 0.12em;
   margin-bottom: 9px;
@@ -149,7 +149,7 @@ button {
   font-size: 12px;
   background: var(--card);
   border: 1px solid var(--bd);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 .lodgeMini {
   background: none;
@@ -171,7 +171,7 @@ button {
   height: 42px;
   background: var(--sec);
   border: 1px solid var(--bd);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
   grid-row: span 2;
@@ -187,17 +187,17 @@ button {
   padding: 3px;
 }
 .lodgeIdentity strong {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 .lodgeIdentity small {
-  font-size: 10px;
+  font-size: 12px;
   margin: 0;
   letter-spacing: 0.02em;
 }
 .lodgeMini > small {
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 13px;
 }
 .lodgeMini > small:last-child {
@@ -210,18 +210,18 @@ button {
   border-bottom: 1px solid var(--bd);
 }
 .platformBadge span {
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   color: var(--ac);
 }
 .platformBadge strong {
   display: block;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 500;
   margin: 8px 0 3px;
 }
 .platformBadge small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tx3);
 }
 .sidebarFooter {
@@ -235,7 +235,7 @@ button {
 }
 .sidebarFooter small,
 .profileText small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tx3);
   display: block;
   word-break: break-word;
@@ -246,7 +246,7 @@ button {
   color: var(--ac);
   border: 1px solid var(--bd);
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
   width: 36px;
   height: 36px;
   flex-shrink: 0;
@@ -288,10 +288,10 @@ button {
   border: 1px solid var(--bd);
   background: transparent;
   color: var(--tx2);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 .topActions .button {
-  font-size: 11px;
+  font-size: 12px;
   min-height: 36px;
   padding: 6px 12px;
 }
@@ -305,7 +305,7 @@ button {
   gap: 24px;
 }
 .pageHeader h1 {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 500;
   letter-spacing: -1.1px;
   line-height: 1.25;
@@ -319,7 +319,7 @@ button {
   margin: 0;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.17em;
   color: var(--ac);
@@ -330,7 +330,7 @@ button {
   background: var(--sec);
   color: var(--tx);
   padding: 11px 17px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   min-height: 43px;
   font-size: 12px;
   line-height: 1.4;
@@ -371,7 +371,7 @@ button {
 .propertyCard {
   background: var(--card);
   border: 1px solid var(--bd);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: none;
   transition: none;
 }
@@ -389,7 +389,7 @@ button {
 }
 .panelHeader h2,
 .card h2 {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 550;
   letter-spacing: -0.02em;
   text-transform: none;
@@ -400,7 +400,7 @@ button {
   margin: 5px 0 0;
 }
 .panel h2 {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 500;
   letter-spacing: -0.025em;
   margin-top: 0;
@@ -424,7 +424,7 @@ button {
   min-height: 150px;
 }
 .metricCard strong {
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 450;
   letter-spacing: -1.4px;
   line-height: 1.2;
@@ -444,12 +444,12 @@ button {
 }
 .dataTable,
 .table {
-  font-size: 13px;
+  font-size: 14px;
 }
 .dataTable th,
 .table th {
   padding: 16px 22px;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 550;
@@ -460,13 +460,13 @@ button {
 .dataTable td,
 .table td {
   padding: 19px 22px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   border-color: var(--bd);
 }
 .dataTable td small,
 .table td small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tx3);
 }
 .dataTable tr:hover td {
@@ -477,7 +477,7 @@ button {
 }
 .statusPill,
 .tag {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.01em;
   padding: 5px 9px;
   border: 1px solid var(--bd);
@@ -502,8 +502,8 @@ button {
 .textarea {
   background: var(--bg);
   border: 1px solid var(--bd);
-  border-radius: 5px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
   padding: 12px 13px;
   min-height: 44px;
   width: 100%;
@@ -528,7 +528,7 @@ button {
   margin: 20px 0 8px;
 }
 .fieldHint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tx3);
   line-height: 1.7;
   margin: 10px 0;
@@ -557,13 +557,13 @@ button {
 }
 .empty {
   padding: 40px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--tx3);
 }
 .dangerText,
 .authError {
   color: var(--red);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
 }
 .notice {
@@ -571,8 +571,8 @@ button {
   border: 1px solid var(--bd);
   border-left: 2px solid var(--ok);
   background: var(--card);
-  border-radius: 5px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
   color: var(--tx);
 }
 .filterPanel {
@@ -580,19 +580,19 @@ button {
   padding: 18px 22px;
   align-items: flex-end;
   gap: 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .filterGroup {
   gap: 16px;
   flex-wrap: wrap;
 }
 .filterGroup label {
-  font-size: 11px;
+  font-size: 12px;
 }
 .taskMain strong,
 .arrivalRow strong,
 .timelineRow strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 .taskMain small,
@@ -600,7 +600,7 @@ button {
 .timelineRow small,
 .arrivalRow span,
 .taskMeta > span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .taskRow,
 .arrivalRow,
@@ -614,7 +614,7 @@ button {
 }
 .row {
   padding: 14px 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 .chartBar {
   background: var(--ac);
@@ -622,14 +622,14 @@ button {
   animation: none;
 }
 .chartLabel {
-  font-size: 10px;
+  font-size: 12px;
 }
 .ringLegend span,
 .ringCenter span {
-  font-size: 10px;
+  font-size: 12px;
 }
 .statusTile span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .summaryStrip {
   gap: 16px;
@@ -640,7 +640,7 @@ button {
   margin: auto;
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ac);
   letter-spacing: 0.02em;
 }
@@ -658,12 +658,12 @@ button {
   border-top: 1px solid var(--bd);
 }
 .collectionToolbar strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 .collectionToolbar > div > span {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tx3);
   margin-top: 3px;
 }
@@ -672,7 +672,7 @@ button {
   align-items: center;
   gap: 12px;
   border: 1px solid var(--bd);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   color: var(--tx3);
   width: 280px;
@@ -712,7 +712,7 @@ button {
   border-radius: 9px;
   overflow: hidden;
   color: var(--ac);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 450;
 }
 .propertyLogo img {
@@ -722,7 +722,7 @@ button {
   padding: 5px;
 }
 .propertyCard h2 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 500;
   letter-spacing: -0.6px;
   margin: 0 0 5px;
@@ -741,17 +741,17 @@ button {
   gap: 12px;
 }
 .propertyDetails dt {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tx3);
   margin-bottom: 6px;
 }
 .propertyDetails dd {
-  font-size: 13px;
+  font-size: 14px;
   margin: 0;
   font-weight: 450;
 }
 .propertyProvider {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--tx3);
   margin-bottom: 24px;
@@ -766,7 +766,7 @@ button {
   gap: 8px;
 }
 .propertyActions .button {
-  font-size: 11px;
+  font-size: 12px;
   padding: 10px 12px;
   min-height: 39px;
 }
@@ -781,7 +781,7 @@ button {
   margin-bottom: 18px;
 }
 .propertyEmpty h2 {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 450;
 }
 .propertyEmpty p {
@@ -795,7 +795,7 @@ button {
   margin-bottom: 28px;
 }
 .activationPanel p {
-  font-size: 13px;
+  font-size: 14px;
 }
 .logoUpload {
   display: flex;
@@ -807,7 +807,7 @@ button {
   width: 86px;
   height: 86px;
   border: 1px dashed var(--tx3);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
   background: var(--bg);
   display: grid;
@@ -825,7 +825,7 @@ button {
   margin: 0 0 9px;
 }
 .logoUpload input {
-  font-size: 11px;
+  font-size: 12px;
   max-width: 100%;
   min-width: 0;
 }
@@ -840,7 +840,7 @@ button {
   background: var(--bg);
 }
 .brandNote strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 .brandNote p {
@@ -909,7 +909,7 @@ button {
   place-items: center;
   background: transparent;
   border: 1px solid var(--bd);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: var(--tx3);
   flex-shrink: 0;
 }
@@ -966,7 +966,7 @@ button {
   max-width: 580px;
 }
 .authStatement .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.2em;
   margin-bottom: 24px;
 }
@@ -1001,14 +1001,14 @@ button {
   border: 0;
   border-radius: 0;
   padding: 0;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tx2);
 }
 .authSignals .statusDot {
   display: none;
 }
 .authFoot {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.02em;
   margin-top: 24px;
   color: var(--tx3);
@@ -1029,7 +1029,7 @@ button {
   border-radius: 0;
 }
 .authCard .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 16px;
 }
 .authCard h1 {
@@ -1040,7 +1040,7 @@ button {
   margin: 0 0 12px;
 }
 .authCard > p {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--tx3);
   margin-bottom: 36px;
 }
@@ -1059,7 +1059,7 @@ button {
   letter-spacing: 0.01em;
 }
 .authLinks {
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -1070,7 +1070,7 @@ button {
   text-decoration: none;
 }
 .authLinks span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tx3);
 }
 .authError {
@@ -1093,14 +1093,14 @@ button {
 .commandPalette {
   background: var(--card);
   border: 1px solid var(--bd);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
 }
 .commandInput {
   padding: 20px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .commandResults button {
-  font-size: 13px;
+  font-size: 14px;
   padding: 15px 20px;
 }
 .mobileBackdrop {
@@ -1210,7 +1210,7 @@ button {
     height: 33px;
   }
   .authStory .safariBrand strong {
-    font-size: 21px;
+    font-size: 20px;
   }
   .authStatement {
     padding: 32px 0 6px;
@@ -1241,7 +1241,7 @@ button {
     max-width: none;
   }
   .authCard h1 {
-    font-size: 24px;
+    font-size: 28px;
   }
   .authCard > p {
     margin-bottom: 24px;
@@ -1259,7 +1259,7 @@ button {
   }
   .topContext {
     gap: 10px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .content {
     padding: 26px 18px;
@@ -1273,7 +1273,7 @@ button {
     font-size: 29px;
   }
   .pageHeader p {
-    font-size: 13px;
+    font-size: 14px;
   }
   .pageHeader > .button {
     width: 100%;
@@ -1320,7 +1320,7 @@ button {
     min-height: 130px;
   }
   .metricCard strong {
-    font-size: 30px;
+    font-size: 28px;
   }
   .panel {
     padding: 20px;
@@ -1341,7 +1341,7 @@ button {
     display: none;
   }
   .authLinks span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .commandPalette {
     width: calc(100vw - 32px);
@@ -1438,7 +1438,7 @@ button {
   }
 }
 .metricTop > span:first-child {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 450;
   color: var(--tx2);
 }
@@ -1446,73 +1446,89 @@ button {
   display: grid;
   place-items: center;
 }
-/* SafariOS warm stone and charcoal. Shared across every screen and theme. */
+/* SafariOS brand source: exact owner-supplied palette, semantic reading tokens. */
 :root {
-  --bg-base: #191c18;
-  --surface-glass: rgba(237, 231, 219, 0.055);
-  --text-primary: #f0ede5;
-  --text-secondary: #c5c4ba;
-  --text-muted: #a5a79b;
-  --accent: #c8bdaa;
-  --accent-hover: #e1d7c5;
-  --premium: #c8bdaa;
-  --success: #b1c6aa;
-  --warning: #d8bd8c;
-  --danger: #e0a69a;
-  --info: #afc2bd;
+  --color-beige: #fcf6ec;
+  --color-gray: #f3ede2;
+  --color-brown: #27221a;
+  --color-orange: #d2942d;
+  --color-brown-20: rgba(39, 34, 26, 0.2);
+  --color-beige-20: rgba(252, 246, 236, 0.2);
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+  --radius-pill: 9999px;
+  --transition-fast: 0.2s ease;
+  --transition-base: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --font-body:
+    "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: "Archivo Narrow", "Archivo", sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --bg-base: var(--color-brown);
+  --surface-glass: rgba(252, 246, 236, 0.08);
+  --text-primary: var(--color-beige);
+  --text-secondary: #d6cdbf;
+  --text-muted: #bbb1a1;
+  --accent: var(--color-orange);
+  --accent-hover: var(--color-orange);
+  --text-accent: var(--color-orange);
+  --premium: var(--text-accent);
+  --success: #b4c59b;
+  --warning: #dfc18d;
+  --danger: #e0a99a;
+  --info: #b0c2bd;
   --bg: var(--bg-base);
-  --side: rgba(32, 36, 30, 0.78);
+  --side: var(--surface-glass);
   --card: var(--surface-glass);
-  --sec: rgba(237, 231, 219, 0.055);
-  --hov: rgba(237, 231, 219, 0.1);
-  --bd: rgba(228, 224, 211, 0.14);
+  --sec: rgba(252, 246, 236, 0.06);
+  --hov: rgba(252, 246, 236, 0.12);
+  --bd: var(--color-beige-20);
   --tx: var(--text-primary);
   --tx2: var(--text-secondary);
   --tx3: var(--text-muted);
-  --ac: var(--accent);
-  --ac2: var(--accent-hover);
-  --acText: #24281f;
+  --ac: var(--text-accent);
+  --ac2: var(--text-accent);
+  --acText: var(--color-brown);
   --red: var(--danger);
   --amb: var(--warning);
   --ok: var(--success);
-  --selection: rgba(200, 189, 170, 0.12);
-  --focus-glow: rgba(200, 189, 170, 0.2);
-  --glass-fallback: #272b24;
-  --shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
-  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --selection: rgba(210, 148, 45, 0.16);
+  --focus-glow: rgba(210, 148, 45, 0.22);
+  --glass-fallback: #383127;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.12);
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --bg-base: #eeeae1;
-  --surface-glass: rgba(255, 253, 247, 0.62);
-  --text-primary: #292e26;
-  --text-secondary: #51574c;
-  --text-muted: #62685d;
-  --accent: #424c3b;
-  --accent-hover: #30392b;
-  --premium: #59624c;
-  --success: #426340;
-  --warning: #7d591e;
-  --danger: #a63e32;
-  --info: #3b625a;
+  --bg-base: var(--color-beige);
+  --surface-glass: rgba(252, 246, 236, 0.6);
+  --text-primary: var(--color-brown);
+  --text-secondary: #534a3c;
+  --text-muted: #6a604f;
+  --text-accent: var(--color-brown);
+  --success: #45613b;
+  --warning: #76531c;
+  --danger: #a34432;
+  --info: #3c625b;
   --bg: var(--bg-base);
-  --side: rgba(250, 248, 241, 0.78);
+  --side: var(--surface-glass);
   --card: var(--surface-glass);
-  --sec: rgba(54, 61, 44, 0.045);
-  --hov: rgba(54, 61, 44, 0.075);
-  --bd: rgba(54, 61, 44, 0.15);
+  --sec: rgba(39, 34, 26, 0.035);
+  --hov: rgba(39, 34, 26, 0.065);
+  --bd: var(--color-brown-20);
   --tx: var(--text-primary);
   --tx2: var(--text-secondary);
   --tx3: var(--text-muted);
-  --acText: #fcfaf3;
   --red: var(--danger);
   --amb: var(--warning);
   --ok: var(--success);
-  --selection: rgba(66, 76, 59, 0.09);
-  --focus-glow: rgba(66, 76, 59, 0.14);
-  --glass-fallback: #f8f5ed;
-  --shadow: 0 16px 48px rgba(44, 49, 37, 0.07);
-  --shadow-sm: 0 8px 24px rgba(44, 49, 37, 0.04);
+  --selection: rgba(210, 148, 45, 0.16);
+  --focus-glow: rgba(210, 148, 45, 0.22);
+  --glass-fallback: var(--color-gray);
+  --shadow: 0 20px 60px rgba(39, 34, 26, 0.08);
+  --shadow-sm: 0 8px 24px rgba(39, 34, 26, 0.045);
   color-scheme: light;
 }
 
@@ -1571,23 +1587,43 @@ select:focus-visible {
 }
 .surfaceBackdrop i {
   position: absolute;
-  background: var(--sec);
-  border: 1px solid var(--bd);
-  width: 48vw;
-  height: 88vh;
-  border-radius: 160px;
-  right: -24vw;
-  top: 8vh;
-  transform: rotate(24deg);
-  opacity: 0.45;
+  width: 54vw;
+  height: 64vh;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.09;
+  background: radial-gradient(ellipse, var(--color-orange), transparent 70%);
+  right: -12vw;
+  top: -12vh;
+  animation: brandMeshDrift 28s ease-in-out infinite alternate;
 }
 .surfaceBackdrop i:nth-child(2) {
-  width: 42vw;
-  height: 65vh;
-  left: -30vw;
-  top: 48vh;
-  transform: rotate(-18deg);
-  opacity: 0.35;
+  background: radial-gradient(ellipse, var(--color-beige), transparent 70%);
+  left: -24vw;
+  top: 45vh;
+  opacity: 0.055;
+  animation-delay: -10s;
+}
+.surfaceBackdrop i:nth-child(3) {
+  background: radial-gradient(ellipse, #64513b, transparent 70%);
+  right: 15vw;
+  top: 70vh;
+  opacity: 0.18;
+  animation-delay: -20s;
+}
+:root[data-theme="light"] .surfaceBackdrop i {
+  opacity: 0.1;
+}
+:root[data-theme="light"] .surfaceBackdrop i:nth-child(2) {
+  opacity: 0.6;
+}
+:root[data-theme="light"] .surfaceBackdrop i:nth-child(3) {
+  opacity: 0.065;
+}
+@keyframes brandMeshDrift {
+  to {
+    transform: translate(8%, 12%) scale(1.12);
+  }
 }
 .grain {
   position: fixed;
@@ -1614,7 +1650,7 @@ select:focus-visible {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
 }
 .mainArea {
   background: transparent;
@@ -1649,7 +1685,7 @@ select:focus-visible {
   letter-spacing: 0.12em;
 }
 .navItem {
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   padding: 12px;
   min-height: 44px;
   color: var(--tx2);
@@ -1676,7 +1712,7 @@ select:focus-visible {
   color: var(--premium);
 }
 .lodgeLogo {
-  border-radius: 14px;
+  border-radius: var(--radius-md);
 }
 .platformBadge {
   padding: 16px 4px;
@@ -1704,7 +1740,7 @@ select:focus-visible {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
   transition:
     transform 0.2s ease,
     background 0.2s ease;
@@ -1777,7 +1813,7 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 select,
 textarea,
 .roleSelect {
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--sec);
   border: 1px solid var(--bd);
   min-height: 44px;
@@ -1806,7 +1842,7 @@ label {
   border-radius: 24px;
   background: var(--surface-glass);
   overflow: auto;
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
 }
 .dataTable {
   background: transparent;
@@ -1833,7 +1869,7 @@ label {
 .errorBox,
 .errorBanner {
   color: var(--red);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
 }
 .workspaceFooter {
   color: var(--tx3);
@@ -1863,7 +1899,7 @@ label {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
   outline: none;
 }
 .glassDialog {
@@ -1926,7 +1962,7 @@ label {
   border: 0 !important;
 }
 .skeleton {
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   min-height: 24px;
   background: linear-gradient(
     90deg,
@@ -2075,7 +2111,7 @@ label {
     right: 16px;
     z-index: 50;
     background: var(--side);
-    backdrop-filter: blur(24px) saturate(110%);
+    backdrop-filter: blur(24px) saturate(160%);
     border: 1px solid var(--bd);
     border-radius: 24px;
     padding: 8px;
@@ -2148,7 +2184,7 @@ label {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
   padding: 28px;
   transition:
     transform 0.2s,
@@ -2159,7 +2195,7 @@ label {
   background: var(--hov);
 }
 .propertyLogo {
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   background: var(--sec);
   color: var(--premium);
 }
@@ -2181,7 +2217,7 @@ label {
 }
 .glassCalendar {
   --rdp-accent-color: var(--accent);
-  --rdp-day_button-border-radius: 14px;
+  --rdp-day_button-border-radius: var(--radius-md);
   --rdp-selected-border: 2px solid var(--accent);
   padding: 16px;
 }
@@ -2209,7 +2245,7 @@ label {
   align-items: center;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .commandPalette [cmdk-item][data-selected="true"] {
@@ -2234,7 +2270,7 @@ label {
   border-radius: 28px;
   overflow: hidden;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
 }
 .authShell {
   background: transparent;
@@ -2250,7 +2286,7 @@ label {
   box-shadow:
     var(--shadow),
     inset 0 1px rgba(255, 255, 255, 0.2) !important;
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
   padding: 32px !important;
 }
 .authStoryInner {
@@ -2268,7 +2304,7 @@ label {
   border: 1px solid var(--bd);
   border-radius: 24px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(24px) saturate(110%);
+  backdrop-filter: blur(24px) saturate(160%);
 }
 .panelHead,
 .panelHeader,
@@ -2590,7 +2626,7 @@ small,
 }
 .glassCalendar .rdp-root {
   --rdp-accent-color: var(--accent);
-  --rdp-day_button-border-radius: 14px;
+  --rdp-day_button-border-radius: var(--radius-md);
   --rdp-selected-border: 2px solid var(--accent);
 }
 .glassCalendar .rdp-today:not(.rdp-selected) {
@@ -2600,62 +2636,84 @@ small,
   color: var(--ac2);
 }
 
-/* Editorial typography, with compact operational labels in the UI font. */
+/* Shared typography: display faces are limited to hero titles and large figures. */
 html {
-  font-family:
-    "Manrope",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-body);
+}
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body);
 }
 h1,
 h2,
-h3 {
-  font-family:
-    "Manrope",
-    -apple-system,
-    sans-serif;
-}
+h3,
+h4,
+h5,
+h6,
 .pageHeader h1,
-.authStatement h1,
 .authCard h1,
 .drawerHead h1,
 .confirmationDialog h2 {
-  font-family: "Cormorant Garamond", Georgia, serif !important;
-  font-weight: 500 !important;
-  letter-spacing: -0.025em !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
 }
 .pageHeader h1 {
-  font-size: 48px;
+  font-size: 40px;
+  line-height: 1.15;
+}
+.authCard h1,
+.drawerHead h1 {
+  font-size: 28px;
 }
 .authStatement h1 {
+  font-family: var(--font-display) !important;
   font-size: 56px !important;
-  line-height: 1.05 !important;
-  max-width: 560px;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.1 !important;
+  max-width: 600px;
 }
-.authCard h1 {
-  font-size: 36px;
+.metricCard strong,
+.statValue,
+.metricValue,
+.ringCenter strong {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
 }
-.drawerHead h1 {
-  font-size: 36px;
+.metricCard strong,
+.statValue,
+.metricValue {
+  color: var(--text-accent);
+  font-size: 40px;
 }
 .safariBrand strong {
-  font-weight: 500;
-  letter-spacing: -0.05em;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .safariMark,
 .safariBrand strong span {
-  color: var(--tx);
+  color: var(--text-accent);
 }
-.metricCard strong {
-  color: var(--tx);
-  font-weight: 500;
-}
-.eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.16em;
+.eyebrow,
+.navSection,
+.panelKicker,
+.platformBadge > span {
+  font-size: 12px;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--tx2);
+}
+.tag,
+.badge {
+  font-size: 12px;
+  letter-spacing: 0.08em;
 }
 .panel,
 .metricCard,
@@ -2666,12 +2724,21 @@ h3 {
 .glassDrawer {
   box-shadow:
     var(--shadow),
-    inset 0 1px rgba(255, 255, 255, 0.08);
+    inset 0 1px rgba(252, 246, 236, 0.12);
+}
+.button.primary,
+.primaryButton,
+button.primary {
+  background: var(--color-orange);
+  color: var(--color-brown);
+  border-color: transparent;
+  background-image: none;
 }
 .button.primary:hover,
 .primaryButton:hover {
-  background: var(--accent-hover);
-  filter: none;
+  background: var(--color-orange);
+  filter: brightness(1.04);
+  box-shadow: 0 4px 18px var(--focus-glow);
 }
 .okText {
   color: var(--ok) !important;
@@ -2679,25 +2746,128 @@ h3 {
 .grain {
   opacity: 0.018;
 }
-.authStory {
-  border-right: 1px solid var(--bd);
-}
 .authStatement p {
   max-width: 440px;
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: 16px;
+  line-height: 1.7;
 }
-.authSignals {
-  border-color: var(--bd);
+.panel,
+.card,
+.metricCard,
+.propertyCard,
+.tableWrap,
+.sidebar,
+.bottomTabs {
+  border-radius: var(--radius-lg);
+}
+.glassDialog {
+  border-radius: var(--radius-xl);
+}
+.glassDrawer {
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+.navItem {
+  border-radius: var(--radius-md);
+}
+.button,
+.primaryButton,
+.iconButton,
+.badge,
+.tag,
+.chip,
+.pill,
+.statusPill {
+  border-radius: var(--radius-pill);
+}
+button,
+a,
+input,
+select,
+textarea,
+.panel,
+.card,
+.metricCard,
+.propertyCard {
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-base);
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-orange);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px var(--focus-glow);
+}
+:root[data-theme="light"] button:focus-visible,
+:root[data-theme="light"] a:focus-visible,
+:root[data-theme="light"] input:focus-visible,
+:root[data-theme="light"] select:focus-visible,
+:root[data-theme="light"] textarea:focus-visible {
+  box-shadow:
+    0 0 0 1px var(--color-brown),
+    0 0 0 6px var(--focus-glow);
+}
+.metricIcon {
+  background: var(--selection);
+  color: var(--text-accent);
+}
+.navItem.active {
+  box-shadow: inset 3px 0 var(--color-orange);
+  color: var(--tx);
+}
+.glassCalendar .rdp-root {
+  --rdp-accent-color: var(--text-accent);
+  --rdp-day_button-border-radius: var(--radius-md);
+  --rdp-selected-border: 2px solid var(--color-orange);
+}
+.glassCalendar .rdp-selected .rdp-day_button {
+  background: var(--color-orange);
+  color: var(--color-brown);
 }
 @media (max-width: 640px) {
   .pageHeader h1 {
-    font-size: 40px;
+    font-size: 28px;
   }
   .authStatement h1 {
     font-size: 40px !important;
   }
   .authCard h1 {
-    font-size: 32px;
+    font-size: 28px;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.tag,
+.badge {
+  text-transform: uppercase;
+}
+.metricTop > span:first-child {
+  font-size: 12px;
+}
+.metricCard strong:after {
+  content: "";
+  display: block;
+  width: 24px;
+  height: 2px;
+  margin-top: 8px;
+  background: var(--color-orange);
+}
+/* Initials sit on nested glass; use reading colors rather than decorative accents. */
+.avatar,.avatarButton,.lodgeLogo,.propertyLogo,.logoPreview{color:var(--tx)}

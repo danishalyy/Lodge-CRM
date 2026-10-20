@@ -177,9 +177,11 @@ def test_web_api_has_csrf_header_support_and_credentials():
     assert "X-CSRF-Token" in api and "credentials:'include'" in api
 
 
-def test_ui_has_charcoal_design_tokens_and_reduced_motion():
-    css=(WEB/'app'/'globals.css').read_text().lower()
-    assert '#181918' in css or '#1c1c1c' in css
+def test_ui_has_glass_design_tokens_and_reduced_motion():
+    css=(WEB/'app'/'design-system.css').read_text().lower()
+    assert '--bg-base: #0b0d17' in css
+    assert '--surface-glass:' in css and 'backdrop-filter:' in css
+    assert '@supports not' in css and 'data-theme="light"' in css
     assert 'prefers-reduced-motion' in css
     assert 'transition' in css
 

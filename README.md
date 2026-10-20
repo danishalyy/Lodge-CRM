@@ -1,6 +1,6 @@
 # SafariOS — Lodge operations
 
-A co-branded lodge operations platform with a charcoal-first interface. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
+A co-branded lodge operations platform with a Liquid Glass interface with dark and light themes. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
 
 Start with [LOCAL_SETUP.md](LOCAL_SETUP.md). See [the new design and screenshots](docs/UI_UX_DESIGN_SYSTEM.md) and [commercial release scope](docs/COMMERCIAL_RELEASE_PLAN.md).
 
@@ -93,7 +93,7 @@ This build fixes the API startup NameError caused by workflow request schemas be
 
 ## v1.7 Premium UI / UX refresh
 
-The web application now uses a charcoal-first operational design system with restrained olive/sage accents, amber warnings, brick-red critical states and muted teal supporting data. The interface intentionally avoids glossy gradients and decorative fake analytics.
+The current web application uses the SafariOS Liquid Glass system: midnight glass surfaces, subtle ambient gradients, champagne identity accents, Geist typography, and a persisted light theme. Dashboards use real operational data. See [the shared design system](docs/UI_UX_DESIGN_SYSTEM.md) for component APIs and current screenshots.
 
 Key UX additions:
 - responsive premium navigation with mobile drawer
@@ -104,7 +104,7 @@ Key UX additions:
 - micro-interactions using transform/opacity patterns and reduced-motion accessibility support
 - responsive layouts for desktop, tablet and mobile
 
-The interaction approach is informed by modern Motion-style layout/micro-interaction patterns and premium component-library conventions while keeping all code original to this product and dependency-light.
+Shared components integrate Radix, Vaul, Framer Motion, cmdk, Sonner, Recharts, TanStack Table, React Hook Form, Zod, and react-day-picker. Tailwind exposes the same semantic tokens as the legacy screen classes.
 
 
 ## 1.7.2 UI runtime hotfix

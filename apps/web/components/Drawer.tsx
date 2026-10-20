@@ -1,7 +1,69 @@
-'use client';
-import {useEffect,useRef} from 'react';
-export default function Drawer({children,onClose}:{children:React.ReactNode;onClose:()=>void}){
- const dialog=useRef<HTMLDialogElement>(null),close=useRef(onClose);close.current=onClose;
- useEffect(()=>{const el=dialog.current;const previous=document.activeElement as HTMLElement|null;el?.showModal();const overflow=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{el?.close();document.body.style.overflow=overflow;previous?.focus()}},[]);
- return <dialog ref={dialog} className="safariDialog" aria-label="Details and actions" onCancel={e=>{e.preventDefault();close.current()}} onClick={e=>{if(e.target===e.currentTarget)close.current()}}><div className="drawer">{children}</div></dialog>;
+"use client";
+import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Drawer as Vaul } from "vaul";
+export default function Drawer({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  const reduced = useReducedMotion();
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const m = matchMedia("(max-width: 767px)");
+    const change = () => setMobile(m.matches);
+    change();
+    m.addEventListener("change", change);
+    return () => m.removeEventListener("change", change);
+  }, []);
+  if (mobile)
+    return (
+      <Vaul.Root
+        open
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <Vaul.Portal>
+          <Vaul.Overlay className="glassOverlay" />
+          <Vaul.Content className="glassDrawer">
+            <div className="drawerHandle" />
+            <Vaul.Title className="sr-only">Details and actions</Vaul.Title>
+            <Vaul.Description className="sr-only">
+              Review and update the selected record.
+            </Vaul.Description>
+            <div className="drawer">{children}</div>
+          </Vaul.Content>
+        </Vaul.Portal>
+      </Vaul.Root>
+    );
+  return (
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="glassOverlay" />
+        <Dialog.Content asChild>
+          <motion.div
+            className="glassDialog"
+            initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{ x: "-50%", y: "-50%" }}
+          >
+            <Dialog.Title className="sr-only">Details and actions</Dialog.Title>
+            <Dialog.Description className="sr-only">
+              Review and update the selected record.
+            </Dialog.Description>
+            <div className="drawer">{children}</div>
+          </motion.div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
 }

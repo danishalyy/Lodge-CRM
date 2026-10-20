@@ -1,62 +1,42 @@
-# SafariOS — Quiet precision
+# SafariOS Liquid Glass
 
-The owner requested a complete change to the shared design language: premium and modern, with dark charcoal and restrained colors. The application now identifies itself as SafariOS and supports lodge-specific identities configured by Super Admin.
+SafariOS uses a calm glass interface with a midnight background, restrained indigo/violet/teal ambient mesh, champagne identity accents, and Geist typography. Lodge names and private logos remain visible alongside SafariOS. This is a visual system; account and tenant authorization remain enforced by the existing API and guarded shells.
 
-## Visual system
+## Foundations
 
-| Token | Dark default | Purpose |
-| --- | --- | --- |
-| Canvas | `#141719` | Main workspace |
-| Navigation | `#101315` | Persistent SafariOS identity |
-| Surface | `#1b1f22` | Panels and property cards |
-| Secondary surface | `#22272a` | Quiet interaction hierarchy |
-| Border | `#32393d` | Subtle separation |
-| Primary text | `#f0f0eb` | Main information |
-| Secondary text | `#b0b7b7` | Supporting information |
-| Muted text | `#9aa5a5` | Labels and metadata |
-| Accent | `#c7b99e` | Warm stone, primary actions and identity |
+`apps/web/app/design-system.css` is the shared visual source. `tailwind.config.ts` exposes the same semantic CSS variables to Tailwind. Both existing operational classes and new components inherit theme changes. The legacy `globals.css` provides structural compatibility; do not add another palette there.
 
-The default is charcoal; an optional daylight theme remains available. No gradients or glowing primary actions are introduced. The new layer removes legacy decorative entrance effects. Line icons replace symbolic navigation glyphs. System sans-serif typography is used for operational interfaces, with editorial serif typography on the sign-in introduction. No external font or image downloads are needed.
+Dark is the default. An early layout script reads the saved `theme` preference before painting; `ThemeToggle` persists changes. Fonts ship locally through `geist`, without a runtime Google Fonts request. Theme colors use `--bg-base`, `--surface-glass`, `--text-primary`, `--text-secondary`, `--text-muted`, `--accent`, `--accent-hover`, `--premium`, and semantic status tokens.
 
-`apps/web/app/design-system.css` owns the new theme and component treatments over the existing structural stylesheet. Shared navigation, controls, fields, tables, metrics, cards, notifications and operational drawers receive the new visual system. Product descriptions were rewritten around staff workflows rather than implementation details.
+The requested dark muted swatch `#6B7280` is retained as a palette token. Reading text uses the brighter `--tx3` instead, because the original muted swatch does not meet AA on these surfaces. Light mode uses darker status text and champagne text. Primary buttons layer a subtle dark overlay on the requested indigo/violet gradient for white-label contrast. Reserve raw palette swatches for decorative elements; use reading tokens for text. Check actual composited colors when introducing a new transparent surface.
 
-## Interaction changes
+Glass uses blur 24px, saturation 180%, a translucent border, inner top highlight, and a soft shadow. Browsers without backdrop filtering receive opaque dark/light surfaces. Cards use 24px corners, dialogs 28px, fields 14px, and action buttons/chips pill corners. Space on an 8px grid with 24–32px card padding. Typography uses 12/14/16/20/28/40px, weight 600 headings, and tight heading tracking.
 
-- A property portfolio replaces the dense lodge administration table. Search, subscription status, expiry and branding actions are easy to find.
-- Registration separates property identity, subscription and administrator details. Logo setup is available during registration or later through Manage branding.
-- Branding changes have preview, validation, busy/error/success states and explicit removal. If lodge creation succeeds but its subsequent logo save fails, the UI directs the operator to Manage branding rather than encouraging duplicate registration.
-- All shared drawers now use native modal dialogs for focus containment, Escape handling and an inert background; focus is restored on close.
-- Platform navigation works on narrow screens with an off-canvas menu. The lodge workspace retains account and role guards.
-- Mobile property and login screens were checked at 390px without horizontal overflow. Focus indicators and reduced-motion support remain available.
+## Components and future screens
 
-## Branding model
+Import reusable primitives from `@/components/ui`: Button (Radix Slot and class variants), Card, Input, Badge, Skeleton, DataTable (TanStack sorting), Calendar (react-day-picker), and ConfirmDialog. `components.json` records the shadcn-compatible aliases and theme configuration. These are application-owned primitives rather than a separate UI framework.
 
-Every package can use a custom lodge display name and logo; this owner requirement supersedes older package descriptions that deferred all branding. SafariOS remains visible in the platform, login, lodge navigation and the Powered by SafariOS attribution. A lodge's display name does not rename its registered legal/property record.
+Use the existing `Drawer` wrapper for record editors. It uses Radix Dialog on desktop and Vaul on mobile, with focus containment, accessible titles, Escape dismissal, and scroll locking. `WorkspaceCommand` provides cmdk search using only authorized modules. `Providers` supplies Framer Motion spring defaults (300/30), reduced-motion handling, and Sonner notifications. Page templates fade and slide 8px. New charts should reuse `DataViz` (Recharts) and preserve a readable nonvisual summary.
 
-The shared sign-in screen is SafariOS branded. Lodge-specific branding appears after authenticated lodge selection. Anonymous lodge login domains, guest portals, branded report exports and deeper white-label/domain customization are outside this change.
+Desktop navigation floats away from the edge and can collapse; the preference persists. Mobile quick tabs show only permitted destinations. More opens a focus-managed drawer listing the authorized screens. Existing top-bar navigation remains available. Avoid adding primary actions to every card: choose one clear action per page and keep secondary work contextual.
 
-Super Admin alone can update branding. Lodge accounts can read their own branding. Logos are accepted as PNG, JPEG or WebP, limited to 256 KB and four megapixels, normalized to PNG up to 512 pixels, and stripped of source metadata. SVG and animated input are rejected. One bounded logo is stored with the lodge in PostgreSQL and included in database backups; it does not depend on MinIO being available. Logo payloads are deferred from ordinary lodge queries until needed.
+For forms, use React Hook Form with Zod, connected labels, inline errors with `aria-describedby` and `aria-invalid`, and server error messages. The lodge branding editor demonstrates this approach. Do not replace API validation with client checks. Confirm destructive changes before submitting; the logo removal flow demonstrates ConfirmDialog. Provide loading, empty, error/retry, and success states; never populate production views with fictitious records.
 
-Migration `0009_lodge_branding` adds nullable logo storage and a display name defaulting to the original lodge name. Existing records are preserved. Rebuilding via Compose runs migrations before the API starts.
+Every new screen must use the shared shell and semantic tokens. Keep visible focus rings, native keyboard controls, meaningful accessible names, 44px action targets, and reduced-motion behavior. New bespoke components still require review; a shared stylesheet cannot guarantee accessibility for arbitrary future markup.
 
-## Visual review
+## Review
 
-These are actual browser captures of the new interface. Authenticated portfolio images use isolated illustrative fixtures, not customer data or records seeded into the application.
+Browser tests cover existing account isolation plus theme persistence, collapse state, mobile drawers, keyboard command search, inline branding validation, reduced motion, and horizontal overflow. Screenshot fixtures use mocked frontend records for review only; they do not create production data.
 
-![SafariOS sign-in](screenshots/safarios-login.png)
+- [Dark lodge portfolio](screenshots/safarios-lodges.png)
+- [Light lodge portfolio](screenshots/safarios-lodges-light.png)
+- [Mobile portfolio](screenshots/safarios-lodges-mobile.png)
+- [Branding dialog](screenshots/safarios-branding.png)
+- [Lodge dashboard](screenshots/safarios-workspace.png)
+- [Mobile lodge dashboard](screenshots/safarios-workspace-mobile.png)
+- [Sign in](screenshots/safarios-login.png)
+- [Mobile sign in](screenshots/safarios-login-mobile.png)
 
-![SafariOS lodge portfolio — illustrative fixtures](screenshots/safarios-lodges.png)
+Run `npm ci --prefix apps/web`, `npm run build --prefix apps/web`, and `BROWSER_EXECUTABLE_PATH=/usr/bin/chromium npm test --prefix e2e` (after `npm ci --prefix e2e`). See `LOCAL_SETUP.md` for Docker setup; preserve `infra/.env` and database volumes when updating.
 
-![Super Admin branding editor — illustrative fixture](screenshots/safarios-branding.png)
-
-[Mobile sign-in capture](screenshots/safarios-login-mobile.png).
-
-## Verification
-
-Backend coverage includes branded names, private asset access, Super Admin mutation rights, audit records, image validation, EXIF removal, name-only changes and logo removal. Browser coverage exercises mobile portfolio layout, upload preview/save, modal Escape behavior, the joint lodge/SafariOS identity and existing account isolation. The upgrade was also applied from the previous local database revision. These checks do not establish a production deployment or a full accessibility certification.
-
-![Operational workspace — empty-state visual fixture](screenshots/safarios-workspace.png)
-
-[Mobile operational workspace](screenshots/safarios-workspace-mobile.png).
-
-Final local validation: 372 backend/source tests passed, seven browser checks passed, production build passed, and Python dependency audit reported no known vulnerabilities after updating the affected certificate bundle. The database upgraded from revision 0008 to 0009. Static guard audit covered 127 routes. Hosted CI and a production deployment are separate and are not claimed here.
+`apps/web/AGENTS.md` carries these conventions into future UI work. The current validation includes 265 surface contract checks and browser checks of account isolation and the new interactions. Automated WCAG A/AA checks cover the dark/light portfolio and login fixtures; this is representative coverage, not a complete manual accessibility certification of every workflow.

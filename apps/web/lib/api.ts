@@ -8,9 +8,26 @@ function readCookie(name:string){
 }
 export function getActiveLodgeId(){return typeof window==='undefined'?'':localStorage.getItem('active_lodge_id')||''}
 export function setActiveLodgeId(id:string){if(typeof window!=='undefined')localStorage.setItem('active_lodge_id',id)}
+export function getActiveUserId(){return typeof window==='undefined'?'':localStorage.getItem('active_user_id')||''}
+function clearAccountContext(){
+  if(typeof window==='undefined')return;
+  for(const key of ['active_user_id','active_lodge_id','active_lodge_name'])localStorage.removeItem(key);
+}
+function bindAccount(user:any){
+  if(typeof window==='undefined')return user;
+  if(getActiveUserId()!==user.id)clearAccountContext();
+  localStorage.setItem('active_user_id',user.id);
+  if(!user.is_super_admin&&!user.memberships?.some((m:any)=>m.lodge_id===getActiveLodgeId())){
+    localStorage.removeItem('active_lodge_id');
+    if(user.memberships?.[0])setActiveLodgeId(user.memberships[0].lodge_id);
+  }
+  return user;
+}
 
 async function request<T>(path:string, init:RequestInit={}){
   const headers=new Headers(init.headers||{});
+  const expectedUser=getActiveUserId();
+  if(expectedUser&&path!=='/api/v1/auth/me'&&!headers.has('X-Expected-User-Id'))headers.set('X-Expected-User-Id',expectedUser);
   if(init.body) headers.set('Content-Type','application/json');
   if(init.method && !['GET','HEAD'].includes(init.method.toUpperCase())){
     const csrf=readCookie('lodge_csrf');
@@ -23,17 +40,20 @@ async function request<T>(path:string, init:RequestInit={}){
   return (await res.json()) as T;
 }
 const lodgePath=(suffix:string)=>{const id=getActiveLodgeId();if(!id)throw new Error('No lodge selected');return `/api/v1/lodges/${id}/${suffix}`};
+type AccountScope={userId:string;lodgeId:string};
+const scopedPath=(name:string,scope?:AccountScope)=>scope?`/api/v1/lodges/${scope.lodgeId}/${name}`:lodgePath(name);
+const scopedHeaders=(scope?:AccountScope)=>scope?{'X-Expected-User-Id':scope.userId}:undefined;
 const tenantCollection=(name:string)=>({
  list:<T=any[]>()=>request<T>(lodgePath(name)),
- create:<T=any>(body:any)=>request<T>(lodgePath(name),{method:'POST',body:JSON.stringify(body)}),
+ create:<T=any>(body:any,scope?:AccountScope)=>request<T>(scopedPath(name,scope),{method:'POST',headers:scopedHeaders(scope),body:JSON.stringify(body)}),
  update:<T=any>(recordId:string,body:any)=>request<T>(lodgePath(`${name}/${recordId}`),{method:'PATCH',body:JSON.stringify(body)})
 });
 
 export const authApi={
  login:(email:string,password:string,otp?:string)=>request('/api/v1/auth/login',{method:'POST',body:JSON.stringify({email,password,otp:otp||undefined})}),
  activate:(token:string,password:string)=>request('/api/v1/auth/activate',{method:'POST',body:JSON.stringify({token,password})}),
- logout:()=>request('/api/v1/auth/logout',{method:'POST'}),
- me:()=>request<any>('/api/v1/auth/me'),
+ logout:async()=>{await request('/api/v1/auth/logout',{method:'POST'});clearAccountContext()},
+ me:()=>request<any>('/api/v1/auth/me').then(bindAccount),
  requestPasswordReset:(email:string)=>request<any>('/api/v1/auth/password-reset/request',{method:'POST',body:JSON.stringify({email})}),
  confirmPasswordReset:(token:string,password:string)=>request<any>('/api/v1/auth/password-reset/confirm',{method:'POST',body:JSON.stringify({token,password})}),
  mfaSetup:()=>request<any>('/api/v1/auth/mfa/setup',{method:'POST'}),
@@ -67,7 +87,7 @@ export const operationsApi={
  fuel:tenantCollection('fuel'),
  activities:tenantCollection('activities'),
  transfers:tenantCollection('transfers'),
- wildlife:{...tenantCollection('wildlife'),uploadUrl:(body:any)=>request<any>(lodgePath('wildlife/media/upload-url'),{method:'POST',body:JSON.stringify(body)}),registerMedia:(body:any)=>request<any>(lodgePath('wildlife/media'),{method:'POST',body:JSON.stringify(body)}),downloadUrl:(id:string)=>request<any>(lodgePath(`wildlife/media/${id}/download-url`))},
+ wildlife:{...tenantCollection('wildlife'),uploadUrl:(body:any,scope?:AccountScope)=>request<any>(scopedPath('wildlife/media/upload-url',scope),{method:'POST',headers:scopedHeaders(scope),body:JSON.stringify(body)}),registerMedia:(body:any,scope?:AccountScope)=>request<any>(scopedPath('wildlife/media',scope),{method:'POST',headers:scopedHeaders(scope),body:JSON.stringify(body)}),downloadUrl:(id:string)=>request<any>(lodgePath(`wildlife/media/${id}/download-url`))},
  rangerToday:()=>request<any>(lodgePath('ranger/today')),
  hr:{leaves:{list:()=>request<any[]>(lodgePath('hr/leaves')),create:(body:any)=>request<any>(lodgePath('hr/leaves'),{method:'POST',body:JSON.stringify(body)}),update:(id:string,body:any)=>request<any>(lodgePath(`hr/leaves/${id}`),{method:'PATCH',body:JSON.stringify(body)})},credentials:{list:()=>request<any[]>(lodgePath('hr/credentials')),create:(body:any)=>request<any>(lodgePath('hr/credentials'),{method:'POST',body:JSON.stringify(body)})},training:{list:()=>request<any[]>(lodgePath('hr/training')),create:(body:any)=>request<any>(lodgePath('hr/training'),{method:'POST',body:JSON.stringify(body)})},shifts:{list:()=>request<any[]>(lodgePath('hr/shifts')),create:(body:any)=>request<any>(lodgePath('hr/shifts'),{method:'POST',body:JSON.stringify(body)}),update:(id:string,body:any)=>request<any>(lodgePath(`hr/shifts/${id}`),{method:'PATCH',body:JSON.stringify(body)})},incidents:{list:()=>request<any[]>(lodgePath('hr/incidents')),create:(body:any)=>request<any>(lodgePath('hr/incidents'),{method:'POST',body:JSON.stringify(body)})},performance:{list:()=>request<any[]>(lodgePath('hr/performance')),create:(body:any)=>request<any>(lodgePath('hr/performance'),{method:'POST',body:JSON.stringify(body)})}},
  roles:{list:()=>request<any[]>(lodgePath('custom-roles')),permissions:()=>request<any[]>(lodgePath('available-permissions')),create:(body:any)=>request<any>(lodgePath('custom-roles'),{method:'POST',body:JSON.stringify(body)}),update:(id:string,body:any)=>request<any>(lodgePath(`custom-roles/${id}`),{method:'PATCH',body:JSON.stringify(body)})},

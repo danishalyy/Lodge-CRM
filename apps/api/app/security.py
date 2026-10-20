@@ -66,7 +66,7 @@ def create_session(db: Session, user: User, response: Response):
     response.set_cookie("lodge_csrf", csrf, httponly=False, secure=settings.cookie_secure, samesite="lax", max_age=settings.session_ttl_hours*3600, path="/")
 
 
-def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends(get_db)) -> User:
+def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None)) -> User:
     if not lodge_session:
         raise HTTPException(401, "Authentication required")
     now = datetime.now(timezone.utc)
@@ -76,15 +76,22 @@ def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends
     user = db.get(User, s.user_id)
     if not user or not user.is_active:
         raise HTTPException(401, "Account unavailable")
+    # This optional client assertion can only restrict an authenticated session.
+    # It prevents stale browser tabs from writing as a newly signed-in account.
+    if x_expected_user_id is not None and x_expected_user_id != str(user.id):
+        raise HTTPException(409, "Signed-in account changed; reload before continuing")
     # Persist session activity first, then establish transaction-local RLS context.
     # Non-platform users must retain an active lodge membership and active employment.
     s.last_seen_at = now
     db.commit()
     set_rls_context(db, None, user.is_super_admin, str(user.id))
     if not user.is_super_admin:
-        membership = db.scalar(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True)))
-        if not membership:
+        memberships = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
+        if not memberships:
             raise HTTPException(401, "Lodge access has been revoked")
+        if len(memberships) != 1:
+            raise HTTPException(403, "Account lodge assignment requires administrator review")
+        membership = memberships[0]
         set_rls_context(db, str(membership.lodge_id), False, str(user.id))
         staff = db.scalar(select(StaffProfile).where(StaffProfile.lodge_id == membership.lodge_id, StaffProfile.user_id == user.id))
         if staff and staff.employment_status != "active":
@@ -97,7 +104,7 @@ def require_csrf(request: Request, x_csrf_token: str | None = Header(None), lodg
         return
     if not lodge_session or not x_csrf_token:
         raise HTTPException(403, "CSRF token required")
-    s = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash(lodge_session), AuthSession.revoked_at.is_(None)))
+    s = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash(lodge_session), AuthSession.revoked_at.is_(None), AuthSession.expires_at > datetime.now(timezone.utc)))
     if not s or not secrets.compare_digest(s.csrf_hash, token_hash(x_csrf_token)):
         raise HTTPException(403, "Invalid CSRF token")
 
@@ -193,6 +200,7 @@ def ensure_feature(db: Session, lodge_id: str, feature_key: str):
 
 def require_lodge_access(lodge_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.is_super_admin:
+        require_super_admin(user)
         set_rls_context(db, lodge_id, True, str(user.id))
         return user
     if not membership_for(db, user, lodge_id):
@@ -217,6 +225,7 @@ def has_permission(db: Session, membership: Membership, permission_key: str) -> 
 def require_permission(permission_key: str, write: bool = False):
     def dependency(lodge_id: str, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
         if user.is_super_admin:
+            require_super_admin(user)
             set_rls_context(db, lodge_id, True, str(user.id))
             if write:
                 ensure_subscription_write_allowed(db, lodge_id)

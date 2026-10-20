@@ -129,3 +129,15 @@ For build errors, capture the output of the failed build command; build failures
 - **Alpine/Go/PyPI download failure:** check internet, VPN/proxy and firewall access. MinIO builds require `dl-cdn.alpinelinux.org`, GitHub and Go module/checksum services. Keep TLS and checksum verification enabled.
 
 Validation limits: the frontend build, native API startup, database/Redis connectivity and 334 tests passed in the cloud workspace. Full Docker Compose startup was blocked there by network access during MinIO's build; it has not been verified on your laptop. Storage, live email and all business workflows are not yet fully accepted. See `docs/COMMERCIAL_RELEASE_PLAN.md` for remaining work.
+
+## Update an existing laptop installation
+
+If you downloaded a ZIP, download the latest GitHub `main` ZIP and update the source files. Preserve your existing `infra/.env` (especially the database passwords and MFA encryption key). Do not replace it with the template, and do not delete Docker volumes. If extracting to a new folder, copy your existing `infra/.env` there first and keep using the same Compose project name (`infra`) to retain the existing named volumes.
+
+Rebuild and restart from the updated project root:
+
+```sh
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+```
+
+Sign out and sign back in after upgrading. Use a separate email/password for each person; a private browser window is useful when testing Lodge Admin separately from Super Admin. See `docs/ACCOUNT_ISOLATION.md` for the account, role and offline queue boundaries.

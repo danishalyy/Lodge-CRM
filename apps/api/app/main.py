@@ -61,7 +61,7 @@ app.add_middleware(
     allow_origins=settings.origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id"],
 )
 
 redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
@@ -330,8 +330,10 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     # A non-platform account must still have active lodge access and active employment.
     if not user.is_super_admin:
         set_rls_context(db,None,False,str(user.id))
-        membership=db.scalar(select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True)))
-        if not membership: raise HTTPException(403,"Account access is unavailable")
+        memberships=db.scalars(select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True))).all()
+        if not memberships: raise HTTPException(403,"Account access is unavailable")
+        if len(memberships)!=1: raise HTTPException(403,"Account lodge assignment requires administrator review")
+        membership=memberships[0]
         set_rls_context(db,str(membership.lodge_id),False,str(user.id))
         staff=db.scalar(select(StaffProfile).where(StaffProfile.lodge_id==membership.lodge_id,StaffProfile.user_id==user.id))
         if staff and staff.employment_status!="active": raise HTTPException(403,"Account access is unavailable")
@@ -350,12 +352,14 @@ def activate(body: ActivateIn, response: Response, db: Session = Depends(get_db)
     now = datetime.now(timezone.utc)
     invitation = db.scalar(select(Invitation).where(
         Invitation.token_hash == token_hash(body.token), Invitation.used_at.is_(None), Invitation.expires_at > now
-    ))
+    ).with_for_update())
     if not invitation:
         raise HTTPException(400, "Activation link is invalid or has expired")
     user = db.get(User, invitation.user_id)
     if not user:
         raise HTTPException(400, "Invitation user no longer exists")
+    if user.is_active:
+        raise HTTPException(400, "Account is already activated; sign in or use password recovery")
     _validate_password_policy(body.password)
     user.password_hash = hash_password(body.password)
     user.is_active = True
@@ -732,13 +736,16 @@ def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Reques
     role_features={"department_manager":"departments","ranger":"ranger","driver":"transfers","fb":"fb"}
     if body.role_key in role_features:ensure_feature(db,lodge_id,role_features[body.role_key])
     account=db.scalar(select(User).where(func.lower(User.email)==staff.email.lower()))
+    new_account=account is None
     if not account:
         account=User(email=staff.email.lower(),full_name=staff.full_name,password_hash=hash_password(new_token()+new_token()),is_active=False)
         db.add(account);db.flush()
     existing=db.scalar(select(Membership).where(Membership.user_id==account.id,Membership.lodge_id==lodge_id))
-    if account and not existing and account.is_active:
+    if not new_account and (not existing or account.is_super_admin):
         # One account belongs to one lodge only; do not reveal where an existing account belongs.
         raise HTTPException(409,"This email cannot be invited to this lodge")
+    if db.scalar(select(StaffProfile.id).where(StaffProfile.lodge_id==lodge_id,StaffProfile.user_id==account.id,StaffProfile.id!=staff.id)):
+        raise HTTPException(409,"This login is already linked to a staff profile")
     if existing:
         existing.role_id=role.id;existing.custom_role_id=None;existing.previous_role_id=None;existing.is_active=True;existing.department_id=staff.department_id
     else:

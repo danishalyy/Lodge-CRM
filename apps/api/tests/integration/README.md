@@ -13,3 +13,5 @@ The fixture creates a random `lodge_test_*` database, runs all Alembic migration
 Coverage: PostgreSQL RLS with missing and mismatched context; foreign tenant read/update denial; successful scoped guest create/read; CSRF rejection; read-only role; expired read-only and pending/suspended subscription restrictions; enabled MFA replacement denial; password and OTP requirements for disable; password-reset session revocation without bypassing MFA; OTP reuse rejection; concurrent reset token consumption.
 
 CI runs the suite against PostgreSQL 16 and Redis 7. Broader per-endpoint/role coverage, real storage, email, full browser workflows, load and deployment checks are still required.
+
+Additional account-isolation cases are in `test_account_isolation.py`, including a runtime request matrix across every tenant route declared in the API, with a real foreign lodge ID. Account ownership, private notifications, session revocation, assigned tasks, department HR, inactive-account invitations, MFA enforcement and concurrent activation are covered. Browser checks live in `e2e/account-isolation.test.cjs`; see `docs/ACCOUNT_ISOLATION.md` for commands and coverage limits.

@@ -28,7 +28,7 @@ The existing `REQUIREMENTS_COMPLIANCE.md` is a source-code inventory, not a prod
 | AI/knowledge | UI explicitly reports unavailability; ingestion/RAG/tool authorization not implemented. | Real document pipeline with provenance, per-lodge authorization, cited answers, evaluation, provider configuration, retention and cost controls. No simulated chatbot. |
 | Guest experience | Dedicated guest access/portal not implemented. | Scoped guest identity or revocable stay invitation; only own itinerary/services; no staff data exposed. |
 | Integrations/telemetry | Not implemented. | Provider-specific adapters and contract/retry/security tests after selecting providers; do not sell unavailable integrations. |
-| Branding | Package-aware lodge branding not implemented. | Validated assets/colors, accessible UI and isolation. Custom domains require separate infrastructure work. |
+| Branding | Core lodge logo/display-name co-branding is implemented across packages; custom domains and branded exports remain. | Validated assets/colors, accessible UI and isolation. Custom domains require separate infrastructure work. |
 | Operations | No verified production backup, recovery, observability or load capacity. | Hostinger VPS deployment review, TLS, secrets, persistent storage, monitoring, restore drill, upgrade rollback and measured capacity before customer launch. |
 
 ## Delivery order

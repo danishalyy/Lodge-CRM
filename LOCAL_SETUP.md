@@ -141,3 +141,11 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 ```
 
 Sign out and sign back in after upgrading. Use a separate email/password for each person; a private browser window is useful when testing Lodge Admin separately from Super Admin. See `docs/ACCOUNT_ISOLATION.md` for the account, role and offline queue boundaries.
+
+## Set up lodge branding in SafariOS
+
+After updating the source and rebuilding with your existing `infra/.env`, sign in as Super Admin and open **Lodges**. Choose a logo during **Register lodge**, or select **Manage branding** on an existing property card. Set the workspace display name, upload the logo, and save.
+
+Use a static PNG, JPEG or WebP file under 256 KB. SafariOS validates and normalizes it before saving. Each lodge sees its own identity in its authenticated workspace, alongside the SafariOS wordmark and “Powered by SafariOS.” Lodge administrators cannot edit these settings.
+
+Migration `0009_lodge_branding` runs automatically during the Compose upgrade. Existing lodge records remain intact. Keep your existing database volumes and MFA encryption key; no reset is required.

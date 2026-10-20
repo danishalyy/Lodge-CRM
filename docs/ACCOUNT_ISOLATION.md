@@ -23,7 +23,7 @@ These scopes separate normal application access. Browser storage is not encrypte
 
 ## Verification
 
-Real PostgreSQL HTTP tests exercise all 102 tenant routes with a foreign lodge ID, alongside session/CSRF ownership, account/membership revocation, platform-role denial, MFA gates, invitation rejection, private notifications, assigned tasks, department HR, password changes, logout replay and one-time activation/recovery concurrency. Tests use a temporary database and a non-superuser application role; customer data is not used.
+Real PostgreSQL HTTP tests exercise all tenant routes (104 with branding) with a foreign lodge ID, alongside session/CSRF ownership, account/membership revocation, platform-role denial, MFA gates, invitation rejection, private notifications, assigned tasks, department HR, password changes, logout replay and one-time activation/recovery concurrency. Tests use a temporary database and a non-superuser application role; customer data is not used.
 
 Browser tests run the built standalone frontend. API responses are controlled fixtures for frontend route/layout/context checks; those checks do not replace the real backend tests. IndexedDB isolation is exercised in actual Chromium with distinct users, lodges, matching record IDs, real Blobs and a legacy store.
 
@@ -41,4 +41,4 @@ For an existing browser executable, set `BROWSER_EXECUTABLE_PATH` instead of dow
 
 This is scoped regression evidence, not a claim that every possible security defect has been eliminated. Full release gates, including real storage/email/provider paths and deployment security, remain in `COMMERCIAL_RELEASE_PLAN.md`.
 
-Latest local verification: 358 backend tests passed, including the 102-route cross-lodge matrix; five browser checks passed; the frontend production build and static guard audit passed. The browser checks also verify sign-out context cleanup and removal of a previously authorized platform console when the account changes in another tab. Hosted CI results are separate from these local results.
+Latest local verification: 358 backend tests passed, including the cross-lodge route matrix; five browser checks passed; the frontend production build and static guard audit passed. The browser checks also verify sign-out context cleanup and removal of a previously authorized platform console when the account changes in another tab. Hosted CI results are separate from these local results.

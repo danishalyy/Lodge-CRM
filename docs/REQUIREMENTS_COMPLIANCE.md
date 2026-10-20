@@ -94,7 +94,7 @@ Status legend: **Implemented** = backed by persistent production data/authorizat
 | Accounting integration | Not built | Provider-specific work remains. |
 | WhatsApp/SMS integration | Not built | Provider/consent configuration remains. |
 | Enterprise API access | Not built | Controlled external API credentials/scopes remain. |
-| Enhanced/advanced branding | Not built | Branding configuration/custom domains remain. |
+| Lodge identity / co-branding | Implemented | Super Admin manages display name and validated raster logo across packages; SafariOS remains visible. Custom domains, branded exports and deeper white-label controls remain. |
 | Workflow automation | Partial | Scheduled system jobs exist; customer-configurable automation rules remain. |
 
 ## Production readiness conclusion

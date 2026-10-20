@@ -1,4 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
+import base64
+import binascii
+from io import BytesIO
+from PIL import Image, ImageOps, UnidentifiedImageError
 import uuid
 import hashlib
 import secrets
@@ -29,7 +33,7 @@ from .models import (
     GuestFeedback, StaffShift, StaffIncident, StaffPerformanceNote, MealService, MealServiceGuest, TaskAttachment,
 )
 from .schemas import (
-    ActivateIn, DepartmentCreate, DepartmentUpdate, GuestCreate, GuestRequestCreate,
+    LodgeBrandingUpdate, ActivateIn, DepartmentCreate, DepartmentUpdate, GuestCreate, GuestRequestCreate,
     GuestRequestUpdate, GuestUpdate, LodgeCreate, LoginIn, MaintenanceCreate,
     MaintenanceUpdate, StaffCreate, StaffUpdate, StayCreate, StayUpdate,
     SubscriptionUpdate, TaskCreate, TaskUpdate, UnitCreate, UnitUpdate, VehicleCreate, VehicleUpdate, VehicleChecklistCreate, FuelCreate, ActivityCreate, ActivityUpdate, TransferCreate, TransferUpdate, WildlifeSightingCreate, WildlifeMediaRegister, MediaUploadRequest, StaffInvite, NotificationPreferenceUpdate, PasswordResetRequestIn, PasswordResetConfirmIn, MfaCodeIn, EntitlementOverrideIn,
@@ -50,7 +54,7 @@ from .services.state import housekeeping_job_created, housekeeping_awaiting_insp
 from .notification_service import create_notification, staff_user_id, user_ids_with_permission
 
 app = FastAPI(
-    title="Lodge CRM API",
+    title="SafariOS API",
     version="1.8.0-security-integrity",
     docs_url="/docs" if settings.app_env == "development" else None,
     redoc_url="/redoc" if settings.app_env == "development" else None,
@@ -171,7 +175,7 @@ def send_activation_email(to_email:str, full_name:str, lodge_name:str, token:str
             raise HTTPException(503,"Email delivery is not configured")
         return False
     msg=EmailMessage()
-    msg["Subject"]=f"Activate your {lodge_name} Lodge CRM account"
+    msg["Subject"]=f"Activate your {lodge_name} SafariOS account"
     msg["From"]=settings.smtp_from_email
     msg["To"]=to_email
     link=f"{settings.public_web_url.rstrip('/')}/activate?token={token}"
@@ -190,11 +194,11 @@ def send_password_reset_email(to_email:str, full_name:str, token:str):
     if not settings.smtp_host or not settings.smtp_from_email:
         raise HTTPException(503,"Password reset email delivery is not configured")
     msg=EmailMessage()
-    msg["Subject"]="Reset your Lodge CRM password"
+    msg["Subject"]="Reset your SafariOS password"
     msg["From"]=settings.smtp_from_email
     msg["To"]=to_email
     link=f"{settings.public_web_url.rstrip('/')}/reset-password?token={token}"
-    msg.set_content(f"Hello {full_name},\n\nA password reset was requested for your Lodge CRM account. Use this secure link:\n{link}\n\nThis link expires in {settings.password_reset_ttl_minutes} minutes. If you did not request this, you can ignore this email.")
+    msg.set_content(f"Hello {full_name},\n\nA password reset was requested for your SafariOS account. Use this secure link:\n{link}\n\nThis link expires in {settings.password_reset_ttl_minutes} minutes. If you did not request this, you can ignore this email.")
     try:
         with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=15) as smtp:
             if settings.smtp_use_tls:smtp.starttls()
@@ -415,7 +419,7 @@ def mfa_setup(user:User=Depends(current_user),db:Session=Depends(get_db)):
         raise HTTPException(409,"MFA is already enabled; disable it with your password and authenticator before enrolling again")
     secret=pyotp.random_base32()
     user.mfa_secret_encrypted=encrypt_mfa_secret(secret);user.mfa_last_timestep=None;db.commit()
-    uri=pyotp.TOTP(secret).provisioning_uri(name=user.email,issuer_name="Lodge CRM")
+    uri=pyotp.TOTP(secret).provisioning_uri(name=user.email,issuer_name="SafariOS")
     return {"secret":secret,"otpauth_uri":uri,"enabled":False}
 
 
@@ -500,7 +504,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                     else: state.discard(ov.feature_key)
                 plan_features=sorted(state)
             memberships.append({
-                "lodge_id": str(lodge.id), "lodge_name": lodge.name,
+                "lodge_id": str(lodge.id), "lodge_name": lodge.name, "branding":lodge_branding(lodge),
                 "role": display_role, "role_key": role.key if role else "", "custom_role_id": str(m.custom_role_id) if m.custom_role_id else None,
                 "department_id": str(m.department_id) if m.department_id else None,
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
@@ -560,12 +564,66 @@ def dashboard(lodge_id: str, user: User = Depends(require_permission("dashboard.
         events=[{"id":str(e.id),"type":e.event_type,"summary":e.summary,"created_at":e.created_at.isoformat()} for e in db.scalars(select(OperationalEvent).where(OperationalEvent.lodge_id==lodge.id).order_by(OperationalEvent.created_at.desc()).limit(20)).all()]
         scope={"type":"lodge"}
     return {
-        "lodge":{"id":str(lodge.id),"name":lodge.name,"location":lodge.location},
+        "lodge":{"id":str(lodge.id),"name":lodge.name,"location":lodge.location,"branding":lodge_branding(lodge)},
         "scope":scope,
         "subscription":{"package":sub.package if sub else None,"status":subscription_status(sub),"expiry_date":sub.expiry_date.isoformat() if sub else None},
         "metrics":{"guests_in_house":guests_in_house,"arrivals_today":arrivals,"departures_today":departures,"open_tasks":open_tasks,"overdue_tasks":overdue,"maintenance_open":maintenance_open,"activities_today":activities_today,"transfers_today":transfers_today,"vehicles_unavailable":vehicles_unavailable},
         "attention":attention,"events":events,
     }
+
+
+def lodge_branding(lodge: Lodge):
+    return {"lodge_id":str(lodge.id),"display_name":lodge.brand_name or lodge.name,
+            "logo_url":f"/api/v1/lodges/{lodge.id}/branding/logo?v={lodge.updated_at.isoformat()}" if lodge.logo_png else None,
+            "platform_name":"SafariOS"}
+
+
+def normalize_lodge_logo(encoded: str) -> bytes:
+    try:
+        raw=base64.b64decode(encoded,validate=True)
+        if not raw or len(raw)>256*1024:raise ValueError()
+        with Image.open(BytesIO(raw)) as image:
+            if image.format not in {"PNG","JPEG","WEBP"} or image.width*image.height>4_000_000 or getattr(image,"n_frames",1)!=1:raise ValueError()
+            image.load()
+            clean=ImageOps.exif_transpose(image).convert("RGBA")
+            clean.info.clear()
+            clean.thumbnail((512,512))
+            out=BytesIO();clean.save(out,format="PNG")
+            result=out.getvalue()
+            if len(result)>512*1024:raise ValueError()
+            return result
+    except (ValueError,binascii.Error,UnidentifiedImageError,OSError,Image.DecompressionBombError):
+        raise HTTPException(422,"Use a valid PNG, JPEG or WebP logo under 256 KB and four megapixels")
+
+
+@app.get("/api/v1/lodges/{lodge_id}/branding")
+def get_lodge_branding(lodge_id:uuid.UUID,user:User=Depends(require_lodge_access),db:Session=Depends(get_db)):
+    lodge=db.get(Lodge,lodge_id)
+    if not lodge:raise HTTPException(404,"Lodge not found")
+    return lodge_branding(lodge)
+
+
+@app.get("/api/v1/lodges/{lodge_id}/branding/logo")
+def get_lodge_logo(lodge_id:uuid.UUID,user:User=Depends(require_lodge_access),db:Session=Depends(get_db)):
+    lodge=db.get(Lodge,lodge_id)
+    if not lodge or not lodge.logo_png:raise HTTPException(404,"Logo not found")
+    return Response(content=lodge.logo_png,media_type="image/png",headers={"X-Content-Type-Options":"nosniff"})
+
+
+@app.patch("/api/v1/platform/lodges/{lodge_id}/branding",dependencies=[Depends(require_csrf)])
+def update_lodge_branding(lodge_id:uuid.UUID,body:LodgeBrandingUpdate,request:Request,user:User=Depends(require_super_admin),db:Session=Depends(get_db)):
+    lodge=db.get(Lodge,lodge_id)
+    if not lodge:raise HTTPException(404,"Lodge not found")
+    name=body.display_name.strip()
+    if not name:raise HTTPException(422,"Display name cannot be blank")
+    if body.remove_logo and body.logo_base64 is not None:raise HTTPException(422,"Choose a replacement logo or removal, not both")
+    logo=normalize_lodge_logo(body.logo_base64) if body.logo_base64 is not None else None
+    lodge.brand_name=name
+    if body.remove_logo:lodge.logo_png=None
+    elif logo is not None:lodge.logo_png=logo
+    audit(db,request,lodge.id,user.id,"lodge.branding_updated","lodge",str(lodge.id))
+    db.commit()
+    return lodge_branding(lodge)
 
 
 # Platform administration
@@ -575,7 +633,7 @@ def list_lodges(user: User = Depends(require_super_admin), db: Session = Depends
     out = []
     for l in db.scalars(select(Lodge).order_by(Lodge.name)).all():
         s = db.get(Subscription, l.id)
-        out.append({"id": str(l.id), "name": l.name, "location": l.location, "status": l.status, "subscription_status": subscription_status(s), "subscription": ({"package": s.package, "start_date": s.start_date.isoformat(), "expiry_date": s.expiry_date.isoformat(), "suspended": s.suspended} if s else None)})
+        out.append({"id": str(l.id), "name": l.name, "branding":lodge_branding(l), "location": l.location, "status": l.status, "subscription_status": subscription_status(s), "subscription": ({"package": s.package, "start_date": s.start_date.isoformat(), "expiry_date": s.expiry_date.isoformat(), "suspended": s.suspended} if s else None)})
     return out
 
 

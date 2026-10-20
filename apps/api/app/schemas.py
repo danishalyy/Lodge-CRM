@@ -549,3 +549,9 @@ class TaskAttachmentUploadRequest(StrictModel):
 
 class TaskAttachmentRegister(TaskAttachmentUploadRequest):
     object_key: str = Field(min_length=1, max_length=600)
+
+
+class LodgeBrandingUpdate(StrictModel):
+    display_name: str = Field(min_length=1, max_length=180)
+    logo_base64: str | None = Field(default=None, max_length=350000)
+    remove_logo: bool = False

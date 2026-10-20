@@ -125,3 +125,48 @@ test('account switch in another tab removes the previous platform console',async
     assert.equal(await page.getByText('Platform Console',{exact:true}).count(),0);
   }finally{await context.close()}
 });
+
+test('platform branding editor previews uploads, saves and remains usable on mobile',async()=>{
+  const context=await browser.newContext({viewport:{width:390,height:844}});const page=await context.newPage();
+  const id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  let brand={display_name:'Acacia Lodge',logo_url:null};let saved;
+  await context.addCookies([{name:'lodge_session',value:'ui-branding-test',url:base}]);
+  await page.route('**/api/**',async route=>{
+    const url=route.request().url();
+    if(url.endsWith('/auth/me'))return route.fulfill({json:{id:'platform',is_super_admin:true,mfa_enabled:true,memberships:[]}});
+    if(url.endsWith('/branding')&&route.request().method()==='PATCH'){
+      saved=route.request().postDataJSON();brand={display_name:saved.display_name,logo_url:null};return route.fulfill({json:brand});
+    }
+    return route.fulfill({json:[{id,name:'Acacia Lodge',location:'South Africa',branding:brand,subscription_status:'Active',subscription:{package:'Standard',expiry_date:'2027-01-01'}}]});
+  });
+  try{
+    await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Acacia Lodge',exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.getByRole('button',{name:'Manage branding',exact:true}).click();
+    await page.getByRole('dialog').waitFor();
+    await page.getByLabel('Workspace display name').fill('Acacia River Lodge');
+    const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+    await page.getByLabel('Lodge logo',{exact:true}).setInputFiles({name:'acacia.png',mimeType:'image/png',buffer:image});
+    await page.getByAltText('Lodge logo preview').waitFor();
+    await page.getByRole('button',{name:'Save branding',exact:true}).click();
+    await page.getByRole('heading',{name:'Acacia River Lodge',exact:true}).waitFor();
+    assert.equal(saved.display_name,'Acacia River Lodge');assert.equal(saved.logo_base64,image.toString('base64'));
+    await page.getByRole('button',{name:/Register lodge/}).click();
+    await page.getByRole('heading',{name:'Welcome a lodge',exact:true}).waitFor();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.getByRole('dialog').count(),0);
+  }finally{await context.close()}
+});
+
+test('lodge identity and SafariOS remain visible together',async()=>{
+  const context=await browser.newContext();const page=await context.newPage();
+  const id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  await context.addCookies([{name:'lodge_session',value:'ui-lodge-test',url:base}]);
+  await page.route('**/api/**',route=>route.fulfill({json:route.request().url().endsWith('/auth/me')?{id:'lodge',full_name:'Lodge Manager',is_super_admin:false,mfa_enabled:false,memberships:[{lodge_id:id,lodge_name:'Original name',permissions:[],entitlements:[]}]}:{display_name:'Acacia River Lodge',logo_url:null,platform_name:'SafariOS'}}));
+  try{
+    await page.goto(base+'/settings');await page.locator('.lodgeIdentity').getByText('Acacia River Lodge',{exact:true}).waitFor();
+    await page.locator('.lodgeIdentity').getByText('Powered by SafariOS',{exact:true}).waitFor();
+    assert.equal(await page.locator('.safariBrand').count(),1);
+    assert.equal(await page.getByRole('link',{name:'Super Admin',exact:true}).count(),0);
+  }finally{await context.close()}
+});

@@ -1,7 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server';
 
 const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'lodge_session';
-const PUBLIC_PATHS = new Set(['/', '/login', '/activate', '/forgot-password', '/reset-password']);
+const PUBLIC_PATHS = new Set(['/', '/login', '/activate', '/forgot-password', '/reset-password', '/icon.svg']);
 
 export function middleware(request: NextRequest) {
   const {pathname} = request.nextUrl;

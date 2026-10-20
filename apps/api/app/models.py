@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 import uuid
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index, Numeric
+from sqlalchemy import LargeBinary, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
@@ -34,6 +34,8 @@ class Lodge(Base):
     name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
     location: Mapped[str] = mapped_column(String(240), default="")
     timezone: Mapped[str] = mapped_column(String(80), default="Africa/Johannesburg")
+    brand_name: Mapped[str] = mapped_column(String(180), default="")
+    logo_png: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
     protected_species: Mapped[str] = mapped_column(Text, default="rhino,black rhino,white rhino")
     status: Mapped[str] = mapped_column(String(30), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

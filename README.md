@@ -1,3 +1,11 @@
+# SafariOS — Lodge operations
+
+A co-branded lodge operations platform with a charcoal-first interface. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
+
+Start with [LOCAL_SETUP.md](LOCAL_SETUP.md). See [the new design and screenshots](docs/UI_UX_DESIGN_SYSTEM.md) and [commercial release scope](docs/COMMERCIAL_RELEASE_PLAN.md).
+
+---
+
 # Lodge CRM — Production Core Operations 1.6
 
 Version 1.6 continues the real application build from 1.5.5. It adds persistent guest feedback/complaints, staff roster/shifts, incidents and performance records, F&B meal-service operations, and verified task image/PDF attachments. No demo operational records are seeded.

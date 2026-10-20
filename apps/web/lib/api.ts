@@ -109,7 +109,10 @@ export const intelligenceApi={
  reportSummary:(start?:string,end?:string)=>{const q=new URLSearchParams();if(start)q.set('start',start);if(end)q.set('end',end);return request<any>(lodgePath(`reports/summary${q.toString()?`?${q}`:''}`))},
 };
 
+export const lodgeBrandingApi={get:(id:string)=>request<{display_name:string;logo_url:string|null;platform_name:string}>(`/api/v1/lodges/${id}/branding`)};
+
 export const superApi={
+ updateBranding:(id:string,body:{display_name:string;logo_base64?:string;remove_logo?:boolean})=>request(`/api/v1/platform/lodges/${id}/branding`,{method:'PATCH',body:JSON.stringify(body)}),
  lodges:()=>request<any[]>('/api/v1/platform/lodges'),
  createLodge:(body:any)=>request<any>('/api/v1/platform/lodges',{method:'POST',body:JSON.stringify(body)}),
  updateSubscription:(id:string,body:any)=>request(`/api/v1/platform/lodges/${id}/subscription`,{method:'PATCH',body:JSON.stringify(body)}),

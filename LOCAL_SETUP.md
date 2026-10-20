@@ -87,7 +87,7 @@ Visit **http://localhost:3000/settings** to set up MFA: add the displayed secret
 
 Return to **http://localhost:3000/super-admin** and register your lodge. Use a different email for the Lodge Admin; select a package and subscription dates that include today. Payments are handled outside the CRM.
 
-Email delivery is not configured by default. In development, the lodge registration screen provides an activation link/token for the new Lodge Admin instead of requiring SMTP. Activate that account, choose its password, then sign in with it to use the lodge dashboard. Your Super Admin account and Lodge Admin account are separate roles. No guest/staff/room sample data is preloaded; create your own test records.
+Email delivery is not configured by default. In development, the lodge registration screen provides an activation link/token for the new Lodge Admin instead of requiring SMTP. Activate that account, choose its password, then sign in with it to use the lodge dashboard. Your Super Admin account and Lodge Admin account are separate logins. Clicking “Open lodge” while signed in as Super Admin does not change your identity or remove platform permissions. To test Lodge Admin permissions, activate the separate Lodge Admin account and sign in with it in a private browser window. No guest/staff/room sample data is preloaded; create your own test records.
 
 ## Stop and start again
 

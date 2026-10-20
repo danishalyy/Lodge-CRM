@@ -141,3 +141,26 @@ def test_reset_token_consumed_once_under_concurrent_requests(account):
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures=[executor.submit(reset) for _ in range(2)]
         assert sorted(f.result(timeout=30) for f in futures)==[200,400]
+
+
+@pytest.mark.parametrize('path', [
+    '/api/v1/platform/lodges',
+    '/api/v1/platform/plans',
+    '/api/v1/platform/users',
+    '/api/v1/platform/audit',
+    '/api/v1/platform/notifications',
+])
+def test_lodge_admin_cannot_read_platform_data(account, path):
+    response = account['client'].get(path)
+    assert response.status_code == 403
+    assert response.json()['detail'] == 'Super Admin access required'
+
+
+def test_lodge_admin_cannot_register_lodges(account):
+    response = account['client'].post('/api/v1/platform/lodges', headers=account['csrf'], json={
+        'name':'Forbidden lodge', 'location':'Test', 'timezone':'Africa/Johannesburg',
+        'package':'Basic','start_date':str(date.today()),'expiry_date':str(date.today()+timedelta(days=30)),
+        'admin_email':'unauthorized@example.com','admin_name':'Unauthorized Admin',
+    })
+    assert response.status_code == 403
+    assert response.json()['detail'] == 'Super Admin access required'

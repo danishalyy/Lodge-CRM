@@ -1,4 +1,5 @@
 "use client";
+import NotificationBell from "./NotificationBell";
 import Link from "next/link";
 import WorkspaceCommand from "./WorkspaceCommand";
 import { usePathname, useRouter } from "next/navigation";
@@ -368,13 +369,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span>Search workspace</span>
               <kbd>⌘ K</kbd>
             </button>
-            <Link
-              href="/notifications"
-              className="iconButton"
-              aria-label="Notifications"
-            >
-              <UiIcon name="bell" />
-            </Link>
+            <NotificationBell />
             <ThemeToggle />
             <SignOutButton />
             <button className="avatarButton" title={me.full_name}>

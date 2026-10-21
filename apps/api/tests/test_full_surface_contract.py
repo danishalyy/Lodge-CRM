@@ -14,14 +14,14 @@ MIG_DIR=ROOT/'alembic'/'versions'
 WEB=ROOT.parent/'web'
 
 def routes():
-    tree=ast.parse(MAIN)
     out=[]
-    for n in tree.body:
-        if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
-            for d in n.decorator_list:
-                if isinstance(d,ast.Call) and isinstance(d.func,ast.Attribute) and isinstance(d.func.value,ast.Name) and d.func.value.id=='app' and d.func.attr in {'get','post','patch','put','delete'}:
-                    path=ast.literal_eval(d.args[0])
-                    out.append((d.func.attr.upper(),path,n.name,ast.get_source_segment(MAIN,d) or '',ast.get_source_segment(MAIN,n) or ''))
+    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text()]:
+        for n in ast.parse(source).body:
+            if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
+                for d in n.decorator_list:
+                    if isinstance(d,ast.Call) and isinstance(d.func,ast.Attribute) and isinstance(d.func.value,ast.Name) and d.func.value.id in {'app','router'} and d.func.attr in {'get','post','patch','put','delete'}:
+                        path=ast.literal_eval(d.args[0])
+                        out.append((d.func.attr.upper(),path,n.name,ast.get_source_segment(source,d) or '',ast.get_source_segment(source,n) or ''))
     return out
 
 ROUTES=routes()
@@ -31,7 +31,7 @@ def test_api_surface_is_large_and_unique():
     keys=[(m,p) for m,p,*_ in ROUTES]
     assert len(keys)==len(set(keys))
 
-@pytest.mark.parametrize('method,path,name,deco,body',[r for r in ROUTES if r[0] in {'POST','PATCH','PUT','DELETE'} and r[1] not in {'/api/v1/auth/login','/api/v1/auth/activate','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/confirm'}])
+@pytest.mark.parametrize('method,path,name,deco,body',[r for r in ROUTES if r[0] in {'POST','PATCH','PUT','DELETE'} and r[1] not in {'/api/v1/auth/invitations/preview','/api/v1/auth/login','/api/v1/auth/activate','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/confirm'}])
 def test_every_authenticated_mutation_has_csrf(method,path,name,deco,body):
     assert 'require_csrf' in deco, f'{method} {path} lacks CSRF guard'
 

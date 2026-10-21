@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -17,11 +18,16 @@ class Settings(BaseSettings):
     object_storage_region: str = "us-east-1"
     public_web_url: str = "http://localhost:3000"
     smtp_host: str = ""
-    smtp_port: int = 587
+    smtp_port: int = Field(587, ge=1, le=65535)
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from_email: str = ""
     smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    email_encryption_key: str = ""
+    notification_escalation_minutes: int = Field(60, ge=1, le=10080)
+    invitation_ttl_hours: int = Field(72, ge=1, le=168)
+    invitation_resend_cooldown_seconds: int = Field(60, ge=1, le=86400)
     mfa_encryption_key: str = ""
     password_reset_ttl_minutes: int = 30
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

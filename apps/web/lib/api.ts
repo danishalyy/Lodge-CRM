@@ -51,6 +51,7 @@ const tenantCollection=(name:string)=>({
 
 export const authApi={
  login:(email:string,password:string,otp?:string)=>request('/api/v1/auth/login',{method:'POST',body:JSON.stringify({email,password,otp:otp||undefined})}),
+ previewInvitation:(token:string)=>request<any>('/api/v1/auth/invitations/preview',{method:'POST',body:JSON.stringify({token})}),
  activate:(token:string,password:string)=>request('/api/v1/auth/activate',{method:'POST',body:JSON.stringify({token,password})}),
  logout:async()=>{await request('/api/v1/auth/logout',{method:'POST'});clearAccountContext()},
  me:()=>request<any>('/api/v1/auth/me').then(bindAccount),
@@ -78,7 +79,7 @@ export const lodgeApi:any={
 };
 
 export const operationsApi={
- staff:{...tenantCollection('staff'),invite:(id:string,role_key:string)=>request<any>(lodgePath(`staff/${id}/invite`),{method:'POST',body:JSON.stringify({role_key})}),assignCustomRole:(id:string,custom_role_id:string|null)=>request<any>(lodgePath(`staff/${id}/custom-role`),{method:'PATCH',body:JSON.stringify({custom_role_id})})},
+ staff:{...tenantCollection('staff'),resendInvitation:(id:string)=>request<any>(lodgePath(`staff/${id}/invitation/resend`),{method:'POST'}),invite:(id:string,role_key:string)=>request<any>(lodgePath(`staff/${id}/invite`),{method:'POST',body:JSON.stringify({role_key})}),assignCustomRole:(id:string,custom_role_id:string|null)=>request<any>(lodgePath(`staff/${id}/custom-role`),{method:'PATCH',body:JSON.stringify({custom_role_id})})},
  departments:tenantCollection('departments'),
  stays:tenantCollection('stays'),
  requests:{...tenantCollection('requests'),createTask:(id:string)=>request(lodgePath(`requests/${id}/create-task`),{method:'POST'})},
@@ -112,6 +113,11 @@ export const intelligenceApi={
 export const lodgeBrandingApi={get:(id:string)=>request<{display_name:string;logo_url:string|null;platform_name:string}>(`/api/v1/lodges/${id}/branding`)};
 
 export const superApi={
+ inviteUser:(body:{email:string;full_name:string})=>request<any>('/api/v1/platform/users/invite',{method:'POST',body:JSON.stringify(body)}),
+ resendInvitation:(id:string)=>request<any>(`/api/v1/platform/users/${id}/invitation`,{method:'POST'}),
+ emailStatus:()=>request<any>('/api/v1/platform/email'),
+ testEmail:()=>request<any>('/api/v1/platform/email/test',{method:'POST'}),
+ retryEmail:(id:string)=>request<any>(`/api/v1/platform/email/${id}/retry`,{method:'POST'}),
  updateBranding:(id:string,body:{display_name:string;logo_base64?:string;remove_logo?:boolean})=>request(`/api/v1/platform/lodges/${id}/branding`,{method:'PATCH',body:JSON.stringify(body)}),
  lodges:()=>request<any[]>('/api/v1/platform/lodges'),
  createLodge:(body:any)=>request<any>('/api/v1/platform/lodges',{method:'POST',body:JSON.stringify(body)}),
@@ -125,3 +131,13 @@ export const superApi={
 };
 
 export {request};
+
+export const accountNotificationsApi={
+ list:(unread=false,severity='')=>request<any[]>(`/api/v1/auth/notifications?unread_only=${unread}${severity?'&severity='+encodeURIComponent(severity):''}`),
+ summary:()=>request<{unread:number}>('/api/v1/auth/notifications/summary'),
+ read:(id:string)=>request(`/api/v1/auth/notifications/${id}/read`,{method:'POST'}),
+ readAll:()=>request('/api/v1/auth/notifications/read-all',{method:'POST'}),
+ archive:(id:string)=>request(`/api/v1/auth/notifications/${id}/archive`,{method:'POST'}),
+ preferences:()=>request<any>('/api/v1/auth/notification-preferences'),
+ updatePreferences:(body:{email_enabled:boolean;email_min_severity:string})=>request<any>('/api/v1/auth/notification-preferences',{method:'PATCH',body:JSON.stringify(body)}),
+};

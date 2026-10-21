@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .models import (
     Membership, Notification, NotificationDelivery, NotificationPreference,
-    NotificationRecipient, Permission, RolePermission, StaffProfile, User,
+    NotificationRecipient, Permission, RolePermission, StaffProfile, User, Role,
 )
 
 SEVERITY_RANK={"low":0,"normal":1,"high":2,"critical":3}
@@ -39,14 +39,33 @@ def create_notification(db:Session,*,lodge_id,notification_type:str,severity:str
         raise
     user_ids=list(dict.fromkeys([x for x in (recipient_user_ids or []) if x]))
     for user_id in user_ids:
+        user=db.get(User,user_id)
+        if not user or not user.is_active:continue
+        if not user.is_super_admin:
+            member=db.scalar(select(Membership).where(Membership.lodge_id==lodge_id,Membership.user_id==user.id,Membership.is_active.is_(True)))
+            staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==lodge_id))
+            if not member or (staff and staff.employment_status!="active"):continue
         db.add(NotificationRecipient(lodge_id=lodge_id,notification_id=notification.id,user_id=user_id))
         pref=db.scalar(select(NotificationPreference).where(NotificationPreference.lodge_id==lodge_id,NotificationPreference.user_id==user_id))
-        if not pref or not pref.email_enabled or SEVERITY_RANK[severity] < SEVERITY_RANK.get(pref.email_min_severity,2):
-            continue
-        user=db.get(User,user_id)
-        if not user or not user.email: continue
-        db.add(NotificationDelivery(
-            lodge_id=lodge_id,notification_id=notification.id,user_id=user_id,channel="email",destination=user.email,
-            idempotency_key=f"email:{notification.id}:{user_id}",status="pending",next_attempt_at=datetime.now(timezone.utc)
-        ))
+        enabled=pref.email_enabled if pref else user.email_notifications_enabled
+        minimum=pref.email_min_severity if pref else user.email_min_severity
+        if not enabled or not user.email_notifications_enabled or not user.email_verified_at or SEVERITY_RANK[severity]<SEVERITY_RANK.get(minimum,2):continue
+        db.add(NotificationDelivery(lodge_id=lodge_id,notification_id=notification.id,user_id=user_id,channel="email",destination=user.email,
+                                   idempotency_key=f"email:{notification.id}:{user_id}",status="pending",next_attempt_at=datetime.now(timezone.utc)))
     return notification
+
+
+def management_recipient_ids(db, lodge_id, permission_key, department_id=None):
+    """Operational notices go to responsible managers, not everyone with inbox access."""
+    from .security import has_permission
+    rows=db.execute(select(Membership,Role,User).join(Role,Role.id==Membership.role_id).join(User,User.id==Membership.user_id)
+                    .where(Membership.lodge_id==lodge_id,Membership.is_active.is_(True),User.is_active.is_(True))).all()
+    out=[]
+    for member,role,user in rows:
+        if role.key not in {"lodge_admin","department_manager"}:continue
+        if role.key=="department_manager" and (not department_id or member.department_id!=department_id):continue
+        if not has_permission(db,member,permission_key):continue
+        staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==lodge_id))
+        if staff and staff.employment_status!="active":continue
+        out.append(user.id)
+    return out

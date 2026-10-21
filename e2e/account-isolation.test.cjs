@@ -269,3 +269,66 @@ test('removing a lodge logo requires confirmation before any write',async()=>{
   await page.getByRole('heading',{name:'Manage branding',exact:true}).waitFor({state:'hidden'});assert.equal(writes,1);
  }finally{await context.close()}
 });
+
+test('invitation preview keeps token out of URLs and owner chooses matching password',async()=>{
+ const context=await browser.newContext();const page=await context.newPage();page.setDefaultTimeout(10000);let activated;
+ const token='test-invitation-token-at-least-20-characters';
+ try{
+  await page.route('**/api/**',async route=>{const url=route.request().url();assert.ok(!url.includes(token));
+   if(url.endsWith('/invitations/preview')){assert.equal(route.request().postDataJSON().token,token);return route.fulfill({json:{name:'New Owner',email_hint:'o***@example.com',workspace:'Acacia Lodge',expires_at:'2027-01-01T00:00:00Z'}})}
+   if(url.endsWith('/auth/activate')){activated=route.request().postDataJSON();await context.addCookies([{name:'lodge_session',value:'activated-test-session',url:base}]);return route.fulfill({json:{ok:true}})}
+   if(url.endsWith('/auth/me'))return route.fulfill({json:{id:'owner',full_name:'New Owner',is_super_admin:false,memberships:[{lodge_id:'lodge',permissions:[],entitlements:[]}]}});
+   return route.fulfill({json:[]});
+  });
+  await page.goto(base+'/activate#token='+token);
+  await page.getByText('Acacia Lodge',{exact:true}).waitFor();assert.equal(new URL(page.url()).hash,'');
+  await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-invitation-light.png'),fullPage:true});
+  await page.getByLabel('New password',{exact:true}).fill('My own private passphrase 42!');
+  await page.getByLabel('Confirm password',{exact:true}).fill('A different passphrase 42!');
+  await page.getByRole('button',{name:/activate|set.*password/i}).click();
+  await page.getByText('Your passwords do not match.',{exact:true}).waitFor();assert.equal(activated,undefined);
+  await page.getByLabel('Confirm password',{exact:true}).fill('My own private passphrase 42!');
+  await page.getByRole('button',{name:/activate|set.*password/i}).click();
+  await page.waitForURL('**/settings');assert.deepEqual(activated,{token,password:'My own private passphrase 42!'});
+ }finally{await context.close()}
+});
+
+test('notification inbox updates unread count, archives and saves private preferences',async()=>{
+ const {context,page}=await accountPage({id:'platform-owner',full_name:'Platform Owner',email:'owner@example.com',is_super_admin:true,mfa_enabled:true,memberships:[]});
+ let read=false,archived=false,saved;
+ try{
+  await page.route('**/api/v1/auth/notification**',async route=>{const url=new URL(route.request().url()),p=url.pathname;
+   if(p.endsWith('/summary'))return route.fulfill({json:{unread:read||archived?0:1}});
+   if(p.endsWith('/notification-preferences')){if(route.request().method()==='PATCH')saved=route.request().postDataJSON();return route.fulfill({json:{email_enabled:true,email_min_severity:'normal',email_verified:true,email_configured:true,...saved}})}
+   if(p.endsWith('/read'))read=true;else if(p.endsWith('/archive'))archived=true;else return route.fulfill({json:archived?[]:[{id:'notice-1',title:'Task needs attention',body:'Only your account can see this update.',severity:'high',created_at:'2026-10-20T12:00:00Z',read_at:read?'2026-10-20T12:01:00Z':null,email_status:'sent'}]});
+   return route.fulfill({json:{ok:true}});
+  });
+  await page.goto(base+'/super-admin/notifications');await page.getByRole('heading',{name:'Task needs attention'}).waitFor();
+  await page.getByRole('link',{name:'Notifications, 1 unread'}).waitFor();
+  await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-notifications-light.png'),fullPage:true});
+  await page.getByRole('button',{name:'Mark read',exact:true}).click();await page.getByRole('link',{name:'Notifications',exact:true}).first().waitFor();
+  await page.getByLabel('Email operational notifications').uncheck();await page.getByRole('button',{name:'Save preferences'}).click();await page.getByText('Notification preferences saved',{exact:true}).waitFor();assert.equal(saved.email_enabled,false);
+  await page.getByRole('button',{name:'Archive Task needs attention'}).click();await page.getByRole('heading',{name:'No notifications here yet'}).waitFor();
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.getByRole('button',{name:'Close toast',exact:true}).click().catch(()=>{});await page.waitForTimeout(500);await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-notifications-mobile-dark.png'),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(x=>({id:x.id,nodes:x.nodes.map(n=>n.target)})),[]);
+ }finally{await context.close()}
+});
+
+test('staff creation queues an invitation without choosing an owner password and supports resend',async()=>{
+ const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+ const {context,page}=await accountPage({id:'lodge-owner',full_name:'Lodge Owner',is_super_admin:false,mfa_enabled:false,memberships:[{lodge_id:lodge,permissions:['staff.view','staff.manage','staff.contact.view'],entitlements:['staff']}]});let created,resends=0;
+ try{
+  await page.route('**/api/v1/lodges/**',async route=>{const url=new URL(route.request().url()),p=url.pathname;
+   if(p.endsWith('/invitation/resend')){resends++;return route.fulfill({json:{delivery_status:'pending'}})}
+   if(p.endsWith('/staff')){if(route.request().method()==='POST'){created=route.request().postDataJSON();return route.fulfill({json:{id:'new-staff',delivery_status:'pending'}})}return route.fulfill({json:created?[{id:'new-staff',full_name:created.full_name,email:created.email,job_title:'',phone:'',employment_status:'active',operational_status:'available',has_login:true,account_status:'pending_activation',delivery_status:'pending'}]:[]})}
+   if(p.endsWith('/branding'))return route.fulfill({json:{display_name:'Acacia Lodge',logo_url:null}});
+   return route.fulfill({json:[]});
+  });
+  await page.goto(base+'/staff');await page.getByRole('button',{name:'+ Staff member'}).click();
+  await page.locator('input[name="full_name"]').fill('Staff Owner');await page.locator('input[name="email"]').fill('owner@business.example');
+  assert.equal(await page.locator('input[type="password"]').count(),0);
+  await page.getByRole('button',{name:'Create and invite',exact:true}).click();
+  await page.getByText('pending_activation',{exact:true}).waitFor();assert.equal(created.invite_role_key,'general_staff');assert.equal(created.email,'owner@business.example');assert.equal(created.password,undefined);
+  await page.getByRole('button',{name:'Resend invitation',exact:true}).click();await page.getByText(/Replacement invitation pending/).waitFor();assert.equal(resends,1);
+ }finally{await context.close()}
+});

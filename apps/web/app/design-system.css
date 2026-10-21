@@ -2940,3 +2940,160 @@ textarea:focus-visible {
     padding-bottom: 32px;
   }
 }
+
+/* Account onboarding and private updates share the workspace glass surfaces. */
+.accountLinkPage {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}
+.accountLinkCard {
+  width: min(100%, 560px);
+  padding: 32px;
+  display: grid;
+  gap: 16px;
+}
+.accountLinkCard form {
+  display: grid;
+  gap: 12px;
+}
+.accountLinkCard .safariBrand {
+  margin-bottom: 16px;
+}
+.notificationLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.notificationToolbar,
+.notificationTitle,
+.notificationActions,
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.notificationToolbar {
+  padding-bottom: 24px;
+}
+.notificationToolbar select {
+  background: var(--surface-glass);
+  color: var(--text-primary);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--bd);
+}
+.notificationItem {
+  display: flex;
+  gap: 16px;
+  padding: 24px 0;
+  border-top: 1px solid var(--bd);
+}
+.notificationItem.unread h2 {
+  font-weight: 600;
+}
+.notificationText {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.notificationTitle h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.notificationText p {
+  white-space: pre-line;
+}
+.notificationText small {
+  color: var(--text-secondary);
+}
+.notificationActions {
+  margin-top: 16px;
+}
+.notificationPriority {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-glass);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.noticeSeverity {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border: 1px solid var(--bd);
+  border-radius: 9999px;
+}
+.noticeSeverity.critical,
+.notificationPriority.critical {
+  color: var(--danger);
+}
+.checkRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 44px;
+}
+.checkRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-orange);
+}
+.notificationBell {
+  position: relative;
+}
+.notificationCount {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  border-radius: 9999px;
+  background: var(--color-orange);
+  color: var(--color-brown);
+  font-weight: 600;
+}
+.notificationOffline {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+.emailDeliveryPanel {
+  margin-top: 24px;
+}
+.emailDeliveryPanel .tableWrap {
+  margin-top: 24px;
+}
+.sectionHeader {
+  justify-content: space-between;
+}
+@media (max-width: 900px) {
+  .notificationLayout {
+    grid-template-columns: 1fr;
+  }
+  .accountLinkCard {
+    padding: 24px;
+  }
+  .notificationItem {
+    gap: 12px;
+  }
+  .notificationTitle {
+    gap: 8px;
+  }
+}
+.accountLinkCard h1,.accountLinkCard p{margin:0}
+.accountLinkFooter{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px}

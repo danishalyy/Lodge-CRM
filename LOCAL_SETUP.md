@@ -77,7 +77,7 @@ Open `http://localhost:8000/health` in your browser. It should report:
 docker compose -f infra/docker-compose.yml exec api python -m app.bootstrap_superadmin
 ```
 
-Enter an email, your full name, and a strong password of at least 12 characters. Password input is intentionally invisible. No default login is included. Run this once per administrator email.
+Enter the owner’s email and full name. With SMTP configured, the owner receives an invitation to choose their own password. In development without SMTP, the command prints a private activation link; open it locally and set your password. No default login is included. Run this once per administrator email. See [Gmail and invitation setup](docs/EMAIL_AND_INVITATIONS.md) to configure real email delivery.
 
 ## 6. Sign in and create a lodge
 

@@ -49,6 +49,7 @@ class DepartmentUpdate(StrictModel):
 
 
 class StaffCreate(StrictModel):
+    invite_role_key: str | None = Field(default=None, pattern="^(department_manager|front_office|ranger|housekeeping|maintenance|driver|fb|finance|general_staff|read_only)$")
     full_name: str = Field(min_length=2, max_length=180)
     email: EmailStr | None = None
     phone: str = Field(default="", max_length=80)
@@ -555,3 +556,12 @@ class LodgeBrandingUpdate(StrictModel):
     display_name: str = Field(min_length=1, max_length=180)
     logo_base64: str | None = Field(default=None, max_length=350000)
     remove_logo: bool = False
+
+
+class PlatformInvite(StrictModel):
+    email: EmailStr
+    full_name: str = Field(min_length=2, max_length=180)
+
+
+class InvitationPreviewIn(StrictModel):
+    token: str = Field(min_length=20, max_length=300)

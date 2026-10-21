@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import {accountHome} from "@/lib/account-routing";
 import SafariBrand from "@/components/SafariBrand";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -22,9 +23,7 @@ export default function Login() {
       const me = await authApi.me();
       if (me.memberships?.[0]) setActiveLodgeId(me.memberships[0].lodge_id);
       router.replace(
-        me.is_super_admin && !me.memberships?.length
-          ? "/super-admin"
-          : "/dashboard",
+        accountHome(me),
       );
     } catch (e: any) {
       if (e.message === "MFA_REQUIRED") {

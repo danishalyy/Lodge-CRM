@@ -1,6 +1,4 @@
 from datetime import date, datetime, timedelta, timezone
-from email.message import EmailMessage
-import smtplib
 import redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,49 +9,22 @@ from .models import (
     Lodge, MaintenanceTicket, Membership, Notification, NotificationDelivery, NotificationPreference,
     StaffProfile, StaffLeave, StaffCredential, MaintenanceAsset, Subscription, Task, User, Vehicle, Stay, Unit
 )
-from .notification_service import create_notification, staff_user_id, user_ids_with_permission
+from .notification_service import create_notification, staff_user_id, user_ids_with_permission, management_recipient_ids
 
 redis_client=redis.Redis.from_url(settings.redis_url,decode_responses=True)
 
 def _lock(name,ttl):
     return redis_client.set(f"job-lock:{name}",str(datetime.now(timezone.utc).timestamp()),nx=True,ex=ttl)
 
-def _send_email(destination,title,body):
-    if not settings.smtp_host or not settings.smtp_from_email:
-        raise RuntimeError("SMTP delivery is not configured")
-    msg=EmailMessage();msg["Subject"]=title;msg["From"]=settings.smtp_from_email;msg["To"]=destination;msg.set_content(body)
-    with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=20) as smtp:
-        if settings.smtp_use_tls:smtp.starttls()
-        if settings.smtp_username:smtp.login(settings.smtp_username,settings.smtp_password)
-        smtp.send_message(msg)
+@celery_app.task(name="app.worker.process_account_email_outbox")
+def process_account_email_outbox():
+    from .email_jobs import process_account_emails
+    return process_account_emails(SessionLocal)
 
 @celery_app.task(name="app.worker.process_notification_outbox")
 def process_notification_outbox():
-    if not _lock("notification-outbox",55):return {"skipped":"locked"}
-    now=datetime.now(timezone.utc);processed=0
-    with SessionLocal() as db:
-        set_rls_context(db,None,True)
-        rows=db.scalars(select(NotificationDelivery).where(NotificationDelivery.status.in_(["pending","failed"]),NotificationDelivery.next_attempt_at<=now).order_by(NotificationDelivery.next_attempt_at).limit(100)).all()
-        for delivery in rows:
-            set_rls_context(db,str(delivery.lodge_id),True)
-            notification=db.get(Notification,delivery.notification_id)
-            if not notification:
-                delivery.status="dead";delivery.last_error="Notification no longer exists";continue
-            delivery.status="sending";delivery.attempts+=1;db.commit()
-            try:
-                _send_email(delivery.destination,notification.title,notification.body or notification.title)
-                set_rls_context(db,str(delivery.lodge_id),True)
-                delivery.status="sent";delivery.sent_at=datetime.now(timezone.utc);delivery.last_error=""
-            except Exception as exc:
-                set_rls_context(db,str(delivery.lodge_id),True)
-                delivery.last_error=str(exc)[:2000]
-                if delivery.attempts>=8:delivery.status="dead"
-                else:
-                    delivery.status="failed"
-                    delay=min(3600,60*(2**max(0,delivery.attempts-1)))
-                    delivery.next_attempt_at=datetime.now(timezone.utc)+timedelta(seconds=delay)
-            db.commit();processed+=1
-    return {"processed":processed}
+    from .email_jobs import process_notification_emails
+    return process_notification_emails(SessionLocal)
 
 @celery_app.task(name="app.worker.generate_operational_alerts")
 def generate_operational_alerts():
@@ -66,17 +37,18 @@ def generate_operational_alerts():
             set_rls_context(db,str(lodge.id),True)
             sub=db.get(Subscription,lodge.id);today=date.today()
             if not sub or sub.suspended or today<sub.start_date or today>sub.expiry_date:continue
-            managers=user_ids_with_permission(db,lodge.id,"notifications.view")
+            managers=management_recipient_ids(db,lodge.id,"maintenance.view")
             overdue=db.scalars(select(Task).where(Task.lodge_id==lodge.id,Task.status.not_in(["completed","cancelled"]),Task.due_at.is_not(None),Task.due_at<now)).all()
             for task in overdue:
                 assignee=staff_user_id(db,lodge.id,task.assigned_staff_id)
-                recipients=list(dict.fromkeys(([assignee] if assignee else [])+managers))
-                n=create_notification(db,lodge_id=lodge.id,notification_type="task.overdue",severity="high" if task.priority!="critical" else "critical",title=f"Overdue task: {task.title}",body=f"Task was due {task.due_at.isoformat()} and is still {task.status}.",resource_type="task",resource_id=task.id,dedupe_key=f"task-overdue:{task.id}:{task.due_at.isoformat()}",recipient_user_ids=recipients)
+                recipients=list(dict.fromkeys(([assignee] if assignee else [])+management_recipient_ids(db,lodge.id,"tasks.manage",task.department_id)))
+                severity="critical" if task.priority=="critical" or now-task.due_at>=timedelta(minutes=settings.notification_escalation_minutes) else "high"
+                n=create_notification(db,lodge_id=lodge.id,notification_type="task.overdue",severity=severity,title=f"Overdue task: {task.title}",body=f"Task was due {task.due_at.isoformat()} and is still {task.status}.",resource_type="task",resource_id=task.id,dedupe_key=f"task-overdue:{task.id}:{task.due_at.isoformat()}:{severity}",recipient_user_ids=recipients)
                 if n:created+=1
             critical=db.scalars(select(MaintenanceTicket).where(MaintenanceTicket.lodge_id==lodge.id,MaintenanceTicket.priority=="critical",MaintenanceTicket.status.not_in(["completed","cancelled"]))).all()
             for ticket in critical:
                 assignee=staff_user_id(db,lodge.id,ticket.assigned_staff_id)
-                recipients=list(dict.fromkeys(([assignee] if assignee else [])+managers))
+                recipients=list(dict.fromkeys(([assignee] if assignee else [])+management_recipient_ids(db,lodge.id,"maintenance.view",ticket.department_id)))
                 n=create_notification(db,lodge_id=lodge.id,notification_type="maintenance.critical",severity="critical",title=f"Critical maintenance: {ticket.title}",body=ticket.description,resource_type="maintenance",resource_id=ticket.id,dedupe_key=f"maintenance-critical:{ticket.id}:{ticket.updated_at.isoformat()}",recipient_user_ids=recipients)
                 if n:created+=1
             assigned=db.scalars(select(Task).where(Task.lodge_id==lodge.id,Task.assigned_staff_id.is_not(None),Task.status.in_(["assigned","accepted","started"]))).all()

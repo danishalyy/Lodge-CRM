@@ -80,13 +80,18 @@ services:
       OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-lodge-crm-media}
       OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
-      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY:-}
+      INVITATION_TTL_HOURS: ${INVITATION_TTL_HOURS:-72}
+      INVITATION_RESEND_COOLDOWN_SECONDS: ${INVITATION_RESEND_COOLDOWN_SECONDS:-60}
+      NOTIFICATION_ESCALATION_MINUTES: ${NOTIFICATION_ESCALATION_MINUTES:-60}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-30}
     depends_on:
       db-grants: {condition: service_completed_successfully}
@@ -99,12 +104,18 @@ services:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_ENV: ${APP_ENV:-production}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY:-}
+      INVITATION_TTL_HOURS: ${INVITATION_TTL_HOURS:-72}
+      INVITATION_RESEND_COOLDOWN_SECONDS: ${INVITATION_RESEND_COOLDOWN_SECONDS:-60}
+      NOTIFICATION_ESCALATION_MINUTES: ${NOTIFICATION_ESCALATION_MINUTES:-60}
     depends_on:
       db-grants: {condition: service_completed_successfully}
       redis: {condition: service_started}
@@ -116,12 +127,18 @@ services:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_ENV: ${APP_ENV:-production}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY:-}
+      INVITATION_TTL_HOURS: ${INVITATION_TTL_HOURS:-72}
+      INVITATION_RESEND_COOLDOWN_SECONDS: ${INVITATION_RESEND_COOLDOWN_SECONDS:-60}
+      NOTIFICATION_ESCALATION_MINUTES: ${NOTIFICATION_ESCALATION_MINUTES:-60}
     depends_on:
       db-grants: {condition: service_completed_successfully}
       redis: {condition: service_started}

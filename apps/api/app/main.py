@@ -6,8 +6,6 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 import uuid
 import hashlib
 import secrets
-import smtplib
-from email.message import EmailMessage
 import redis
 import boto3
 import pyotp
@@ -52,6 +50,7 @@ from .security import (
 )
 from .services.state import housekeeping_job_created, housekeeping_awaiting_inspection, housekeeping_completed, maintenance_opened, maintenance_released, unit_is_occupied
 from .notification_service import create_notification, staff_user_id, user_ids_with_permission
+from .email_service import issue_invitation, account_email_status, queue_account_email, validate_email_configuration
 
 app = FastAPI(
     title="SafariOS API",
@@ -84,6 +83,10 @@ def validate_production_configuration():
     if not settings.cookie_secure: problems.append("COOKIE_SECURE must be true")
     if not settings.mfa_encryption_key: problems.append("MFA_ENCRYPTION_KEY is required")
     if not settings.smtp_host or not settings.smtp_from_email: problems.append("SMTP is required for password recovery and invitations")
+    else:
+        try: validate_email_configuration()
+        except HTTPException as exc: problems.append(str(exc.detail))
+    if not (settings.email_encryption_key or settings.mfa_encryption_key): problems.append("EMAIL_ENCRYPTION_KEY or MFA_ENCRYPTION_KEY is required for the account email outbox")
     if "change-this" in settings.object_storage_secret_key: problems.append("OBJECT_STORAGE_SECRET_KEY must be replaced")
     if any(o.startswith("http://") for o in settings.origins): problems.append("FRONTEND_ORIGINS must use HTTPS")
     if settings.public_web_url.startswith("http://"): problems.append("PUBLIC_WEB_URL must use HTTPS")
@@ -168,45 +171,6 @@ def clear_login_limit(request: Request, email: str):
     except redis.RedisError:
         pass
 
-
-def send_activation_email(to_email:str, full_name:str, lodge_name:str, token:str):
-    if not settings.smtp_host or not settings.smtp_from_email:
-        if settings.app_env == "production":
-            raise HTTPException(503,"Email delivery is not configured")
-        return False
-    msg=EmailMessage()
-    msg["Subject"]=f"Activate your {lodge_name} SafariOS account"
-    msg["From"]=settings.smtp_from_email
-    msg["To"]=to_email
-    link=f"{settings.public_web_url.rstrip('/')}/activate?token={token}"
-    msg.set_content(f"Hello {full_name},\n\nYou have been invited to {lodge_name} on Lodge CRM. Activate your account using this secure link:\n{link}\n\nThis link expires in 72 hours.")
-    try:
-        with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=15) as smtp:
-            if settings.smtp_use_tls:smtp.starttls()
-            if settings.smtp_username:smtp.login(settings.smtp_username,settings.smtp_password)
-            smtp.send_message(msg)
-    except Exception as exc:
-        raise HTTPException(503,"Invitation email could not be delivered") from exc
-    return True
-
-
-def send_password_reset_email(to_email:str, full_name:str, token:str):
-    if not settings.smtp_host or not settings.smtp_from_email:
-        raise HTTPException(503,"Password reset email delivery is not configured")
-    msg=EmailMessage()
-    msg["Subject"]="Reset your SafariOS password"
-    msg["From"]=settings.smtp_from_email
-    msg["To"]=to_email
-    link=f"{settings.public_web_url.rstrip('/')}/reset-password?token={token}"
-    msg.set_content(f"Hello {full_name},\n\nA password reset was requested for your SafariOS account. Use this secure link:\n{link}\n\nThis link expires in {settings.password_reset_ttl_minutes} minutes. If you did not request this, you can ignore this email.")
-    try:
-        with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=15) as smtp:
-            if settings.smtp_use_tls:smtp.starttls()
-            if settings.smtp_username:smtp.login(settings.smtp_username,settings.smtp_password)
-            smtp.send_message(msg)
-    except Exception as exc:
-        raise HTTPException(503,"Password reset email could not be delivered") from exc
-    return True
 
 
 def audit(db: Session, request: Request, lodge_id, user_id, action: str, resource_type: str, resource_id: str, detail: str = ""):
@@ -356,14 +320,22 @@ def activate(body: ActivateIn, response: Response, db: Session = Depends(get_db)
     now = datetime.now(timezone.utc)
     invitation = db.scalar(select(Invitation).where(
         Invitation.token_hash == token_hash(body.token), Invitation.used_at.is_(None), Invitation.expires_at > now
-    ).with_for_update())
+    ))
     if not invitation:
         raise HTTPException(400, "Activation link is invalid or has expired")
-    user = db.get(User, invitation.user_id)
+    user = db.scalar(select(User).where(User.id == invitation.user_id).with_for_update())
+    invitation = db.scalar(select(Invitation).where(Invitation.id==invitation.id, Invitation.used_at.is_(None), Invitation.expires_at>now).with_for_update().execution_options(populate_existing=True))
+    if not invitation:raise HTTPException(400,"Activation link is invalid or has expired")
     if not user:
         raise HTTPException(400, "Invitation user no longer exists")
     if user.is_active:
         raise HTTPException(400, "Account is already activated; sign in or use password recovery")
+    if invitation.lodge_id:
+        member=db.scalar(select(Membership).where(Membership.user_id==user.id,Membership.lodge_id==invitation.lodge_id,Membership.is_active.is_(True)))
+        staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==invitation.lodge_id))
+        if not member or (staff and staff.employment_status!="active"):raise HTTPException(400,"This invitation is no longer available. Contact your administrator.")
+    elif not user.is_super_admin:
+        raise HTTPException(400,"This invitation is no longer available")
     _validate_password_policy(body.password)
     user.password_hash = hash_password(body.password)
     user.is_active = True
@@ -377,10 +349,10 @@ def activate(body: ActivateIn, response: Response, db: Session = Depends(get_db)
 
 @app.post("/api/v1/auth/password-reset/request")
 def request_password_reset(body: PasswordResetRequestIn, request: Request, db: Session = Depends(get_db)):
-    if not settings.smtp_host or not settings.smtp_from_email:
-        raise HTTPException(503,"Password reset is unavailable because email delivery is not configured")
+    validate_email_configuration()
     rate_limit_login(request, f"reset:{body.email}")
-    user=db.scalar(select(User).where(User.email==body.email.lower(),User.is_active.is_(True)))
+    set_rls_context(db,None,True)
+    user=db.scalar(select(User).where(User.email==body.email.lower(),User.is_active.is_(True)).with_for_update())
     if user:
         now=datetime.now(timezone.utc)
         for old in db.scalars(select(PasswordResetToken).where(PasswordResetToken.user_id==user.id,PasswordResetToken.used_at.is_(None))).all():
@@ -388,20 +360,24 @@ def request_password_reset(body: PasswordResetRequestIn, request: Request, db: S
         raw=new_token()
         row=PasswordResetToken(user_id=user.id,token_hash=token_hash(raw),expires_at=now+timedelta(minutes=settings.password_reset_ttl_minutes))
         db.add(row);db.flush()
-        send_password_reset_email(user.email,user.full_name,raw)
+        queue_account_email(db,user=user,kind="password_reset",title="Reset your SafariOS password",
+                            body=f"Hello {user.full_name},\n\nSet a new SafariOS password using the button below. This one-time link expires in {settings.password_reset_ttl_minutes} minutes. If you did not request this, ignore the email.",
+                            action_label="Reset my password",action_url=f"{settings.public_web_url.rstrip('/')}/reset-password#token={raw}",reset_token=row)
         db.commit()
-    return {"ok":True,"message":"If an active account exists for that email, a reset link has been sent."}
+    return {"ok":True,"message":"If an active account exists for that email, a reset email has been queued for delivery."}
 
 
 @app.post("/api/v1/auth/password-reset/confirm")
 def confirm_password_reset(body: PasswordResetConfirmIn, response: Response, db: Session = Depends(get_db)):
     now=datetime.now(timezone.utc)
-    row=db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash==token_hash(body.token),PasswordResetToken.used_at.is_(None),PasswordResetToken.expires_at>now).with_for_update())
+    row=db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash==token_hash(body.token),PasswordResetToken.used_at.is_(None),PasswordResetToken.expires_at>now))
     if not row: raise HTTPException(400,"Password reset link is invalid or has expired")
-    user=db.get(User,row.user_id)
+    user=db.scalar(select(User).where(User.id==row.user_id).with_for_update())
+    row=db.scalar(select(PasswordResetToken).where(PasswordResetToken.id==row.id,PasswordResetToken.used_at.is_(None),PasswordResetToken.expires_at>now).with_for_update().execution_options(populate_existing=True))
+    if not row:raise HTTPException(400,"Password reset link is invalid or has expired")
     if not user or not user.is_active: raise HTTPException(400,"Account is unavailable")
     _validate_password_policy(body.password)
-    user.password_hash=hash_password(body.password);row.used_at=now
+    user.password_hash=hash_password(body.password);user.email_verified_at=now;row.used_at=now
     sessions=db.scalars(select(AuthSession).where(AuthSession.user_id==user.id,AuthSession.revoked_at.is_(None))).all()
     for sess in sessions:sess.revoked_at=now
     db.commit()
@@ -510,7 +486,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
                 "package": sub.package if sub else None, "entitlements":plan_features,
             })
-    return {"id": str(user.id), "email": user.email, "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "memberships": memberships}
+    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "memberships": memberships}
 
 
 @app.get("/api/v1/lodges/{lodge_id}/dashboard")
@@ -633,7 +609,9 @@ def list_lodges(user: User = Depends(require_super_admin), db: Session = Depends
     out = []
     for l in db.scalars(select(Lodge).order_by(Lodge.name)).all():
         s = db.get(Subscription, l.id)
-        out.append({"id": str(l.id), "name": l.name, "branding":lodge_branding(l), "location": l.location, "status": l.status, "subscription_status": subscription_status(s), "subscription": ({"package": s.package, "start_date": s.start_date.isoformat(), "expiry_date": s.expiry_date.isoformat(), "suspended": s.suspended} if s else None)})
+        admin=db.scalar(select(User).join(Membership,Membership.user_id==User.id).join(Role,Role.id==Membership.role_id).where(Membership.lodge_id==l.id,Membership.is_active.is_(True),Role.key=="lodge_admin").order_by(User.created_at).limit(1))
+        administrator={"id":str(admin.id),"email":admin.email,"name":admin.full_name,**account_email_status(db,admin)} if admin else None
+        out.append({"id": str(l.id), "administrator":administrator, "name": l.name, "branding":lodge_branding(l), "location": l.location, "status": l.status, "subscription_status": subscription_status(s), "subscription": ({"package": s.package, "start_date": s.start_date.isoformat(), "expiry_date": s.expiry_date.isoformat(), "suspended": s.suspended} if s else None)})
     return out
 
 
@@ -659,14 +637,12 @@ def create_lodge(body: LodgeCreate, request: Request, user: User = Depends(requi
     existing = db.scalar(select(Membership).where(Membership.user_id == admin.id, Membership.lodge_id == lodge.id))
     if not existing:
         db.add(Membership(user_id=admin.id, lodge_id=lodge.id, role_id=role.id, is_active=True))
-    if not admin.is_active:
-        activation_token = new_token()
-        db.add(Invitation(lodge_id=lodge.id, user_id=admin.id, token_hash=token_hash(activation_token), expires_at=datetime.now(timezone.utc)+timedelta(hours=72), created_by_user_id=user.id))
-        send_activation_email(admin.email, admin.full_name, lodge.name, activation_token)
+    invitation_result = issue_invitation(db, admin, lodge=lodge, creator_id=user.id)
     audit(db, request, lodge.id, user.id, "lodge.created", "lodge", str(lodge.id), f"Package {body.package}")
     event(db, lodge.id, user.id, "lodge.created", "lodge", str(lodge.id), f"Lodge {lodge.name} registered")
     db.commit()
-    return {"id": str(lodge.id), "name": lodge.name, "activation_token": activation_token if settings.app_env != "production" else None, "activation_expires_hours": 72 if activation_token else None, "activation_email_sent": bool(activation_token and settings.smtp_host and settings.smtp_from_email)}
+    return {"id": str(lodge.id), "name": lodge.name, **invitation_result}
+
 
 
 @app.patch("/api/v1/platform/lodges/{lodge_id}/subscription", dependencies=[Depends(require_csrf)])
@@ -760,16 +736,22 @@ def staff(lodge_id: str, user: User = Depends(require_permission("staff.view")),
         dep=db.get(Department,x.department_id) if x.department_id else None
         membership=db.scalar(select(Membership).where(Membership.lodge_id==lodge_id,Membership.user_id==x.user_id,Membership.is_active.is_(True))) if x.user_id else None
         custom=db.get(CustomRole,membership.custom_role_id) if membership and membership.custom_role_id else None
-        out.append({"id":str(x.id),"full_name":x.full_name,"email":x.email if can_contact else None,"phone":x.phone if can_contact else "","job_title":x.job_title,"employee_code":x.employee_code if can_contact else None,"department_id":str(x.department_id) if x.department_id else None,"department_name":dep.name if dep else None,"employment_status":x.employment_status,"operational_status":x.operational_status,"supervisor_staff_id":str(x.supervisor_staff_id) if x.supervisor_staff_id else None,"supervisor_name":_name_staff(db,x.supervisor_staff_id),"hire_date":x.hire_date.isoformat() if x.hire_date else None,"has_login":bool(x.user_id),"custom_role_id":str(custom.id) if custom else None,"custom_role_name":custom.name if custom else None})
+        out.append({"id":str(x.id),"full_name":x.full_name,"email":x.email if can_contact else None,"phone":x.phone if can_contact else "","job_title":x.job_title,"employee_code":x.employee_code if can_contact else None,"department_id":str(x.department_id) if x.department_id else None,"department_name":dep.name if dep else None,"employment_status":x.employment_status,"operational_status":x.operational_status,"supervisor_staff_id":str(x.supervisor_staff_id) if x.supervisor_staff_id else None,"supervisor_name":_name_staff(db,x.supervisor_staff_id),"hire_date":x.hire_date.isoformat() if x.hire_date else None,"has_login":bool(x.user_id),**(account_email_status(db,db.get(User,x.user_id)) if x.user_id and db.get(User,x.user_id) else {"account_status":"no_account","delivery_status":None,"expires_at":None}),"custom_role_id":str(custom.id) if custom else None,"custom_role_name":custom.name if custom else None})
     return out
 
 
 @app.post("/api/v1/lodges/{lodge_id}/staff", dependencies=[Depends(require_csrf)])
 def create_staff(lodge_id: str, body: StaffCreate, request: Request, user: User = Depends(require_permission("staff.manage", write=True)), db: Session = Depends(get_db)):
+    if body.invite_role_key and not body.email:raise HTTPException(422,"Email is required when creating a login invitation")
     ensure_fk(db, Department, body.department_id, lodge_id, "Department");ensure_fk(db,StaffProfile,body.supervisor_staff_id,lodge_id,"Supervisor")
     row=StaffProfile(lodge_id=lodge_id,full_name=body.full_name.strip(),email=str(body.email).lower() if body.email else None,phone=body.phone.strip(),job_title=body.job_title.strip(),employee_code=body.employee_code.strip() if body.employee_code else None,department_id=body.department_id,employment_status=body.employment_status,operational_status=body.operational_status,supervisor_staff_id=body.supervisor_staff_id,hire_date=body.hire_date)
-    db.add(row);db.flush();audit(db,request,row.lodge_id,user.id,"staff.created","staff",str(row.id));event(db,row.lodge_id,user.id,"staff.created","staff",str(row.id),f"Staff profile {row.full_name} created");commit_or_conflict(db,"Employee code already exists for this lodge")
-    return {"id":str(row.id),"full_name":row.full_name,"email":row.email,"phone":row.phone,"job_title":row.job_title,"employee_code":row.employee_code,"department_id":str(row.department_id) if row.department_id else None,"employment_status":row.employment_status,"operational_status":row.operational_status}
+    db.add(row);db.flush();audit(db,request,row.lodge_id,user.id,"staff.created","staff",str(row.id));event(db,row.lodge_id,user.id,"staff.created","staff",str(row.id),f"Staff profile {row.full_name} created")
+    result={"id":str(row.id),"full_name":row.full_name,"email":row.email,"phone":row.phone,"job_title":row.job_title,"employee_code":row.employee_code,"department_id":str(row.department_id) if row.department_id else None,"employment_status":row.employment_status,"operational_status":row.operational_status}
+
+    if body.invite_role_key:
+        result.update(invite_staff_user(lodge_id,str(row.id),StaffInvite(role_key=body.invite_role_key),request,user,db))
+    else:commit_or_conflict(db,"Employee code already exists for this lodge")
+    return result
 
 
 @app.patch("/api/v1/lodges/{lodge_id}/staff/{record_id}", dependencies=[Depends(require_csrf)])
@@ -788,12 +770,19 @@ def update_staff(lodge_id:str,record_id:str,body:StaffUpdate,request:Request,use
 @app.post("/api/v1/lodges/{lodge_id}/staff/{record_id}/invite",dependencies=[Depends(require_csrf)])
 def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Request,user:User=Depends(require_permission("staff.manage",write=True)),db:Session=Depends(get_db)):
     staff=tenant_get(db,StaffProfile,record_id,lodge_id,"Staff profile")
+    ctx=_ctx(db,user,lodge_id)
+    if ctx.role_key=="department_manager" and (not ctx.department_id or staff.department_id!=ctx.department_id):raise HTTPException(403,"Only staff in your department can be invited")
+    if staff.employment_status != "active":raise HTTPException(409,"Only active staff can be invited")
+    if body.role_key == "department_manager" and not staff.department_id:raise HTTPException(422,"Assign a department before inviting a department manager")
+    if staff.user_id:
+        linked=db.get(User,staff.user_id)
+        if linked and linked.email.lower() != (staff.email or "").lower():raise HTTPException(409,"This staff profile is linked to another email; resolve the account link before inviting")
     if not staff.email: raise HTTPException(422,"An email address is required before inviting this staff member")
     role=db.scalar(select(Role).where(Role.key==body.role_key))
     if not role: raise HTTPException(422,"Selected role is not installed")
     role_features={"department_manager":"departments","ranger":"ranger","driver":"transfers","fb":"fb"}
     if body.role_key in role_features:ensure_feature(db,lodge_id,role_features[body.role_key])
-    account=db.scalar(select(User).where(func.lower(User.email)==staff.email.lower()))
+    account=db.scalar(select(User).where(func.lower(User.email)==staff.email.lower()).with_for_update())
     new_account=account is None
     if not account:
         account=User(email=staff.email.lower(),full_name=staff.full_name,password_hash=hash_password(new_token()+new_token()),is_active=False)
@@ -809,18 +798,13 @@ def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Reques
     else:
         db.add(Membership(user_id=account.id,lodge_id=lodge_id,role_id=role.id,department_id=staff.department_id,is_active=True))
     staff.user_id=account.id
-    activation_token=None;email_sent=False
+    invitation_result={"activation_token":None,"activation_email_sent":False,"activation_email_queued":False,"delivery_status":"already_active"}
     if not account.is_active:
-        prior=db.scalars(select(Invitation).where(Invitation.lodge_id==lodge_id,Invitation.user_id==account.id,Invitation.used_at.is_(None))).all()
-        for inv in prior: inv.used_at=datetime.now(timezone.utc)
-        activation_token=new_token()
-        db.add(Invitation(lodge_id=lodge_id,user_id=account.id,token_hash=token_hash(activation_token),expires_at=datetime.now(timezone.utc)+timedelta(hours=72),created_by_user_id=user.id))
-        lodge=db.get(Lodge,lodge_id)
-        email_sent=send_activation_email(account.email,account.full_name,lodge.name if lodge else "Lodge CRM",activation_token)
+        invitation_result=issue_invitation(db,account,lodge=db.get(Lodge,lodge_id),creator_id=user.id)
     audit(db,request,lodge_id,user.id,"staff.invited","staff_profile",str(staff.id),f"Role {body.role_key}")
     event(db,lodge_id,user.id,"staff.invited","staff_profile",str(staff.id),f"{staff.full_name} invited to Lodge CRM")
     db.commit()
-    return {"staff_id":str(staff.id),"user_id":str(account.id),"role_key":body.role_key,"activation_token":activation_token if settings.app_env!="production" else None,"activation_email_sent":email_sent}
+    return {"staff_id":str(staff.id),"user_id":str(account.id),"role_key":body.role_key,**invitation_result}
 
 
 @app.post("/api/v1/lodges/{lodge_id}/staff/{record_id}/revoke-access",dependencies=[Depends(require_csrf)])
@@ -1608,7 +1592,7 @@ def mark_notification_read(lodge_id:str,notification_id:str,user:User=Depends(re
 @app.get("/api/v1/lodges/{lodge_id}/notification-preferences")
 def get_notification_preferences(lodge_id:str,user:User=Depends(require_permission("notifications.view")),db:Session=Depends(get_db)):
     pref=db.scalar(select(NotificationPreference).where(NotificationPreference.lodge_id==lodge_id,NotificationPreference.user_id==user.id))
-    return {"email_enabled":pref.email_enabled if pref else False,"email_min_severity":pref.email_min_severity if pref else "high"}
+    return {"email_enabled":pref.email_enabled if pref else user.email_notifications_enabled,"email_min_severity":pref.email_min_severity if pref else user.email_min_severity}
 
 @app.patch("/api/v1/lodges/{lodge_id}/notification-preferences",dependencies=[Depends(require_csrf)])
 def update_notification_preferences(lodge_id:str,body:NotificationPreferenceUpdate,user:User=Depends(require_permission("notifications.manage",write=True)),db:Session=Depends(get_db)):
@@ -1617,6 +1601,7 @@ def update_notification_preferences(lodge_id:str,body:NotificationPreferenceUpda
         pref=NotificationPreference(lodge_id=lodge_id,user_id=user.id,email_enabled=body.email_enabled,email_min_severity=body.email_min_severity);db.add(pref)
     else:
         pref.email_enabled=body.email_enabled;pref.email_min_severity=body.email_min_severity
+    user.email_notifications_enabled=body.email_enabled;user.email_min_severity=body.email_min_severity
     db.commit()
     return {"email_enabled":pref.email_enabled,"email_min_severity":pref.email_min_severity}
 
@@ -1715,7 +1700,7 @@ def platform_users(user:User=Depends(require_super_admin),db:Session=Depends(get
     set_rls_context(db,None,True,str(user.id));rows=db.scalars(select(User).order_by(User.full_name,User.email)).all();out=[]
     for row in rows:
         memberships=db.execute(select(Membership,Lodge,Role).join(Lodge,Lodge.id==Membership.lodge_id).join(Role,Role.id==Membership.role_id).where(Membership.user_id==row.id,Membership.is_active.is_(True))).all()
-        out.append({"id":str(row.id),"email":row.email,"full_name":row.full_name,"is_active":row.is_active,"is_super_admin":row.is_super_admin,"mfa_enabled":bool(row.mfa_enabled_at),"created_at":row.created_at.isoformat(),"memberships":[{"lodge_id":str(m.lodge_id),"lodge_name":l.name,"role":r.name,"role_key":r.key} for m,l,r in memberships]})
+        out.append({"id":str(row.id),"email":row.email,"full_name":row.full_name,"is_active":row.is_active,"is_super_admin":row.is_super_admin,"mfa_enabled":bool(row.mfa_enabled_at),"created_at":row.created_at.isoformat(),**account_email_status(db,row),"memberships":[{"lodge_id":str(m.lodge_id),"lodge_name":l.name,"role":r.name,"role_key":r.key} for m,l,r in memberships]})
     return out
 
 
@@ -2111,3 +2096,7 @@ def task_attachment_download_url(lodge_id:str,task_id:str,attachment_id:str,user
     ensure_feature(db,lodge_id,"task_attachments");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,task_id,lodge_id,"Task");_assert_task_visible(db,ctx,task);row=tenant_get(db,TaskAttachment,attachment_id,lodge_id,"Task attachment")
     if row.task_id!=task.id:raise HTTPException(404,"Task attachment not found")
     return {"url":s3_public.generate_presigned_url("get_object",Params={"Bucket":settings.object_storage_bucket,"Key":row.object_key},ExpiresIn=600),"expires_in_seconds":600}
+
+
+from .account_routes import router as account_router
+app.include_router(account_router)

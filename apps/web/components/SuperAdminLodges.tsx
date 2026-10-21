@@ -20,6 +20,12 @@ type Lodge = {
   id: string;
   name: string;
   location: string;
+  administrator?: {
+    id: string;
+    email: string;
+    account_status: string;
+    delivery_status?: string;
+  };
   subscription_status: string;
   subscription?: { package: string; expiry_date: string };
   branding?: { display_name: string; logo_url: string | null };
@@ -179,7 +185,7 @@ export default function SuperAdminLodges() {
       created = true;
       if (result.activation_token)
         setActivation(
-          `${location.origin}/activate?token=${encodeURIComponent(result.activation_token)}`,
+          `${location.origin}/activate#token=${encodeURIComponent(result.activation_token)}`,
         );
       if (logo)
         await superApi.updateBranding(result.id, {
@@ -187,7 +193,7 @@ export default function SuperAdminLodges() {
           logo_base64: logo,
         });
       setNotice(
-        "Lodge registered. Subscription and administrator access are ready.",
+        "Lodge registered. The administrator must activate their account using the invitation link.",
       );
       setOpen(false);
       setFile(null);
@@ -360,6 +366,43 @@ export default function SuperAdminLodges() {
                   <dd>{lodge.subscription?.expiry_date || "—"}</dd>
                 </div>
               </dl>
+              {lodge.administrator && (
+                <div className="propertyAdmin">
+                  <p className="textSecondary">
+                    {lodge.administrator.email}
+                    <br />
+                    Account:{" "}
+                    {lodge.administrator.account_status.replaceAll("_", " ")}
+                    {lodge.administrator.delivery_status
+                      ? ` · Email: ${lodge.administrator.delivery_status}`
+                      : ""}
+                  </p>
+                  {lodge.administrator.account_status !== "active" && (
+                    <button
+                      className="button"
+                      onClick={async () => {
+                        try {
+                          const r = await superApi.resendInvitation(
+                            lodge.administrator!.id,
+                          );
+                          if (r.activation_token)
+                            setActivation(
+                              `${location.origin}/activate#token=${r.activation_token}`,
+                            );
+                          toast.success(
+                            "Replacement invitation " + r.delivery_status,
+                          );
+                          await load();
+                        } catch (e: any) {
+                          toast.error(e.message);
+                        }
+                      }}
+                    >
+                      Resend administrator invitation
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="propertyProvider">
                 Powered by <strong>SafariOS</strong>
               </div>

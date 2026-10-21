@@ -98,6 +98,7 @@ export default function NavigationEnhancements({
                 ["super-admin/packages", "Packages"],
                 ["super-admin/users", "Platform Users"],
                 ["super-admin/audit", "Audit"],
+                ["super-admin/notifications", "Notifications"],
                 ["super-admin/settings", "Settings"],
               ]
             ).map(([key, label]) => (

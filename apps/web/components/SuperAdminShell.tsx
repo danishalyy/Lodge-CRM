@@ -1,4 +1,5 @@
 "use client";
+import NotificationBell from "./NotificationBell";
 import Link from "next/link";
 import NavigationEnhancements from "./NavigationEnhancements";
 import SafariBrand from "./SafariBrand";
@@ -16,6 +17,7 @@ const items = [
   ["packages", "Packages", "▦"],
   ["users", "Platform Users", "◎"],
   ["audit", "Audit", "≡"],
+  ["notifications", "Notifications", "◉"],
   ["settings", "Settings", "⚙"],
 ];
 export default function SuperAdminShell({
@@ -155,6 +157,7 @@ export default function SuperAdminShell({
             </strong>
           </div>
           <div className="topActions">
+            <NotificationBell platform />
             <ThemeToggle />
             <SignOutButton />
           </div>

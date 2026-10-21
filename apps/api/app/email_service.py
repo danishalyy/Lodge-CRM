@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from .config import settings
-from .models import AccountEmail, Invitation, User
+from .models import AccountEmail, Invitation, User, LodgeGroup
 
 
 def email_configured():
@@ -133,7 +133,8 @@ def issue_invitation(db, user, *, lodge=None, creator_id=None):
         result["activation_token"] = raw
         result["delivery_status"] = "development_link"
         return result
-    name = lodge.brand_name or lodge.name if lodge else "SafariOS platform"
+    group=db.scalar(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))) if not lodge and not user.is_super_admin else None
+    name = (lodge.brand_name or lodge.name) if lodge else (group.name+" group") if group else "SafariOS platform"
     link = f"{settings.public_web_url.rstrip('/')}/activate#token={raw}"
     row = queue_account_email(db, user=user, kind="invitation", title=f"Set up your {name} account",
                               body=f"Hello {user.full_name},\n\nYou have been invited to {name}. Set your own SafariOS password using the button below. Your inviter cannot see your password.\n\nThis one-time link expires in {settings.invitation_ttl_hours} hours. If you did not expect this invitation, ignore this email.",

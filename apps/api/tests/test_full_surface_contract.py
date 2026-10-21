@@ -15,7 +15,7 @@ WEB=ROOT.parent/'web'
 
 def routes():
     out=[]
-    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text()]:
+    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text(), (ROOT/'app'/'group_routes.py').read_text()]:
         for n in ast.parse(source).body:
             if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
                 for d in n.decorator_list:
@@ -80,7 +80,7 @@ def test_notification_writes_obey_expiry_read_only_rule():
     assert all('write=True' in b for b in blocks)
 
 
-def test_role_catalog_exact_no_group_admin():
+def test_initial_role_catalog_before_group_restoration():
     txt=(MIG_DIR/'0001_production_foundation.py').read_text()
     expected=['lodge_admin','department_manager','front_office','ranger','housekeeping','maintenance','driver','fb','finance','general_staff','read_only']
     for role in expected: assert f"'{role}'" in txt

@@ -13,6 +13,7 @@ import AccountChangeGuard from "./AccountChangeGuard";
 const items = [
   ["", "Overview", "◫"],
   ["lodges", "Lodges", "⌂"],
+  ["groups", "Lodge groups", "⌂"],
   ["subscriptions", "Subscriptions", "◷"],
   ["packages", "Packages", "▦"],
   ["users", "Platform Users", "◎"],

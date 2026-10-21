@@ -94,6 +94,7 @@ export default function NavigationEnhancements({
               items || [
                 ["super-admin", "Overview"],
                 ["super-admin/lodges", "Lodges"],
+                ["super-admin/groups", "Lodge groups"],
                 ["super-admin/subscriptions", "Subscriptions"],
                 ["super-admin/packages", "Packages"],
                 ["super-admin/users", "Platform Users"],

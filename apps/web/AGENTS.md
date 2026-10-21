@@ -14,3 +14,7 @@ Apply the shared warm-neutral, translucent design system to every new or edited 
 - Every data-driven view needs loading, empty, error/retry, and success feedback. Never add fabricated operational records or inert product controls.
 - Honor reduced motion and use the shared spring defaults. Keep the solid-surface fallback functional when blur is unsupported.
 - Validate UI changes with a production build and relevant browser interactions. Review desktop/mobile and dark/light screenshots for material layout changes. Automated accessibility checks supplement visual and keyboard review; do not claim comprehensive accessibility certification from them.
+
+- Group Admin is an explicitly assigned multi-lodge role, never a platform role. Preserve lodge isolation, per-lodge subscriptions and account-change guards when switching. Ordinary accounts remain single-lodge.
+- Use `WorkspaceAccessContext`/`useWorkspaceAccess` for per-feature tabs and controls. Hide disabled features and avoid their API requests. Keep backend feature and role checks intact.
+- Mutations through `lib/api.ts` receive shared success/error feedback. Avoid duplicate manual success toasts; keep inline validation and destructive-action confirmation.

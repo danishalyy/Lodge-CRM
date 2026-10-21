@@ -35,6 +35,7 @@ Keep both `worker` and `beat` running. Migration and database grants must finish
 
 - **First Super Admin:** run `docker compose --env-file infra/.env -f infra/docker-compose.yml exec api python -m app.bootstrap_superadmin`. Enter the owner’s email and name. A setup invitation is queued; the owner sets the password and then enrolls in MFA.
 - **Other Super Admins:** use **Super Admin → Platform Users → Invite Super Admin**. These accounts have platform-wide access and must enroll in MFA before managing the platform.
+- **Group Admin:** use **Super Admin → Lodge groups → Create group**, then assign the lodges. The owner receives a password-setup invitation and signs in to their group overview. See [group setup and access controls](LODGE_GROUPS_AND_FEEDBACK.md).
 - **Lodge Admin:** register the lodge using a separate Lodge Admin email. Registration creates an inactive account and queues its setup invitation.
 - **Managers and staff:** use **Staff → Staff member**, choose **Invite to SafariOS**, and select the permitted role. Existing staff profiles without a login can also be invited. Department Managers must belong to a department.
 

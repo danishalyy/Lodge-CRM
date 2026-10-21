@@ -7,7 +7,9 @@ export function ConfirmDialog({
   title,
   description,
   onConfirm,
+  actionLabel = "Confirm removal",
 }: {
+  actionLabel?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -32,7 +34,7 @@ export function ConfirmDialog({
                 onConfirm();
               }}
             >
-              Confirm removal
+              {actionLabel}
             </Button>
           </div>
         </Dialog.Content>

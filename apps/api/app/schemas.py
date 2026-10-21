@@ -565,3 +565,19 @@ class PlatformInvite(StrictModel):
 
 class InvitationPreviewIn(StrictModel):
     token: str = Field(min_length=20, max_length=300)
+
+
+class GroupCreate(StrictModel):
+    name: str = Field(min_length=2,max_length=180)
+    admin_name: str = Field(min_length=2,max_length=180)
+    admin_email: EmailStr
+    lodge_ids: list[UUID] = Field(default_factory=list,max_length=200)
+
+class GroupUpdate(StrictModel):
+    name: str = Field(min_length=2,max_length=180)
+    lodge_ids: list[UUID] = Field(max_length=200)
+    is_active: bool = True
+
+class LodgeAdminInvite(StrictModel):
+    full_name: str = Field(min_length=2,max_length=180)
+    email: EmailStr

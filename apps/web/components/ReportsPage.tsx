@@ -1,6 +1,298 @@
-'use client';
-import {useEffect,useState} from 'react';
-import {intelligenceApi} from '@/lib/api';
-import {BarChart,RingChart} from './DataViz';
-const iso=(d:Date)=>d.toISOString().slice(0,10);
-export default function ReportsPage(){const today=new Date(),prior=new Date(Date.now()-29*86400000);const[start,setStart]=useState(iso(prior)),[end,setEnd]=useState(iso(today)),[data,setData]=useState<any>(null),[error,setError]=useState('');const load=async()=>{try{setError('');setData(await intelligenceApi.reportSummary(start,end))}catch(e:any){setError(e.message)}};useEffect(()=>{load()},[]);const chart=data?[{label:'Tasks',value:data.tasks.created},{label:'Maint.',value:data.maintenance.created},{label:'Requests',value:data.guest_requests.created},{label:'Activities',value:data.safari.activities},{label:'Transfers',value:data.safari.transfers},{label:'Sightings',value:data.safari.wildlife_sightings}]:[];return <><div className="pageHeader premiumHeader"><div><span className="eyebrow">REPORTS & ANALYTICS</span><h1>Operational intelligence</h1><p>A clear view of lodge performance for your selected period.</p></div></div><section className="panel filterPanel"><div className="filterGroup"><label>From<input className="field" type="date" value={start} onChange={e=>setStart(e.target.value)}/></label><label>To<input className="field" type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label></div><button className="button primary" onClick={load}>Run report</button></section>{error&&<div className="panel dangerText">{error}</div>}{data&&<><div className="metricGrid"><div className="metricCard premiumMetric"><span>Tasks completed</span><strong>{data.tasks.completed}</strong><small>{data.tasks.completion_rate}% completion rate</small></div><div className="metricCard premiumMetric"><span>Maintenance completed</span><strong>{data.maintenance.completed}</strong><small>{data.maintenance.critical} critical created</small></div><div className="metricCard premiumMetric"><span>Requests resolved</span><strong>{data.guest_requests.resolved}</strong><small>{data.guest_requests.created} created</small></div><div className="metricCard premiumMetric"><span>Fuel used</span><strong>{data.fleet.fuel_litres.toLocaleString()} L</strong><small>{data.fleet.fuel_records} records</small></div></div><div className="analyticsGrid"><section className="panel premiumPanel span2"><div className="panelHeader"><div><span className="panelKicker">WORKLOAD</span><h2>Operational volume</h2><p>Records created during the selected period</p></div></div><div className="chartSurface"><BarChart data={chart}/></div></section><section className="panel premiumPanel"><div className="panelHeader"><div><span className="panelKicker">TASKS</span><h2>Completion rate</h2></div></div><div className="ringPanel"><RingChart value={data.tasks.completed} total={data.tasks.created} label="Completed"/></div></section></div><div className="twoCol"><section className="panel premiumPanel"><div className="panelHeader"><h2>Operations</h2></div><div className="checkRow"><span>Tasks created</span><strong>{data.tasks.created}</strong></div><div className="checkRow"><span>Average task completion</span><strong>{data.tasks.average_completion_hours==null?'—':`${data.tasks.average_completion_hours} h`}</strong></div><div className="checkRow"><span>Maintenance created</span><strong>{data.maintenance.created}</strong></div><div className="checkRow"><span>Maintenance cost</span><strong>R {(data.maintenance.cost_cents/100).toFixed(2)}</strong></div><div className="checkRow"><span>Overlapping stays</span><strong>{data.stays.overlapping_period}</strong></div></section><section className="panel premiumPanel"><div className="panelHeader"><h2>Safari & Fleet</h2></div><div className="checkRow"><span>Activities</span><strong>{data.safari.activities}</strong></div><div className="checkRow"><span>Transfers</span><strong>{data.safari.transfers}</strong></div><div className="checkRow"><span>Wildlife sightings</span><strong>{data.safari.wildlife_sightings}</strong></div><div className="checkRow"><span>Fuel cost</span><strong>R {(data.fleet.fuel_cost_cents/100).toFixed(2)}</strong></div></section></div><section className="panel premiumPanel" style={{marginTop:14}}><div className="panelHeader"><div><span className="panelKicker">CURRENT INVENTORY</span><h2>Room status now</h2></div></div><div className="statusTiles">{Object.entries(data.rooms.by_status||{}).map(([k,v])=><div className="statusTile" key={k}><span>{k.replaceAll('_',' ')}</span><strong>{String(v)}</strong></div>)}{!Object.keys(data.rooms.by_status||{}).length&&<div className="empty">No rooms have been created.</div>}</div></section></>}</>}
+"use client";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { intelligenceApi } from "@/lib/api";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
+import { BarChart, RingChart } from "./DataViz";
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+export default function ReportsPage() {
+  const access = useWorkspaceAccess();
+  const [start, setStart] = useState(iso(new Date(Date.now() - 29 * 86400000))),
+    [end, setEnd] = useState(iso(new Date())),
+    [data, setData] = useState<any>(null),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState("");
+  async function load(feedback = false) {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await intelligenceApi.reportSummary(start, end);
+      setData(result);
+      if (feedback) toast.success("Report updated");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  const enabled = (feature: string, value: any) =>
+    access.feature(feature) && value != null;
+  const chart = data
+    ? [
+        { label: "Tasks", feature: "tasks", value: data.tasks?.created },
+        {
+          label: "Maintenance",
+          feature: "maintenance",
+          value: data.maintenance?.created,
+        },
+        {
+          label: "Requests",
+          feature: "guest_requests",
+          value: data.guest_requests?.created,
+        },
+        {
+          label: "Activities",
+          feature: "activities",
+          value: data.safari?.activities,
+        },
+        {
+          label: "Transfers",
+          feature: "transfers",
+          value: data.safari?.transfers,
+        },
+        {
+          label: "Sightings",
+          feature: "wildlife",
+          value: data.safari?.wildlife_sightings,
+        },
+      ].filter((r) => enabled(r.feature, r.value))
+    : [];
+  const operations = data
+    ? [
+        {
+          label: "Tasks created",
+          feature: "tasks",
+          value: data.tasks?.created,
+        },
+        {
+          label: "Average task completion",
+          feature: "tasks",
+          value: data.tasks
+            ? data.tasks.average_completion_hours == null
+              ? "—"
+              : `${data.tasks.average_completion_hours} h`
+            : null,
+        },
+        {
+          label: "Maintenance created",
+          feature: "maintenance",
+          value: data.maintenance?.created,
+        },
+        {
+          label: "Maintenance cost",
+          feature: "maintenance_workshop",
+          value: data.maintenance
+            ? `R ${(data.maintenance.cost_cents / 100).toFixed(2)}`
+            : null,
+        },
+        {
+          label: "Overlapping stays",
+          feature: "stays",
+          value: data.stays?.overlapping_period,
+        },
+      ].filter((r) => enabled(r.feature, r.value))
+    : [];
+  const safari = data
+    ? [
+        {
+          label: "Activities",
+          feature: "activities",
+          value: data.safari?.activities,
+        },
+        {
+          label: "Transfers",
+          feature: "transfers",
+          value: data.safari?.transfers,
+        },
+        {
+          label: "Wildlife sightings",
+          feature: "wildlife",
+          value: data.safari?.wildlife_sightings,
+        },
+        {
+          label: "Fuel cost",
+          feature: "fuel",
+          value: data.fleet
+            ? `R ${(data.fleet.fuel_cost_cents / 100).toFixed(2)}`
+            : null,
+        },
+      ].filter((r) => enabled(r.feature, r.value))
+    : [];
+  return (
+    <>
+      <div className="pageHeader premiumHeader">
+        <div>
+          <span className="eyebrow">REPORTS & ANALYTICS</span>
+          <h1>Operational intelligence</h1>
+          <p>
+            A clear view of authorized, enabled operations for your selected
+            period.
+          </p>
+        </div>
+      </div>
+      <section className="panel filterPanel">
+        <div className="filterGroup">
+          <label>
+            From
+            <input
+              className="field"
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </label>
+          <label>
+            To
+            <input
+              className="field"
+              type="date"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </label>
+        </div>
+        <button
+          className="button primary"
+          disabled={loading}
+          onClick={() => load(true)}
+        >
+          {loading ? "Running…" : "Run report"}
+        </button>
+      </section>
+      {error && (
+        <section className="panel dangerText" role="alert">
+          <p>{error}</p>
+          <button className="button" onClick={() => load()}>
+            Try again
+          </button>
+        </section>
+      )}
+      {loading ? (
+        <section className="panel" role="status">
+          Loading operational report…
+        </section>
+      ) : (
+        data && (
+          <>
+            <div className="metricGrid">
+              {enabled("tasks", data.tasks) && (
+                <section className="metricCard">
+                  <span>Tasks completed</span>
+                  <strong>{data.tasks.completed}</strong>
+                  <small>{data.tasks.completion_rate}% completion rate</small>
+                </section>
+              )}
+              {enabled("maintenance", data.maintenance) && (
+                <section className="metricCard">
+                  <span>Maintenance completed</span>
+                  <strong>{data.maintenance.completed}</strong>
+                  <small>{data.maintenance.critical} critical created</small>
+                </section>
+              )}
+              {enabled("guest_requests", data.guest_requests) && (
+                <section className="metricCard">
+                  <span>Requests resolved</span>
+                  <strong>{data.guest_requests.resolved}</strong>
+                  <small>{data.guest_requests.created} created</small>
+                </section>
+              )}
+              {enabled("fuel", data.fleet) && (
+                <section className="metricCard">
+                  <span>Fuel used</span>
+                  <strong>{data.fleet.fuel_litres.toLocaleString()} L</strong>
+                  <small>{data.fleet.fuel_records} records</small>
+                </section>
+              )}
+            </div>
+            <div className="analyticsGrid">
+              {!!chart.length && (
+                <section className="panel premiumPanel span2">
+                  <div className="panelHeader">
+                    <div>
+                      <span className="panelKicker">WORKLOAD</span>
+                      <h2>Operational volume</h2>
+                      <p>Records created during the selected period</p>
+                    </div>
+                  </div>
+                  <div className="chartSurface">
+                    <BarChart data={chart} />
+                  </div>
+                </section>
+              )}
+              {enabled("tasks", data.tasks) && (
+                <section className="panel premiumPanel">
+                  <div className="panelHeader">
+                    <h2>Completion rate</h2>
+                  </div>
+                  <div className="ringPanel">
+                    <RingChart
+                      value={data.tasks.completed}
+                      total={data.tasks.created}
+                      label="Completed"
+                    />
+                  </div>
+                </section>
+              )}
+            </div>
+            <div className="twoCol">
+              {!!operations.length && (
+                <section className="panel">
+                  <h2>Operations</h2>
+                  {operations.map((r) => (
+                    <div className="checkRow" key={r.label}>
+                      <span>{r.label}</span>
+                      <strong>{String(r.value)}</strong>
+                    </div>
+                  ))}
+                </section>
+              )}
+              {!!safari.length && (
+                <section className="panel">
+                  <h2>Safari & Fleet</h2>
+                  {safari.map((r) => (
+                    <div className="checkRow" key={r.label}>
+                      <span>{r.label}</span>
+                      <strong>{String(r.value)}</strong>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </div>
+            {enabled("units", data.rooms) && (
+              <section className="panel" style={{ marginTop: 24 }}>
+                <div className="panelHeader">
+                  <h2>Room status now</h2>
+                </div>
+                <div className="statusTiles">
+                  {Object.entries(data.rooms.by_status || {}).map(
+                    ([key, value]) => (
+                      <div className="statusTile" key={key}>
+                        <span>{key.replaceAll("_", " ")}</span>
+                        <strong>{String(value)}</strong>
+                      </div>
+                    ),
+                  )}
+                  {!Object.keys(data.rooms.by_status || {}).length && (
+                    <p className="empty">No rooms have been created.</p>
+                  )}
+                </div>
+              </section>
+            )}
+            {!chart.length &&
+              !operations.length &&
+              !safari.length &&
+              !enabled("units", data.rooms) && (
+                <section className="panel empty">
+                  <h2>No report sections available</h2>
+                  <p>There are no enabled report sections for this account.</p>
+                </section>
+              )}
+          </>
+        )
+      )}
+    </>
+  );
+}

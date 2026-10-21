@@ -605,3 +605,8 @@ select:focus-visible {
 /* Flat neutral canvas: olive belongs to actions and selection only. */
 .surfaceBackdrop i {display:none}
 :root:not([data-theme="light"]) .grain {display:none}
+
+.groupPortfolio{min-height:100dvh}.groupTopbar{min-height:88px;padding:20px 38px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;background:var(--side);backdrop-filter:blur(32px)}
+@media(max-width:640px){.groupTopbar{padding:20px;gap:16px}.groupTopbar .topActions{flex-wrap:wrap}}
+
+.groupAdministrators{margin-top:24px;border-top:1px solid var(--bd);padding-top:20px}.groupAdministrator{padding:12px 0}.groupAdministrator p{margin:6px 0;overflow-wrap:anywhere}

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import and_, or_, select
 from .config import settings
 from .db import set_rls_context
-from .models import AccountEmail, Invitation, PasswordResetToken, User, Notification, NotificationDelivery, NotificationPreference, Membership, StaffProfile, Task, MaintenanceTicket
+from .models import LodgeGroup, AccountEmail, Invitation, PasswordResetToken, User, Notification, NotificationDelivery, NotificationPreference, Membership, StaffProfile, Task, MaintenanceTicket
 from .email_service import decrypt_payload, send_email, safe_delivery_error
 
 
@@ -44,6 +44,8 @@ def process_account_emails(session_factory, limit=50):
             if row.invitation_id:
                 inv = db.get(Invitation, row.invitation_id)
                 valid = valid and not user.is_active and inv and not inv.used_at and inv.expires_at > now
+                if valid and not inv.lodge_id and not user.is_super_admin:
+                    valid=bool(db.scalar(select(LodgeGroup.id).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))))
                 if valid and inv.lodge_id:
                     member = db.scalar(select(Membership).where(Membership.user_id == user.id, Membership.lodge_id == inv.lodge_id, Membership.is_active.is_(True)))
                     staff = db.scalar(select(StaffProfile).where(StaffProfile.user_id == user.id, StaffProfile.lodge_id == inv.lodge_id))

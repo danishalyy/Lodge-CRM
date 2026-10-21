@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "./Drawer";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import StatusPill from "./StatusPill";
 import { authApi, getActiveLodgeId, operationsApi } from "@/lib/api";
 
@@ -38,6 +39,16 @@ const roles = [
   ["read_only", "Read Only / Auditor"],
 ] as const;
 export default function StaffPage() {
+  const access = useWorkspaceAccess();
+  const roleFeatures: Record<string, string> = {
+    department_manager: "departments",
+    ranger: "ranger",
+    driver: "transfers",
+    fb: "fb",
+  };
+  const inviteRoles = roles.filter(
+    ([key]) => !roleFeatures[key] || access.feature(roleFeatures[key]),
+  );
   const [rows, setRows] = useState<Staff[]>([]),
     [deps, setDeps] = useState<Department[]>([]),
     [customRoles, setCustomRoles] = useState<any[]>([]),
@@ -410,7 +421,7 @@ export default function StaffPage() {
                   name="role_key"
                   defaultValue="general_staff"
                 >
-                  {roles.map(([k, n]) => (
+                  {inviteRoles.map(([k, n]) => (
                     <option key={k} value={k}>
                       {n}
                     </option>
@@ -488,7 +499,7 @@ export default function StaffPage() {
               />
               <label className="label">Role</label>
               <select className="select" name="role_key" required>
-                {roles.map(([k, n]) => (
+                {inviteRoles.map(([k, n]) => (
                   <option key={k} value={k}>
                     {n}
                   </option>

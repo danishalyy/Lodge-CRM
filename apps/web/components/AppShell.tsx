@@ -1,11 +1,17 @@
 "use client";
+import { WorkspaceAccessContext } from "@/lib/workspace-access";
 import NotificationBell from "./NotificationBell";
 import Link from "next/link";
 import WorkspaceCommand from "./WorkspaceCommand";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { modules, moduleFeature } from "@/lib/modules";
-import { authApi, getActiveLodgeId, setActiveLodgeId } from "@/lib/api";
+import {
+  authApi,
+  getActiveLodgeId,
+  setActiveLodgeId,
+  superApi,
+} from "@/lib/api";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import NavigationEnhancements from "./NavigationEnhancements";
 import SafariBrand from "./SafariBrand";
@@ -101,7 +107,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     authApi
       .me()
-      .then((v) => {
+      .then(async (v) => {
+        if (v.is_super_admin && v.mfa_enabled && getActiveLodgeId())
+          v.support_entitlements =
+            (await superApi.lodgeEntitlements(getActiveLodgeId())).effective ||
+            [];
         setMe(v);
         if (!getActiveLodgeId() && v.memberships?.[0])
           setActiveLodgeId(v.memberships[0].lodge_id);
@@ -114,6 +124,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setSearchOpen(false);
     setQ("");
   }, [path]);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const user = await authApi.me();
+        if (user.is_super_admin && user.mfa_enabled && getActiveLodgeId())
+          user.support_entitlements =
+            (await superApi.lodgeEntitlements(getActiveLodgeId())).effective ||
+            [];
+        if (alive) setMe(user);
+      } catch {}
+    };
+    const focus = () => {
+      if (!document.hidden) void refresh();
+    };
+    window.addEventListener("safarios-feature-unavailable", focus);
+    window.addEventListener("focus", focus);
+    const timer = setInterval(focus, 60000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      window.removeEventListener("safarios-feature-unavailable", focus);
+      window.removeEventListener("focus", focus);
+    };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -148,15 +183,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               : "Selected lodge",
           role: "Super Admin",
           permissions: [],
+          entitlements: me.support_entitlements || [],
           subscription_status: "Platform access",
         }
       : null);
   const allowed = (key: string) => {
     if (!migrated.has(key)) return false;
     if (key === "settings") return true;
-    if (me.is_super_admin) return true;
     const feature = moduleFeature[key as keyof typeof moduleFeature];
     if (feature && !membership?.entitlements?.includes(feature)) return false;
+    if (me.is_super_admin) return true;
     const p = required[key];
     return !p || membership?.permissions?.includes(p);
   };
@@ -177,6 +213,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </section>
       </main>
     );
+  const requestedFeature =
+    moduleFeature[requestedModule as keyof typeof moduleFeature];
+  if (
+    requestedFeature &&
+    membership &&
+    !membership.entitlements?.includes(requestedFeature)
+  )
+    return (
+      <HiddenFeatureRedirect
+        to={
+          "/" +
+          (modules.find(
+            ([key]) => key !== requestedModule && allowed(key),
+          )?.[0] || "settings")
+        }
+      />
+    );
   if (
     !me.is_super_admin &&
     ((!membership && requestedModule !== "settings") ||
@@ -195,7 +248,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </section>
       </main>
     );
-  const visible = modules.filter(([key]) => allowed(key));
+  const visible: readonly (readonly string[])[] = [
+    ...(me.groups?.length ? [["group", "Group overview", "⌂"]] : []),
+    ...modules.filter(([key]) => allowed(key)),
+  ];
 
   const blocked =
     membership &&
@@ -369,7 +425,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span>Search workspace</span>
               <kbd>⌘ K</kbd>
             </button>
-            <NotificationBell />
+            {allowed("notifications") && <NotificationBell />}
             <ThemeToggle />
             <SignOutButton />
             <button className="avatarButton" title={me.full_name}>
@@ -391,7 +447,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </section>
           )}
-          {children}
+          <WorkspaceAccessContext.Provider
+            value={{
+              features: membership?.entitlements || [],
+              permissions: membership?.permissions || [],
+              platform: !!me.is_super_admin,
+            }}
+          >
+            {children}
+          </WorkspaceAccessContext.Provider>
         </div>
       </main>
       <WorkspaceCommand
@@ -400,5 +464,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         items={visible}
       />
     </div>
+  );
+}
+
+function HiddenFeatureRedirect({ to }: { to: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(to);
+  }, [router, to]);
+  return (
+    <main className="content" role="status">
+      Opening your workspace…
+    </main>
   );
 }

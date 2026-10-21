@@ -47,7 +47,7 @@ test('lodge account cannot render any platform children',async()=>{
 });
 
 test('direct lodge module URL enforces role permissions and resets previous account context',async()=>{
-  const user={id:'new-staff',is_super_admin:false,mfa_enabled:false,memberships:[{lodge_id:'own-lodge',permissions:['tasks.view'],entitlements:['tasks']}]};
+  const user={id:'new-staff',is_super_admin:false,mfa_enabled:false,memberships:[{lodge_id:'own-lodge',permissions:['tasks.view'],entitlements:['tasks','staff_hr']}]};
   const {context,page,requests}=await accountPage(user);
   try{
     await context.addInitScript(()=>{
@@ -335,10 +335,84 @@ test('staff creation queues an invitation without choosing an owner password and
    return route.fulfill({json:[]});
   });
   await page.goto(base+'/staff');await page.getByRole('button',{name:'+ Staff member'}).click();
+  assert.equal(await page.locator('select[name="role_key"] option[value="department_manager"]').count(),0);
   await page.locator('input[name="full_name"]').fill('Staff Owner');await page.locator('input[name="email"]').fill('owner@business.example');
   assert.equal(await page.locator('input[type="password"]').count(),0);
   await page.getByRole('button',{name:'Create and invite',exact:true}).click();
   await page.getByText('pending_activation',{exact:true}).waitFor();assert.equal(created.invite_role_key,'general_staff');assert.equal(created.email,'owner@business.example');assert.equal(created.password,undefined);
   await page.getByRole('button',{name:'Resend invitation',exact:true}).click();await page.getByText(/Replacement invitation pending/).waitFor();assert.equal(resends,1);
+ }finally{await context.close()}
+});
+
+test('disabled modules and HR subfeatures stay hidden without forbidden requests; saving shows a popup',async()=>{
+ const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+ const user={id:'hr-owner',full_name:'Lodge Owner',is_super_admin:false,memberships:[{lodge_id:lodge,permissions:['staff.view','staff.contact.view','staff.hr.view','staff.hr.manage','staff.roster.manage','staff.performance.manage','fuel.view'],entitlements:['staff','staff_hr']}]};
+ const {context,page}=await accountPage(user);let saved=false,disabledCalls=0;
+ try{
+  await page.route('**/api/v1/lodges/**',async route=>{const p=new URL(route.request().url()).pathname;
+   if(/\/(shifts|incidents|performance|fuel)$/.test(p)){disabledCalls++;return route.fulfill({status:403,json:{detail:'Feature is not enabled for this lodge subscription'}})}
+   if(p.endsWith('/staff'))return route.fulfill({json:[{id:'staff-1',full_name:'Team Member',employment_status:'active',operational_status:'available'}]});
+   if(p.endsWith('/hr/leaves')){if(route.request().method()==='POST'){saved=true;return route.fulfill({json:{id:'leave-1',status:'pending'}})}return route.fulfill({json:saved?[{id:'leave-1',staff_name:'Team Member',leave_type:'annual',start_date:'2026-11-01',end_date:'2026-11-02',status:'pending'}]:[]})}
+   return route.fulfill({json:[]});
+  });
+  await page.goto(base+'/hr');await page.getByRole('heading',{name:'Staff HR',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Roster',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Performance',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Incidents',exact:true}).count(),0);
+  assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),0);
+  await page.locator('select[name="staff_id"]').selectOption('staff-1');await page.locator('input[name="start_date"]').fill('2026-11-01');await page.locator('input[name="end_date"]').fill('2026-11-02');
+  await page.getByRole('button',{name:'Create request',exact:true}).click();await page.getByText('Saved successfully',{exact:true}).waitFor();await page.locator('.taskRow').getByText('Team Member',{exact:true}).waitFor();assert.equal(saved,true);assert.equal(await page.locator('input[name="start_date"]').inputValue(),'');
+  await page.goto(base+'/fuel');await page.waitForURL('**/staff');assert.equal(disabledCalls,0);
+ }finally{await context.close()}
+});
+
+test('Group Admin opens an assigned lodge and returns to the group without platform access',async()=>{
+ const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',gid='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+ const user={id:'group-owner',full_name:'Group Owner',is_super_admin:false,groups:[{id:gid,name:'Safari Collection'}],memberships:[{lodge_id:lodge,lodge_name:'Acacia Lodge',role:'Group Admin',role_key:'group_admin',permissions:['tasks.view'],entitlements:['tasks']}]};
+ const {context,page,requests}=await accountPage(user);
+ try{
+  await page.route('**/api/v1/groups/**',route=>route.fulfill({json:{id:gid,name:'Safari Collection',totals:{open_tasks:2},lodges:[{id:lodge,name:'Acacia Lodge',location:'Kenya',package:'Basic',subscription_status:'Active',metrics:{open_tasks:2}}]}}));
+  await page.route('**/api/v1/lodges/**',route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith('/branding')?{display_name:'Acacia Lodge',logo_url:null}:[]}));
+  await page.goto(base+'/group');await page.getByRole('heading',{name:'Safari Collection',exact:true}).waitFor();await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-group-overview.png'),fullPage:true});
+  await page.getByRole('button',{name:'Open lodge',exact:true}).click();await page.waitForURL('**/tasks');await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('active_lodge_id')),lodge);
+  await page.getByRole('link',{name:'Group overview',exact:true}).click();await page.waitForURL('**/group');await page.getByRole('heading',{name:'Safari Collection',exact:true}).waitFor();
+  await page.goto(base+'/super-admin/groups');await page.getByRole('heading',{name:'Access denied',exact:true}).waitFor();assert.equal(requests.filter(u=>u.includes('/platform/')).length,0);
+ }finally{await context.close()}
+});
+
+test('Super Admin creates a lodge group and confirms suspension with action feedback',async()=>{
+ const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';const {context,page}=await accountPage({id:'platform-owner',full_name:'Platform Owner',is_super_admin:true,mfa_enabled:true,memberships:[]});let groups=[],created,suspensions=0;
+ try{
+  await page.route('**/api/v1/platform/lodges',route=>route.fulfill({json:[{id:lodge,name:'Acacia Lodge'}]}));
+  await page.route('**/api/v1/platform/groups**',async route=>{const method=route.request().method();
+   if(method==='POST'){created=route.request().postDataJSON();groups=[{id:'group-1',name:created.name,is_active:true,lodge_ids:created.lodge_ids,administrator:{id:'owner-1',name:created.admin_name,email:created.admin_email,account_status:'pending_activation'}}];return route.fulfill({json:{...groups[0],activation_email_queued:true,delivery_status:'pending'}})}
+   if(method==='PATCH'){const body=route.request().postDataJSON();if(body.is_active===false)suspensions++;groups=[{...groups[0],...body}];return route.fulfill({json:groups[0]})}
+   return route.fulfill({json:groups});
+  });
+  await page.goto(base+'/super-admin/groups');await page.getByRole('button',{name:'Create group',exact:true}).click();await page.getByLabel('Group name',{exact:true}).fill('Safari Collection');await page.getByLabel('Group Admin name',{exact:true}).fill('Collection Owner');await page.getByLabel('Group Admin email',{exact:true}).fill('owner@business.example');await page.getByLabel('Acacia Lodge',{exact:true}).check();
+  await page.getByRole('button',{name:'Create group and invite',exact:true}).click();await page.getByRole('heading',{name:'Safari Collection',exact:true}).waitFor();await page.getByText('Invitation queued',{exact:true}).waitFor();assert.deepEqual(created.lodge_ids,[lodge]);assert.equal(created.admin_email,'owner@business.example');assert.equal(created.password,undefined);
+  await page.getByRole('button',{name:'Suspend',exact:true}).click();await page.getByRole('heading',{name:'Suspend group access?',exact:true}).waitFor();assert.equal(suspensions,0);await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(suspensions,0);
+  await page.getByRole('button',{name:'Suspend',exact:true}).click();await page.getByRole('button',{name:'Suspend group',exact:true}).click();await page.getByRole('button',{name:'Restore access',exact:true}).waitFor();assert.equal(suspensions,1);await page.getByText('Saved successfully',{exact:true}).waitFor();
+ }finally{await context.close()}
+});
+
+test('Group Admin resends and removes or restores a Lodge Admin with clear popups',async()=>{
+ const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',gid='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+ const user={id:'group-owner',full_name:'Group Owner',is_super_admin:false,groups:[{id:gid,name:'Safari Collection'}],memberships:[{lodge_id:lodge,role:'Group Admin',role_key:'group_admin',permissions:['tasks.view'],entitlements:['tasks']}]};
+ const {context,page}=await accountPage(user);let enabled=true,resends=0,removed=0,restored=0;
+ try{
+  await page.route('**/api/v1/groups/**',route=>route.fulfill({json:{id:gid,name:'Safari Collection',totals:{},lodges:[{id:lodge,name:'Acacia Lodge',location:'Kenya',package:'Basic',subscription_status:'Active',metrics:{},administrators:[{id:'local-admin',name:'Local Owner',email:'local@business.example',access_enabled:enabled,account_status:'pending_activation'}]}]}}));
+  await page.route('**/api/v1/lodges/**/administrators/**',route=>{const p=new URL(route.request().url()).pathname;if(p.endsWith('/resend'))resends++;if(p.endsWith('/revoke-access')){enabled=false;removed++}if(p.endsWith('/restore-access')){enabled=true;restored++}return route.fulfill({json:{ok:true,delivery_status:'pending'}})});
+  await page.goto(base+'/group');await page.getByText('Local Owner',{exact:true}).waitFor();await page.getByRole('button',{name:'Resend invitation',exact:true}).click();await page.getByText('Invitation queued',{exact:true}).waitFor();assert.equal(resends,1);
+  await page.getByRole('button',{name:'Remove access',exact:true}).click();await page.getByRole('heading',{name:'Remove Lodge Admin access?',exact:true}).waitFor();assert.equal(removed,0);await page.getByRole('dialog').getByRole('button',{name:'Remove access',exact:true}).click();await page.getByRole('button',{name:'Restore access',exact:true}).waitFor();await page.getByText('Account access removed',{exact:true}).waitFor();assert.equal(removed,1);
+  await page.getByRole('button',{name:'Restore access',exact:true}).click();await page.getByRole('button',{name:'Resend invitation',exact:true}).waitFor();await page.getByText('Account access restored',{exact:true}).waitFor();assert.equal(restored,1);
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ }finally{await context.close()}
+});
+
+test('scoped reports hide unavailable feature sections and handle restricted data',async()=>{
+ const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';const {context,page}=await accountPage({id:'department-owner',full_name:'Department Manager',is_super_admin:false,memberships:[{lodge_id:lodge,role:'Department Manager',permissions:['reports.view'],entitlements:['reports','tasks']}]});
+ try{
+  await page.route('**/api/v1/lodges/**/reports/summary**',route=>route.fulfill({json:{tasks:{created:4,completed:2,completion_rate:50,average_completion_hours:3},maintenance:{created:1,completed:0,critical:0,cost_cents:0},guest_requests:{created:0,resolved:0},fleet:null,stays:null,rooms:null,safari:{activities:0,transfers:0,wildlife_sightings:null}}}));
+  await page.goto(base+'/reports');await page.getByText('Tasks completed',{exact:true}).waitFor();assert.equal(await page.getByText('Fuel used',{exact:true}).count(),0);assert.equal(await page.getByRole('heading',{name:'Safari & Fleet',exact:true}).count(),0);assert.equal(await page.getByRole('heading',{name:'Room status now',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Run report',exact:true}).click();await page.getByText('Report updated',{exact:true}).waitFor();await page.getByText('Tasks completed',{exact:true}).waitFor();
  }finally{await context.close()}
 });

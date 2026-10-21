@@ -224,7 +224,7 @@ export default function SuperAdminLodges() {
         remove_logo: removeLogo,
       });
       setNotice(`Branding updated for ${branding.name}.`);
-      toast.success("Lodge branding saved");
+
       setBranding(null);
       setFile(null);
       await load();
@@ -389,12 +389,10 @@ export default function SuperAdminLodges() {
                             setActivation(
                               `${location.origin}/activate#token=${r.activation_token}`,
                             );
-                          toast.success(
-                            "Replacement invitation " + r.delivery_status,
-                          );
+
                           await load();
                         } catch (e: any) {
-                          toast.error(e.message);
+                          setError(e.message);
                         }
                       }}
                     >

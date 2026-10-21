@@ -1,3 +1,5 @@
+import {actionFeedback} from "./action-feedback";
+import {toast} from "sonner";
 // Same-origin requests keep session/CSRF cookies on the application domain.
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -15,29 +17,34 @@ function clearAccountContext(){
 }
 function bindAccount(user:any){
   if(typeof window==='undefined')return user;
+  const previousUser=getActiveUserId(),previousLodge=getActiveLodgeId();
   if(getActiveUserId()!==user.id)clearAccountContext();
   localStorage.setItem('active_user_id',user.id);
   if(!user.is_super_admin&&!user.memberships?.some((m:any)=>m.lodge_id===getActiveLodgeId())){
     localStorage.removeItem('active_lodge_id');
     if(user.memberships?.[0])setActiveLodgeId(user.memberships[0].lodge_id);
   }
+  if(previousUser===user.id&&previousLodge&&previousLodge!==getActiveLodgeId())window.dispatchEvent(new Event('safarios-lodge-changed'));
   return user;
 }
 
 async function request<T>(path:string, init:RequestInit={}){
   const headers=new Headers(init.headers||{});
   const expectedUser=getActiveUserId();
+  const activeLodge=getActiveLodgeId();if(activeLodge&&path!=="/api/v1/auth/me"&&!headers.has("X-Lodge-Context"))headers.set("X-Lodge-Context",activeLodge);
   if(expectedUser&&path!=='/api/v1/auth/me'&&!headers.has('X-Expected-User-Id'))headers.set('X-Expected-User-Id',expectedUser);
   if(init.body) headers.set('Content-Type','application/json');
   if(init.method && !['GET','HEAD'].includes(init.method.toUpperCase())){
     const csrf=readCookie('lodge_csrf');
     if(csrf)headers.set('X-CSRF-Token',csrf);
   }
-  const res=await fetch(`${API_URL}${path}`,{...init,headers,credentials:'include',cache:'no-store'});
+  const res=await fetch(`${API_URL}${path}`,{...init,headers,credentials:'include',cache:'no-store'}).catch(error=>{if(init.method&&!['GET','HEAD'].includes(init.method.toUpperCase())&&!path.startsWith('/api/v1/auth/'))toast.error('Connection interrupted. Check the record before trying again.',{id:`action:${path}`});throw error});
   if(res.status===401 && typeof window!=='undefined' && !location.pathname.startsWith('/login') && !location.pathname.startsWith('/activate')) location.href='/login';
-  if(!res.ok){let message=`Request failed (${res.status})`;try{const body=await res.json();message=typeof body.detail==='string'?body.detail:JSON.stringify(body.detail||message)}catch{}throw new Error(message)}
-  if(res.status===204)return undefined as T;
-  return (await res.json()) as T;
+  if(!res.ok){let message=`Request failed (${res.status})`;try{const body=await res.json();message=typeof body.detail==='string'?body.detail:JSON.stringify(body.detail||message)}catch{}if(res.status===403&&message.includes('not enabled for this lodge subscription')&&typeof window!=='undefined'){if(init.method&&!['GET','HEAD'].includes(init.method.toUpperCase()))toast.info('This action is no longer available. Your changes were not saved.',{id:`action:${path}`});window.dispatchEvent(new Event('safarios-feature-unavailable'));throw new Error('')}
+if(init.method&&!['GET','HEAD'].includes(init.method.toUpperCase())&&!path.startsWith('/api/v1/auth/'))toast.error(message,{id:`action:${path}`});throw new Error(message)}
+  const result=res.status===204?undefined:await res.json();
+  actionFeedback(path,(init.method||'GET').toUpperCase(),result);
+  return result as T;
 }
 const lodgePath=(suffix:string)=>{const id=getActiveLodgeId();if(!id)throw new Error('No lodge selected');return `/api/v1/lodges/${id}/${suffix}`};
 type AccountScope={userId:string;lodgeId:string};
@@ -140,4 +147,15 @@ export const accountNotificationsApi={
  archive:(id:string)=>request(`/api/v1/auth/notifications/${id}/archive`,{method:'POST'}),
  preferences:()=>request<any>('/api/v1/auth/notification-preferences'),
  updatePreferences:(body:{email_enabled:boolean;email_min_severity:string})=>request<any>('/api/v1/auth/notification-preferences',{method:'PATCH',body:JSON.stringify(body)}),
+};
+
+export const groupsApi={
+ resendAdmin:(lodge:string,id:string)=>request<any>(`/api/v1/lodges/${lodge}/administrators/${id}/invitation/resend`,{method:"POST"}),
+ revokeAdmin:(lodge:string,id:string)=>request<any>(`/api/v1/lodges/${lodge}/administrators/${id}/revoke-access`,{method:"POST"}),
+ restoreAdmin:(lodge:string,id:string)=>request<any>(`/api/v1/lodges/${lodge}/administrators/${id}/restore-access`,{method:"POST"}),
+ list:()=>request<any[]>('/api/v1/platform/groups'),
+ create:(body:any)=>request<any>('/api/v1/platform/groups',{method:'POST',body:JSON.stringify(body)}),
+ update:(id:string,body:any)=>request<any>(`/api/v1/platform/groups/${id}`,{method:'PATCH',body:JSON.stringify(body)}),
+ overview:(id:string)=>request<any>(`/api/v1/groups/${id}/overview`),
+ inviteAdmin:(id:string,body:any)=>request<any>(`/api/v1/lodges/${id}/administrators/invite`,{method:'POST',body:JSON.stringify(body)})
 };

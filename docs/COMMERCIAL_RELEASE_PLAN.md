@@ -6,7 +6,7 @@ See [the latest requirements review](REQUIREMENTS_REVIEW.md) for the three-docum
 
 The owner confirmed a web application first, external payment collection, and Hostinger VPS as the future deployment target. Hosting provisioning is deferred. Super Admin manually controls package, activation, suspension and subscription dates; no payment integration is required.
 
-Requirements were supplied as `Lodge_CRM_Packages_and_Features.docx`, `AI_Lodge_CRM_Complete_Workflow_and_Role_Access.pdf`, and `AI-LODGE-CRM-OPERATING-SYSTEM.pdf`. The workflow specification explicitly applies newer owner decisions: **no Group Admin / Owner and no multi-lodge management**. Those decisions take precedence over the older package/operating-system descriptions. Payroll and the booking system can remain external.
+Requirements were supplied as `Lodge_CRM_Packages_and_Features.docx`, `AI_Lodge_CRM_Complete_Workflow_and_Role_Access.pdf`, and `AI-LODGE-CRM-OPERATING-SYSTEM.pdf`. The workflow specification explicitly applies newer owner decisions: **Group Admin / Owner and multi-lodge management were initially excluded**. The owner explicitly restored them on 21 October 2026; [group setup and boundaries](LODGE_GROUPS_AND_FEEDBACK.md) now govern this scope. Payroll and the booking system can remain external.
 
 Web-first delivery defers native mobile applications. It does not silently remove the remaining documented web, role, package, AI, offline and integration requirements. Standard/Premium features must not be advertised as available until implemented and verified. External integrations require a named provider, supported API and customer configuration; telemetry additionally requires real devices/providers.
 

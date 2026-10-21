@@ -2,6 +2,7 @@
 export function accountHome(user: any): string {
   if (user.is_super_admin)
     return user.mfa_enabled ? "/super-admin" : "/settings";
+  if(user.groups?.length)return "/group";
   const member = user.memberships?.[0];
   const permissions = member?.permissions || [];
   const entitlements = member?.entitlements || [];
@@ -13,7 +14,7 @@ export function accountHome(user: any): string {
     ["maintenance", "maintenance.view", "maintenance"],
     ["guests", "guests.view", "guests"],
     ["transfers", "transfers.view", "transfers"],
-    ["food-beverage", "fb.view", "fb"],
+    ["food-beverage", "fb.view", "fb_operations"],
     ["reports", "reports.view", "reports"],
   ] as const) {
     if (permissions.includes(permission) && entitlements.includes(feature))

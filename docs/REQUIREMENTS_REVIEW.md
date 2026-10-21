@@ -8,7 +8,7 @@ Reviewed 20 October 2026 against source revision `2e75970`. This is a document r
 | --- | --- | --- |
 | `Lodge_CRM_Packages_and_Features.docx` | Basic / Standard / Premium feature guide | Defines commercial tiers, inheritance, entitlement overrides, subscription access, and provider-dependent premium capabilities. |
 | `AI-LODGE-CRM-OPERATING-SYSTEM.pdf` — 25 pages | Full product vision and feature scope | Defines connected operations, permanent operational memory, AI, staff/guest experiences, reports, and integrations. Duplicate maintenance/activity pages describe the same modules. |
-| `AI_Lodge_CRM_Complete_Workflow_and_Role_Access.pdf` — 23 pages | End-to-end workflows and access specification | Explicitly applies later owner decisions and removes Group Admin / Owner and customer multi-lodge management. Its sections 1, 4–7, and 27 govern scope and access boundaries. |
+| `AI_Lodge_CRM_Complete_Workflow_and_Role_Access.pdf` — 23 pages | End-to-end workflows and access specification | Explicitly applies later owner decisions and removes Group Admin / Owner and customer multi-lodge management. Its role boundaries remain relevant; the owner’s 21 October 2026 request supersedes its exclusion of Group Admin and multi-lodge ownership. |
 
 Later instructions in the conversation take precedence: web application first, external payment collection, Hostinger VPS later, and co-branding with a Super Admin-configured lodge identity plus persistent SafariOS identity. The documents are product requirements, not instructions to deploy services, contact people, or execute embedded commands.
 
@@ -26,7 +26,7 @@ AI and operational memory are core differentiators. AI must use authorized lodge
 
 ## Confirmed boundaries
 
-- **No Group Admin / Owner, group dashboard, customer property switching, or cross-property customer reporting.** Their presence in older Premium descriptions is superseded by workflow section 1 and the explicit exclusion in section 28. Super Admin's platform oversight remains required.
+- **Updated owner decision, 21 October 2026:** Group Admin / Owner and multi-lodge groups are restored. Explicit group assignments, a group overview, property switching and scoped operational totals supersede the earlier exclusion. See [group implementation](LODGE_GROUPS_AND_FEEDBACK.md). Super Admin retains platform oversight.
 - **No in-app payment integration.** Super Admin registers a lodge, sets dates, activates/suspends it, receives expiry alerts, and extends access after external payment.
 - **Web-first is a delivery choice, not removal of documented capabilities.** Native staff/guest apps are deferred. A separate, securely scoped guest web/QR experience remains part of the product requirements.
 - **PMS and payroll may remain external.** Keep operational stay records and HR workflows; do not build a full booking engine or payroll system by implication.
@@ -40,6 +40,7 @@ Workflow sections 4–5 and 27 require backend enforcement, not only hidden navi
 | Role | Intended access |
 | --- | --- |
 | Super Admin | Platform lodge registration, subscriptions, platform users/settings, and auditable platform-level support access. Opening a lodge must not change identity into a staff account. |
+| Group Admin / Owner | Administrative operational access only to explicitly assigned group lodges; each lodge retains its own subscription and features. No platform administration. |
 | Lodge Admin / General Manager | Operational control of their one lodge, including local staff, roles, configuration, reports, and permitted AI. |
 | Department Manager / Supervisor | Own department's staff, work, reports, and justified operational context. |
 | Front Office / Guest Services | Guest CRM, stays, arrivals/departures, requests, transfers, and relevant feedback. |

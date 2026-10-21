@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell, Archive, CheckCheck, RefreshCw } from "lucide-react";
 import { accountNotificationsApi } from "@/lib/api";
 import { Skeleton } from "./ui/skeleton";
-import { toast } from "sonner";
 type Notice = {
   id: string;
   title: string;
@@ -96,7 +95,6 @@ export default function NotificationsPage() {
         email_min_severity: prefs.email_min_severity,
       });
       setPrefs(p);
-      toast.success("Notification preferences saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save preferences.");
     } finally {

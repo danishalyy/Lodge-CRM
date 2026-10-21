@@ -21,7 +21,7 @@ from starlette.responses import JSONResponse
 from .config import settings
 from .db import engine, get_db, set_rls_context
 from .models import (
-    AuditLog, AuthSession, Department, Guest, GuestRequest, Invitation, Lodge,
+    LodgeGroup, AuditLog, AuthSession, Department, Guest, GuestRequest, Invitation, Lodge,
     MaintenanceTicket, Membership, OperationalEvent, Permission, Role, RolePermission,
     StaffProfile, Stay, Subscription, Task, Unit, User, Vehicle, VehicleChecklist, VehicleChecklistItem, FuelRecord, Activity, ActivityGuest, Transfer, WildlifeSighting, WildlifeMedia,
     Notification, NotificationRecipient, NotificationPreference, NotificationDelivery,
@@ -45,7 +45,7 @@ from .schemas import (
 from .security import (
     create_session, current_user, hash_password, new_token, require_csrf,
     require_lodge_access, require_permission, require_super_admin, token_hash,
-    verify_password, access_context, has_permission, ensure_feature, entitlement_enabled,
+    verify_password, access_context, membership_for, has_permission, ensure_feature, entitlement_enabled,
     encrypt_mfa_secret, decrypt_mfa_secret,
 )
 from .services.state import housekeeping_job_created, housekeeping_awaiting_inspection, housekeeping_completed, maintenance_opened, maintenance_released, unit_is_occupied
@@ -64,7 +64,7 @@ app.add_middleware(
     allow_origins=settings.origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id", "X-Lodge-Context"],
 )
 
 redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
@@ -299,12 +299,17 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     if not user.is_super_admin:
         set_rls_context(db,None,False,str(user.id))
         memberships=db.scalars(select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True))).all()
-        if not memberships: raise HTTPException(403,"Account access is unavailable")
-        if len(memberships)!=1: raise HTTPException(403,"Account lodge assignment requires administrator review")
-        membership=memberships[0]
-        set_rls_context(db,str(membership.lodge_id),False,str(user.id))
-        staff=db.scalar(select(StaffProfile).where(StaffProfile.lodge_id==membership.lodge_id,StaffProfile.user_id==user.id))
-        if staff and staff.employment_status!="active": raise HTTPException(403,"Account access is unavailable")
+        groups=db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()
+        if groups:
+            if any(db.get(Role,m.role_id).key!='group_admin' for m in memberships):raise HTTPException(403,'Account assignment requires administrator review')
+        else:
+            if not memberships: raise HTTPException(403,"Account access is unavailable")
+            if len(memberships)!=1: raise HTTPException(403,"Account lodge assignment requires administrator review")
+            membership=memberships[0]
+            set_rls_context(db,str(membership.lodge_id),False,str(user.id))
+            staff=db.scalar(select(StaffProfile).where(StaffProfile.lodge_id==membership.lodge_id,StaffProfile.user_id==user.id))
+            if staff and staff.employment_status!="active": raise HTTPException(403,"Account access is unavailable")
+            if not membership_for(db,user,str(membership.lodge_id)):raise HTTPException(403,'Account access is unavailable')
     if user.mfa_enabled_at:
         if not body.otp: raise HTTPException(401, "MFA_REQUIRED")
         if not _verify_totp_once(user,body.otp): raise HTTPException(401, "Invalid or already-used MFA code")
@@ -334,7 +339,7 @@ def activate(body: ActivateIn, response: Response, db: Session = Depends(get_db)
         member=db.scalar(select(Membership).where(Membership.user_id==user.id,Membership.lodge_id==invitation.lodge_id,Membership.is_active.is_(True)))
         staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==invitation.lodge_id))
         if not member or (staff and staff.employment_status!="active"):raise HTTPException(400,"This invitation is no longer available. Contact your administrator.")
-    elif not user.is_super_admin:
+    elif not user.is_super_admin and not db.scalar(select(LodgeGroup.id).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))):
         raise HTTPException(400,"This invitation is no longer available")
     _validate_password_policy(body.password)
     user.password_hash = hash_password(body.password)
@@ -457,6 +462,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     memberships = []
     member_rows = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
     for m in member_rows:
+        if not user.is_super_admin and not membership_for(db,user,str(m.lodge_id)):continue
         lodge = db.get(Lodge, m.lodge_id)
         role = db.get(Role, m.role_id)
         if not user.is_super_admin:
@@ -486,7 +492,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
                 "package": sub.package if sub else None, "entitlements":plan_features,
             })
-    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "memberships": memberships}
+    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "groups": [{"id":str(g.id),"name":g.name} for g in db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()], "memberships": memberships}
 
 
 @app.get("/api/v1/lodges/{lodge_id}/dashboard")
@@ -783,11 +789,13 @@ def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Reques
     role_features={"department_manager":"departments","ranger":"ranger","driver":"transfers","fb":"fb"}
     if body.role_key in role_features:ensure_feature(db,lodge_id,role_features[body.role_key])
     account=db.scalar(select(User).where(func.lower(User.email)==staff.email.lower()).with_for_update())
+    if account and db.scalar(select(LodgeGroup.id).where(LodgeGroup.admin_user_id==account.id)):raise HTTPException(409,"Group administrator accounts cannot be linked to staff profiles")
     new_account=account is None
     if not account:
         account=User(email=staff.email.lower(),full_name=staff.full_name,password_hash=hash_password(new_token()+new_token()),is_active=False)
         db.add(account);db.flush()
     existing=db.scalar(select(Membership).where(Membership.user_id==account.id,Membership.lodge_id==lodge_id))
+    if existing and db.get(Role,existing.role_id).key=="group_admin":raise HTTPException(409,"Group administrator accounts cannot be linked to staff profiles")
     if not new_account and (not existing or account.is_super_admin):
         # One account belongs to one lodge only; do not reveal where an existing account belongs.
         raise HTTPException(409,"This email cannot be invited to this lodge")
@@ -1506,7 +1514,7 @@ def create_wildlife(lodge_id:str,body:WildlifeSightingCreate,request:Request,use
     existing=db.scalar(select(WildlifeSighting).where(WildlifeSighting.lodge_id==lodge_id,WildlifeSighting.client_ref==body.client_ref))
     if existing:return {"id":str(existing.id),"client_ref":str(existing.client_ref),"duplicate":True}
     data=body.model_dump()
-    if not (ctx.super_admin or ctx.role_key in {"lodge_admin","department_manager"}):
+    if not (ctx.super_admin or ctx.role_key in {"lodge_admin","group_admin","department_manager"}):
         staff=_require_own_staff(ctx);data["reported_by_staff_id"]=staff.id
     elif data.get("reported_by_staff_id"):
         ensure_fk(db,StaffProfile,data["reported_by_staff_id"],lodge_id,"Staff member")
@@ -1622,6 +1630,16 @@ def operational_memory(lodge_id:str,event_type:str|None=None,resource_type:str|N
     rows=db.scalars(q.order_by(OperationalEvent.created_at.desc()).offset(offset).limit(limit)).all()
     return [{"id":str(e.id),"event_type":e.event_type,"resource_type":e.resource_type,"resource_id":e.resource_id,"summary":e.summary,"detail":e.detail,"actor_user_id":str(e.actor_user_id) if e.actor_user_id else None,"created_at":e.created_at.isoformat()} for e in rows]
 
+def _filter_report_features(db,lodge_id,report):
+    for section,feature in {'tasks':'tasks','maintenance':'maintenance','guest_requests':'guest_requests','fleet':'fuel','stays':'stays','rooms':'units'}.items():
+        if not entitlement_enabled(db,lodge_id,feature):report[section]=None
+    safari=report.get('safari')
+    if safari:
+        for metric,feature in {'activities':'activities','transfers':'transfers','wildlife_sightings':'wildlife'}.items():
+            if not entitlement_enabled(db,lodge_id,feature):safari[metric]=None
+    return report
+
+
 @app.get("/api/v1/lodges/{lodge_id}/reports/summary")
 def reports_summary(lodge_id:str,start:date|None=None,end:date|None=None,user:User=Depends(require_permission("reports.view")),db:Session=Depends(get_db)):
     ensure_feature(db,lodge_id,"reports")
@@ -1650,7 +1668,7 @@ def reports_summary(lodge_id:str,start:date|None=None,end:date|None=None,user:Us
         activities=db.scalar(select(func.count()).select_from(Activity).where(Activity.lodge_id==lodge_id,Activity.department_id==dept,Activity.starts_at>=start_dt,Activity.starts_at<end_dt,Activity.status!="cancelled")) or 0
         transfers=db.scalar(select(func.count()).select_from(Transfer).where(Transfer.lodge_id==lodge_id,Transfer.department_id==dept,Transfer.scheduled_at>=start_dt,Transfer.scheduled_at<end_dt,Transfer.status!="cancelled")) or 0
         base.update({"stays":None,"fleet":None,"safari":{"activities":activities,"transfers":transfers,"wildlife_sightings":None},"rooms":None})
-        return base
+        return _filter_report_features(db,lodge_id,base)
     fuel=db.scalars(select(FuelRecord).where(FuelRecord.lodge_id==lodge_id,FuelRecord.recorded_at>=start_dt,FuelRecord.recorded_at<end_dt)).all()
     stays=db.scalars(select(Stay).where(Stay.lodge_id==lodge_id,Stay.arrival_date<=end,Stay.departure_date>=start,Stay.status!="cancelled")).all()
     activities=db.scalar(select(func.count()).select_from(Activity).where(Activity.lodge_id==lodge_id,Activity.starts_at>=start_dt,Activity.starts_at<end_dt,Activity.status!="cancelled")) or 0
@@ -1663,7 +1681,7 @@ def reports_summary(lodge_id:str,start:date|None=None,end:date|None=None,user:Us
         "safari":{"activities":activities,"transfers":transfers,"wildlife_sightings":sightings},
         "rooms":{"by_status":unit_counts},
     })
-    return base
+    return _filter_report_features(db,lodge_id,base)
 
 
 @app.get("/api/v1/lodges/{lodge_id}/reports/summary.csv")
@@ -1787,7 +1805,7 @@ def available_permissions(lodge_id:str,user:User=Depends(require_permission("rol
 @app.post("/api/v1/lodges/{lodge_id}/custom-roles",dependencies=[Depends(require_csrf)])
 def create_custom_role(lodge_id:str,body:CustomRoleCreate,request:Request,user:User=Depends(require_permission("roles.custom.manage",write=True)),db:Session=Depends(get_db)):
     ensure_feature(db,lodge_id,"custom_roles");base=db.scalar(select(Role).where(Role.key==body.base_role_key))
-    if not base or body.base_role_key in {"lodge_admin"}:raise HTTPException(422,"Choose an operational base role; Lodge Admin cannot be cloned")
+    if not base or body.base_role_key in {"lodge_admin","group_admin"}:raise HTTPException(422,"Choose an operational base role; Lodge Admin cannot be cloned")
     _validate_custom_permissions(body.permission_keys)
     row=CustomRole(lodge_id=lodge_id,name=body.name.strip(),base_role_id=base.id,description=body.description,is_active=True);db.add(row);db.flush()
     perms=db.scalars(select(Permission).where(Permission.key.in_(body.permission_keys))).all() if body.permission_keys else []
@@ -2100,3 +2118,6 @@ def task_attachment_download_url(lodge_id:str,task_id:str,attachment_id:str,user
 
 from .account_routes import router as account_router
 app.include_router(account_router)
+
+from .group_routes import router as group_router
+app.include_router(group_router)

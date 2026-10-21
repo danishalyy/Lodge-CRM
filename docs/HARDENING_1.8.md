@@ -5,3 +5,7 @@ This release addresses the source-audit defects identified against 1.7.x. It add
 ## Verification boundary
 
 `pytest` validates the included source/contract/regression suite. Full production sign-off still requires `scripts/runtime_acceptance.sh` against PostgreSQL, Redis, object storage, Celery, and the Next.js UI, plus authenticated two-lodge concurrency/security testing. The script preserves Docker volumes and intentionally fails instead of hiding runtime errors.
+
+## Later account-scope update
+
+On 21 October 2026 the owner restored Group Admin and explicit multi-lodge groups. The one-lodge restriction in this historical release remains in force for ordinary staff and Lodge Admin accounts; assigned Group Admin memberships are now the controlled exception. See [group setup](LODGE_GROUPS_AND_FEEDBACK.md).

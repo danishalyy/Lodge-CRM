@@ -2,10 +2,10 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, text
 from .config import settings
 from .db import get_db, set_rls_context
-from .models import AccountEmail, Invitation, User, Lodge, Membership, Role, StaffProfile, Notification, NotificationRecipient, NotificationDelivery, NotificationPreference
+from .models import LodgeGroup, AccountEmail, Invitation, User, Lodge, Membership, Role, StaffProfile, Notification, NotificationRecipient, NotificationDelivery, NotificationPreference
 from .schemas import PlatformInvite, InvitationPreviewIn, NotificationPreferenceUpdate
 from .security import current_user, require_super_admin, require_permission, require_csrf, hash_password, new_token, token_hash
 from .email_service import issue_invitation, account_email_status, email_configured, queue_account_email
@@ -31,9 +31,11 @@ def preview_invitation(body: InvitationPreviewIn, db=Depends(get_db)):
     if inv.lodge_id:
         staff=db.scalar(select(StaffProfile).where(StaffProfile.lodge_id==inv.lodge_id,StaffProfile.user_id==user.id))
         if staff and staff.employment_status!='active':raise HTTPException(400,'This invitation is no longer available.')
+    group=db.scalar(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))) if not inv.lodge_id and not user.is_super_admin else None
+    if not inv.lodge_id and not user.is_super_admin and not group:raise HTTPException(400,'This invitation is no longer available.')
     address, domain = user.email.split('@', 1)
     return {'name': user.full_name, 'email_hint': address[:1] + '***@' + domain,
-            'workspace': (lodge.brand_name or lodge.name) if lodge else 'SafariOS platform', 'expires_at': inv.expires_at.isoformat()}
+            'workspace': (lodge.brand_name or lodge.name) if lodge else group.name+' group' if group else 'SafariOS platform', 'expires_at': inv.expires_at.isoformat()}
 
 
 @router.post('/api/v1/platform/users/invite', dependencies=[Depends(require_csrf)])
@@ -57,9 +59,11 @@ def resend_platform_invitation(user_id: uuid.UUID, request: Request, actor: User
     if not target:
         raise HTTPException(404, 'User not found')
     member = db.scalar(select(Membership).where(Membership.user_id == target.id, Membership.is_active.is_(True)))
-    if not target.is_super_admin and not member:
+    group=db.scalar(select(LodgeGroup).where(LodgeGroup.admin_user_id==target.id,LodgeGroup.is_active.is_(True)))
+    if not target.is_super_admin and not member and not group:
         raise HTTPException(409, 'This account has no active lodge membership.')
-    lodge = db.get(Lodge, member.lodge_id) if member else None
+    group=db.scalar(select(LodgeGroup).where(LodgeGroup.admin_user_id==target.id,LodgeGroup.is_active.is_(True)))
+    lodge = db.get(Lodge, member.lodge_id) if member and not group else None
     result = issue_invitation(db, target, lodge=lodge, creator_id=actor.id)
     _audit(db, request, actor, 'account.invitation.resent', target.id, lodge.id if lodge else None)
     db.commit()
@@ -119,7 +123,11 @@ def _inbox_context(db, user):
     if user.is_super_admin:
         set_rls_context(db, None, True, str(user.id))
     else:
-        member = db.scalar(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True)))
+        group=db.scalar(select(LodgeGroup.id).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True)))
+        selected=db.scalar(text("select current_setting('app.current_lodge_id',true)")) if group else None
+        query=select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True))
+        if group and selected:query=query.where(Membership.lodge_id==selected)
+        member=db.scalar(query)
         set_rls_context(db, str(member.lodge_id) if member else None, False, str(user.id))
         if member:
             from .security import ensure_subscription_read_allowed
@@ -205,9 +213,14 @@ def save_personal_notification_preferences(body: NotificationPreferenceUpdate, u
     _inbox_context(db, user)
     user.email_notifications_enabled = body.email_enabled
     user.email_min_severity = body.email_min_severity
-    for pref in db.scalars(select(NotificationPreference).where(NotificationPreference.user_id == user.id)).all():
-        pref.email_enabled = body.email_enabled
-        pref.email_min_severity = body.email_min_severity
+    members=db.scalars(select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True))).all()
+    for member in members:
+        from .security import membership_for
+        if not membership_for(db,user,str(member.lodge_id)):continue
+        set_rls_context(db,str(member.lodge_id),user.is_super_admin,str(user.id))
+        for pref in db.scalars(select(NotificationPreference).where(NotificationPreference.user_id==user.id,NotificationPreference.lodge_id==member.lodge_id)).all():
+            pref.email_enabled=body.email_enabled;pref.email_min_severity=body.email_min_severity
+        db.flush()
     db.commit()
     return personal_notification_preferences(user)
 

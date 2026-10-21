@@ -1,6 +1,6 @@
 # Lodge CRM requirements compliance review — Security & Integrity Hardening 1.8
 
-Source of truth reviewed: the final operating-system scope, package/feature guide, and role-access document. A later product decision removes **Group Admin / Owner**; therefore multi-property Group Admin functionality is intentionally excluded until the product owner explicitly reintroduces it.
+Source of truth reviewed: the final operating-system scope, package/feature guide, and role-access document. Group Admin / Owner was initially excluded. The owner explicitly reintroduced it on 21 October 2026; see [group implementation and boundaries](LODGE_GROUPS_AND_FEEDBACK.md) for the current scope.
 
 Status legend: **Implemented** = backed by persistent production data/authorization; **Partial** = meaningful foundation exists but the documented workflow is not complete; **Not built** = intentionally unavailable rather than simulated.
 
@@ -83,7 +83,7 @@ Status legend: **Implemented** = backed by persistent production data/authorizat
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Multi-property / Group Admin | Intentionally excluded | Later product-owner decision removed Group Admin / Owner despite older documents. |
+| Multi-property / Group Admin | Restored core workflows | Owner reintroduced groups on 21 October 2026: explicit lodge assignments, owner invitations, group overview, lodge switching and scoped operational totals. See LODGE_GROUPS_AND_FEEDBACK.md. |
 | Live GPS | Not built | Requires real supported hardware/provider. |
 | Trip playback | Not built | Requires telemetry history. |
 | Geofencing | Not built | Requires telemetry layer. |

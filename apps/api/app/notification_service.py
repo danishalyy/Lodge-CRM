@@ -62,7 +62,7 @@ def management_recipient_ids(db, lodge_id, permission_key, department_id=None):
                     .where(Membership.lodge_id==lodge_id,Membership.is_active.is_(True),User.is_active.is_(True))).all()
     out=[]
     for member,role,user in rows:
-        if role.key not in {"lodge_admin","department_manager"}:continue
+        if role.key not in {"lodge_admin","group_admin","department_manager"}:continue
         if role.key=="department_manager" and (not department_id or member.department_id!=department_id):continue
         if not has_permission(db,member,permission_key):continue
         staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==lodge_id))

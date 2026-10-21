@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .db import get_db, set_rls_context
 from .models import (
-    AuditLog, AuthSession, LodgeEntitlementOverride, Membership, Permission, PlanEntitlement,
+    Lodge, LodgeGroup, AuditLog, AuthSession, LodgeEntitlementOverride, Membership, Permission, PlanEntitlement,
     Role, RolePermission, StaffProfile, Subscription, User, CustomRole, CustomRolePermission,
 )
 
@@ -66,7 +66,7 @@ def create_session(db: Session, user: User, response: Response):
     response.set_cookie("lodge_csrf", csrf, httponly=False, secure=settings.cookie_secure, samesite="lax", max_age=settings.session_ttl_hours*3600, path="/")
 
 
-def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None)) -> User:
+def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None), x_lodge_context: str | None = Header(None)) -> User:
     if not lodge_session:
         raise HTTPException(401, "Authentication required")
     now = datetime.now(timezone.utc)
@@ -87,11 +87,20 @@ def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends
     set_rls_context(db, None, user.is_super_admin, str(user.id))
     if not user.is_super_admin:
         memberships = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
+        groups=db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()
+        if groups:
+            valid=[m for m in memberships if membership_for(db,user,str(m.lodge_id))]
+            if any(db.get(Role,m.role_id).key!='group_admin' for m in valid):raise HTTPException(403,'Account assignment requires administrator review')
+            selected=next((m for m in valid if str(m.lodge_id)==x_lodge_context),None) if x_lodge_context else (valid[0] if valid else None)
+            if x_lodge_context and not selected:raise HTTPException(403,'You do not have access to this lodge')
+            set_rls_context(db,str(selected.lodge_id) if selected else None,False,str(user.id))
+            return user
         if not memberships:
             raise HTTPException(401, "Lodge access has been revoked")
         if len(memberships) != 1:
             raise HTTPException(403, "Account lodge assignment requires administrator review")
-        membership = memberships[0]
+        membership = membership_for(db,user,str(memberships[0].lodge_id))
+        if not membership:raise HTTPException(401,"Lodge access has been revoked")
         set_rls_context(db, str(membership.lodge_id), False, str(user.id))
         staff = db.scalar(select(StaffProfile).where(StaffProfile.lodge_id == membership.lodge_id, StaffProfile.user_id == user.id))
         if staff and staff.employment_status != "active":
@@ -118,7 +127,12 @@ def require_super_admin(user: User = Depends(current_user)) -> User:
 
 
 def membership_for(db: Session, user: User, lodge_id: str):
-    return db.scalar(select(Membership).where(Membership.user_id == user.id, Membership.lodge_id == lodge_id, Membership.is_active.is_(True)))
+    member=db.scalar(select(Membership).where(Membership.user_id==user.id,Membership.lodge_id==lodge_id,Membership.is_active.is_(True)))
+    if member and db.get(Role,member.role_id).key=='group_admin':
+        lodge=db.get(Lodge,lodge_id)
+        group=db.get(LodgeGroup,lodge.group_id) if lodge and lodge.group_id else None
+        if not group or not group.is_active or group.admin_user_id!=user.id:return None
+    return member
 
 
 @dataclass

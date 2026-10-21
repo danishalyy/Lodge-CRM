@@ -5,6 +5,7 @@ This file describes the enforced server-side access model. UI hiding is not trea
 | Role | Production access rule |
 |---|---|
 | Super Admin | Platform-wide administration. Can register lodges, control subscriptions and package overrides, inspect tenants for support, and review platform audit/users. Operational writes still respect subscription write state. |
+| Group Admin / Owner | Full authorized operations in explicitly assigned group lodges, subject to each lodge’s package and subscription. Group overview and lodge switching; no platform administration. |
 | Lodge Admin / General Manager | Full authorized access inside one lodge, subject to package entitlements and subscription state. Can manage HR records and Standard/Premium custom roles where entitled. |
 | Department Manager / Supervisor | Department-scoped staff, HR records, tasks, requests, housekeeping/maintenance, activities, transfers, reports and command-centre metrics. No lodge-wide operational memory or guest CRM by default. |
 | Front Office / Guest Services | Guest CRM, stays/arrivals/departures, rooms, guest requests, activities/transfers and relevant operational tasks according to permissions. |
@@ -37,3 +38,5 @@ This file describes the enforced server-side access model. UI hiding is not trea
 ## Custom roles
 
 Standard/Premium lodges can define a custom role by choosing a built-in base operational scope and an explicit permission set. The base role continues to control record scope (for example department-only or own-assignment-only), while the custom permission set controls which modules/actions are authorized. A custom role cannot be used to bypass tenant, subscription, package, department or own-record restrictions.
+
+Group Admin was restored by the owner on 21 October 2026. See [group setup and boundaries](LODGE_GROUPS_AND_FEEDBACK.md). Ordinary staff/Lodge Admin accounts remain single-lodge.

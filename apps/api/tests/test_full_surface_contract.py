@@ -174,7 +174,9 @@ def test_web_routes_exist_for_every_visible_module():
 
 def test_web_api_has_csrf_header_support_and_credentials():
     api=(WEB/'lib'/'api.ts').read_text()
-    assert "X-CSRF-Token" in api and "credentials:'include'" in api
+    assert "X-CSRF-Token" in api
+    import re
+    assert re.search(r"credentials\s*:\s*[\"']include[\"']", api)
 
 
 def test_ui_has_glass_design_tokens_and_reduced_motion():

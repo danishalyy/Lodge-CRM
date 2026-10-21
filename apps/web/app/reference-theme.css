@@ -622,3 +622,10 @@ select:focus-visible {
 .passwordToggle { position: absolute; top: 28px; right: 4px; width: 44px; height: 44px; }
 
 .requiredMarker::before { content: " *"; }
+.setupChecklist progress { width: 100%; accent-color: var(--accent); }
+.setupChecklist ul { list-style: none; padding: 0; margin: 24px 0 0; }
+.setupChecklist li { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid var(--border); }
+.setupChecklist li > div { flex: 1; min-width: 0; }
+.setupChecklist li p { margin: 8px 0 0; }
+.drawerActions { position: sticky; bottom: -24px; z-index: 2; padding: 16px 0; margin-top: 24px; background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+@media (max-width: 600px) { .setupChecklist li { flex-wrap: wrap; } .setupChecklist li > div { flex-basis: 75%; } }

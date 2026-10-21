@@ -1,4 +1,6 @@
 "use client";
+import LockedFeature from "./LockedFeature";
+import { LockKeyhole } from "lucide-react";
 import { Field } from "@/components/ui/field";
 import { WorkspaceAccessContext } from "@/lib/workspace-access";
 import NotificationBell from "./NotificationBell";
@@ -70,6 +72,7 @@ const required: Record<string, string | undefined> = {
   reports: "reports.view",
   memory: "memory.view",
   notifications: "notifications.view",
+  "lodge-ai": "ai.use",
 };
 const migrated = new Set([
   "dashboard",
@@ -96,6 +99,7 @@ const migrated = new Set([
   "memory",
   "notifications",
   "settings",
+  "lodge-ai",
 ]);
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname(),
@@ -188,15 +192,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           subscription_status: "Platform access",
         }
       : null);
-  const allowed = (key: string) => {
+  const roleAllowed = (key: string) => {
     if (!migrated.has(key)) return false;
     if (key === "settings") return true;
-    const feature = moduleFeature[key as keyof typeof moduleFeature];
-    if (feature && !membership?.entitlements?.includes(feature)) return false;
     if (me.is_super_admin) return true;
+    if (key === "lodge-ai")
+      return ["lodge_admin", "group_admin"].includes(membership?.role_key);
     const p = required[key];
     return !p || membership?.permissions?.includes(p);
   };
+  const locked = (key: string) => {
+    const feature = moduleFeature[key as keyof typeof moduleFeature];
+    return !!feature && !membership?.entitlements?.includes(feature);
+  };
+  const allowed = (key: string) => roleAllowed(key) && !locked(key);
   const requestedModule = path.split("/")[1];
   if (me.is_super_admin && !me.mfa_enabled && requestedModule !== "settings")
     return (
@@ -217,24 +226,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const requestedFeature =
     moduleFeature[requestedModule as keyof typeof moduleFeature];
   if (
-    requestedFeature &&
-    membership &&
-    !membership.entitlements?.includes(requestedFeature)
-  )
-    return (
-      <HiddenFeatureRedirect
-        to={
-          "/" +
-          (modules.find(
-            ([key]) => key !== requestedModule && allowed(key),
-          )?.[0] || "settings")
-        }
-      />
-    );
-  if (
     !me.is_super_admin &&
     ((!membership && requestedModule !== "settings") ||
-      (migrated.has(requestedModule) && !allowed(requestedModule)))
+      (migrated.has(requestedModule) && !roleAllowed(requestedModule)))
   )
     return (
       <main className="content">
@@ -251,7 +245,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   const visible: readonly (readonly string[])[] = [
     ...(me.groups?.length ? [["group", "Group overview", "⌂"]] : []),
-    ...modules.filter(([key]) => allowed(key)),
+    ...modules
+      .filter(([key]) => roleAllowed(key))
+      .map(([key, label, icon]) => [
+        key,
+        label,
+        icon,
+        locked(key) ? "locked" : "",
+      ]),
   ];
 
   const blocked =
@@ -316,7 +317,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       />
       <aside className="sidebar">
         <SafariBrand />
-        {me.memberships?.length > 0 && (
+        {me.memberships?.length > 1 && (
           <div className="roleBox">
             <Field label="ACTIVE LODGE">
               <select
@@ -364,6 +365,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Link
                     href={`/${key}`}
                     aria-label={label}
+                    title={
+                      locked(key)
+                        ? "Available with additional workspace access"
+                        : undefined
+                    }
                     className={
                       path === `/${key}` ? "navItem active" : "navItem"
                     }
@@ -372,6 +378,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <UiIcon name={moduleIcon(key)} />
                     </span>
                     <span>{label}</span>
+                    {locked(key) && (
+                      <LockKeyhole size={14} aria-label="Locked feature" />
+                    )}
                     {path === `/${key}` && <i className="activeRail" />}
                   </Link>
                 </div>
@@ -456,7 +465,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               platform: !!me.is_super_admin,
             }}
           >
-            {children}
+            {requestedFeature && locked(requestedModule) ? (
+              <LockedFeature module={requestedModule} />
+            ) : (
+              children
+            )}
           </WorkspaceAccessContext.Provider>
         </div>
       </main>
@@ -466,17 +479,5 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         items={visible}
       />
     </div>
-  );
-}
-
-function HiddenFeatureRedirect({ to }: { to: string }) {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace(to);
-  }, [router, to]);
-  return (
-    <main className="content" role="status">
-      Opening your workspace…
-    </main>
   );
 }

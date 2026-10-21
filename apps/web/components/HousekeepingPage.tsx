@@ -3,6 +3,7 @@ import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { FormEvent, useEffect, useState } from "react";
+import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
 import { authApi, getActiveLodgeId, lodgeApi, operationsApi } from "@/lib/api";
 type Room = {
@@ -25,6 +26,8 @@ const next: Record<string, string | undefined> = {
 };
 export default function HousekeepingPage() {
   const access = useWorkspaceAccess();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [assetOpen, setAssetOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
     [jobs, setJobs] = useState<any[]>([]),
@@ -76,6 +79,8 @@ export default function HousekeepingPage() {
           : null,
       });
       form.reset();
+      setCreateOpen(false);
+      setAssetOpen(false);
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -100,6 +105,14 @@ export default function HousekeepingPage() {
             authoritative room readiness states.
           </p>
         </div>
+        {canManage && (
+          <button
+            className="button primary"
+            onClick={() => setCreateOpen(true)}
+          >
+            + Add job
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <div className="summaryStrip">
@@ -117,51 +130,49 @@ export default function HousekeepingPage() {
           </div>
         ))}
       </div>
-      <div className={canManage ? "twoCol" : ""}>
+      <div className="moduleContent">
         {canManage && (
-          <section className="card formCard">
-            <h2>Create housekeeping job</h2>
-            <Form onSubmit={create}>
-              <Field label="Room / unit">
-                <select className="select" name="unit_id" required>
-                  <option value="">Select unit…</option>
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} · {r.status}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Job type">
-                <select className="select" name="job_type">
-                  <option value="cleaning">Cleaning</option>
-                  {fullWorkflow && (
-                    <>
-                      <option value="turndown">Turndown</option>
-                      <option value="inspection">Inspection</option>
-                      <option value="linen">Linen</option>
-                    </>
-                  )}
-                  <option value="guest_request">Guest request</option>
-                </select>
-              </Field>
-              <Field label="Assigned housekeeper">
-                <select className="select" name="assigned_staff_id">
-                  <option value="">Unassigned</option>
-                  {staff
-                    .filter((s) => s.employment_status === "active")
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.full_name}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-              {fullWorkflow && (
-                <>
-                  <Field label="Inspector">
-                    <select className="select" name="inspector_staff_id">
-                      <option value="">No named inspector</option>
+          <>
+            {createOpen && (
+              <Drawer onClose={() => setCreateOpen(false)}>
+                <div className="drawerHead">
+                  <h2>Create housekeeping job</h2>
+                  <button
+                    className="closeButton"
+                    aria-label="Close dialog"
+                    onClick={() => setCreateOpen(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <Form onSubmit={create}>
+                  <Field label="Room / unit">
+                    <select className="select" name="unit_id" required>
+                      <option value="">Select unit…</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} · {r.status}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Job type">
+                    <select className="select" name="job_type">
+                      <option value="cleaning">Cleaning</option>
+                      {fullWorkflow && (
+                        <>
+                          <option value="turndown">Turndown</option>
+                          <option value="inspection">Inspection</option>
+                          <option value="linen">Linen</option>
+                        </>
+                      )}
+                      <option value="guest_request">Guest request</option>
+                    </select>
+                  </Field>
+                  <Field label="Assigned housekeeper">
+                    <select className="select" name="assigned_staff_id">
+                      <option value="">Unassigned</option>
                       {staff
                         .filter((s) => s.employment_status === "active")
                         .map((s) => (
@@ -171,24 +182,46 @@ export default function HousekeepingPage() {
                         ))}
                     </select>
                   </Field>
-                </>
-              )}
-              <Field label="Due">
-                <input className="field" type="datetime-local" name="due_at" />
-              </Field>
-              {fullWorkflow && (
-                <>
-                  <Field label="Linen requirements">
-                    <textarea className="textarea" name="linen_notes" />
+                  {fullWorkflow && (
+                    <>
+                      <Field label="Inspector">
+                        <select className="select" name="inspector_staff_id">
+                          <option value="">No named inspector</option>
+                          {staff
+                            .filter((s) => s.employment_status === "active")
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.full_name}
+                              </option>
+                            ))}
+                        </select>
+                      </Field>
+                    </>
+                  )}
+                  <Field label="Due">
+                    <input
+                      className="field"
+                      type="datetime-local"
+                      name="due_at"
+                    />
                   </Field>
-                </>
-              )}
-              <Field label="Notes">
-                <textarea className="textarea" name="notes" />
-              </Field>
-              <button className="button primary">Create job</button>
-            </Form>
-          </section>
+                  {fullWorkflow && (
+                    <>
+                      <Field label="Linen requirements">
+                        <textarea className="textarea" name="linen_notes" />
+                      </Field>
+                    </>
+                  )}
+                  <Field label="Notes">
+                    <textarea className="textarea" name="notes" />
+                  </Field>
+                  <div className="drawerActions">
+                    <button className="button primary">Create job</button>
+                  </div>
+                </Form>
+              </Drawer>
+            )}
+          </>
         )}
         <section className="panel">
           <h2>Active housekeeping</h2>

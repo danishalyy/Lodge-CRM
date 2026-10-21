@@ -1,4 +1,5 @@
 "use client";
+import { LockKeyhole } from "lucide-react";
 import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
 import UiIcon, { moduleIcon } from "./UiIcon";
@@ -28,7 +29,7 @@ export default function WorkspaceCommand({
       <Command.List>
         <Command.Empty>No matching module.</Command.Empty>
         <Command.Group heading="Workspace">
-          {items.map(([key, label]) => (
+          {items.map(([key, label, , state]) => (
             <Command.Item
               key={key}
               value={label}
@@ -39,6 +40,9 @@ export default function WorkspaceCommand({
             >
               <UiIcon name={moduleIcon(key)} />
               <span>{label}</span>
+              {state === "locked" && (
+                <LockKeyhole size={14} aria-label="Locked feature" />
+              )}
             </Command.Item>
           ))}
         </Command.Group>

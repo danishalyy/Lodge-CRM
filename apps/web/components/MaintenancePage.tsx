@@ -32,6 +32,8 @@ const next: Record<string, string | undefined> = {
 };
 export default function MaintenancePage() {
   const access = useWorkspaceAccess();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [assetOpen, setAssetOpen] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]),
     [rooms, setRooms] = useState<Room[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
@@ -109,6 +111,8 @@ export default function MaintenancePage() {
           Number(f.get("recurrence_interval_days") || 0) || null,
       });
       form.reset();
+      setCreateOpen(false);
+      setAssetOpen(false);
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -188,6 +192,16 @@ export default function MaintenancePage() {
             parts and recurring service workflows.
           </p>
         </div>
+        {(tab === "assets" ? canAssets : canManage) && (
+          <button
+            className="button primary"
+            onClick={() =>
+              tab === "assets" ? setAssetOpen(true) : setCreateOpen(true)
+            }
+          >
+            {tab === "assets" ? "+ Add asset" : "+ Add ticket"}
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <div className="tabs">
@@ -207,98 +221,114 @@ export default function MaintenancePage() {
         )}
       </div>
       {tab === "tickets" && (
-        <div className={canManage ? "twoCol" : ""}>
+        <div className="moduleContent">
           {canManage && (
-            <section className="card formCard">
-              <h2>Create maintenance ticket</h2>
-              <Form onSubmit={submit}>
-                <Field label="Title">
-                  <input className="field" name="title" required />
-                </Field>
-                <Field label="Description">
-                  <textarea className="textarea" name="description" />
-                </Field>
-                <Field label="Category">
-                  <input className="field" name="category" />
-                </Field>
-                {workshop && (
-                  <>
-                    <Field label="Asset">
-                      <select className="select" name="asset_id">
-                        <option value="">No registered asset</option>
-                        {assets.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.asset_code} · {a.name}
+            <>
+              {createOpen && (
+                <Drawer onClose={() => setCreateOpen(false)}>
+                  <div className="drawerHead">
+                    <h2>Create maintenance ticket</h2>
+                    <button
+                      className="closeButton"
+                      aria-label="Close dialog"
+                      onClick={() => setCreateOpen(false)}
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <Form onSubmit={submit}>
+                    <Field label="Title">
+                      <input className="field" name="title" required />
+                    </Field>
+                    <Field label="Description">
+                      <textarea className="textarea" name="description" />
+                    </Field>
+                    <Field label="Category">
+                      <input className="field" name="category" />
+                    </Field>
+                    {workshop && (
+                      <>
+                        <Field label="Asset">
+                          <select className="select" name="asset_id">
+                            <option value="">No registered asset</option>
+                            {assets.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.asset_code} · {a.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </>
+                    )}
+                    <Field label="Room / unit">
+                      <select className="select" name="unit_id">
+                        <option value="">Not room-related</option>
+                        {rooms.map((r) => (
+                          <option value={r.id} key={r.id}>
+                            {r.name}
                           </option>
                         ))}
                       </select>
                     </Field>
-                  </>
-                )}
-                <Field label="Room / unit">
-                  <select className="select" name="unit_id">
-                    <option value="">Not room-related</option>
-                    {rooms.map((r) => (
-                      <option value={r.id} key={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Vehicle">
-                  <select className="select" name="vehicle_id">
-                    <option value="">Not vehicle-related</option>
-                    {vehicles.map((v) => (
-                      <option value={v.id} key={v.id}>
-                        {v.name || v.registration}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Assign to">
-                  <select className="select" name="assigned_staff_id">
-                    <option value="">Unassigned</option>
-                    {staff
-                      .filter((s) => s.employment_status === "active")
-                      .map((s) => (
-                        <option value={s.id} key={s.id}>
-                          {s.full_name}
+                    <Field label="Vehicle">
+                      <select className="select" name="vehicle_id">
+                        <option value="">Not vehicle-related</option>
+                        {vehicles.map((v) => (
+                          <option value={v.id} key={v.id}>
+                            {v.name || v.registration}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Assign to">
+                      <select className="select" name="assigned_staff_id">
+                        <option value="">Unassigned</option>
+                        {staff
+                          .filter((s) => s.employment_status === "active")
+                          .map((s) => (
+                            <option value={s.id} key={s.id}>
+                              {s.full_name}
+                            </option>
+                          ))}
+                      </select>
+                    </Field>
+                    <Field label="Priority">
+                      <select className="select" name="priority">
+                        <option>low</option>
+                        <option selected value="normal">
+                          normal
                         </option>
-                      ))}
-                  </select>
-                </Field>
-                <Field label="Priority">
-                  <select className="select" name="priority">
-                    <option>low</option>
-                    <option selected value="normal">
-                      normal
-                    </option>
-                    <option>high</option>
-                    <option>critical</option>
-                  </select>
-                </Field>
-                {workshop && (
-                  <>
-                    <Field label="Scheduled for">
-                      <input
-                        className="field"
-                        type="datetime-local"
-                        name="scheduled_for"
-                      />
+                        <option>high</option>
+                        <option>critical</option>
+                      </select>
                     </Field>
-                    <Field label="Repeat every N days">
-                      <input
-                        className="field"
-                        type="number"
-                        min="1"
-                        name="recurrence_interval_days"
-                      />
-                    </Field>
-                  </>
-                )}
-                <button className="button primary">Create ticket</button>
-              </Form>
-            </section>
+                    {workshop && (
+                      <>
+                        <Field label="Scheduled for">
+                          <input
+                            className="field"
+                            type="datetime-local"
+                            name="scheduled_for"
+                          />
+                        </Field>
+                        <Field label="Repeat every N days">
+                          <input
+                            className="field"
+                            type="number"
+                            min="1"
+                            name="recurrence_interval_days"
+                          />
+                        </Field>
+                      </>
+                    )}
+                    <div className="drawerActions">
+                      <button className="button primary">Create ticket</button>
+                    </div>
+                  </Form>
+                </Drawer>
+              )}
+            </>
           )}
           <section className="panel">
             <h2>Maintenance queue</h2>
@@ -353,56 +383,74 @@ export default function MaintenancePage() {
         </div>
       )}
       {tab === "assets" && canAssets && (
-        <div className="twoCol">
-          <section className="card formCard">
-            <h2>Register asset</h2>
-            <Form onSubmit={createAsset}>
-              <Field label="Asset code">
-                <input className="field" name="asset_code" required />
-              </Field>
-              <Field label="Name">
-                <input className="field" name="name" required />
-              </Field>
-              <Field label="Category">
-                <input className="field" name="category" />
-              </Field>
-              <Field label="Unit">
-                <select className="select" name="unit_id">
-                  <option value="">None</option>
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Vehicle">
-                <select className="select" name="vehicle_id">
-                  <option value="">None</option>
-                  {vehicles.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name || v.registration}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Service interval days">
-                <input
-                  className="field"
-                  type="number"
-                  min="1"
-                  name="service_interval_days"
-                />
-              </Field>
-              <Field label="Next service">
-                <input className="field" type="date" name="next_service_date" />
-              </Field>
-              <Field label="Notes">
-                <textarea className="textarea" name="notes" />
-              </Field>
-              <button className="button primary">Register asset</button>
-            </Form>
-          </section>
+        <div className="moduleContent">
+          {assetOpen && (
+            <Drawer onClose={() => setAssetOpen(false)}>
+              <div className="drawerHead">
+                <h2>Register asset</h2>
+                <button
+                  className="closeButton"
+                  aria-label="Close dialog"
+                  onClick={() => setAssetOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <Form onSubmit={createAsset}>
+                <Field label="Asset code">
+                  <input className="field" name="asset_code" required />
+                </Field>
+                <Field label="Name">
+                  <input className="field" name="name" required />
+                </Field>
+                <Field label="Category">
+                  <input className="field" name="category" />
+                </Field>
+                <Field label="Unit">
+                  <select className="select" name="unit_id">
+                    <option value="">None</option>
+                    {rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Vehicle">
+                  <select className="select" name="vehicle_id">
+                    <option value="">None</option>
+                    {vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name || v.registration}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Service interval days">
+                  <input
+                    className="field"
+                    type="number"
+                    min="1"
+                    name="service_interval_days"
+                  />
+                </Field>
+                <Field label="Next service">
+                  <input
+                    className="field"
+                    type="date"
+                    name="next_service_date"
+                  />
+                </Field>
+                <Field label="Notes">
+                  <textarea className="textarea" name="notes" />
+                </Field>
+                <div className="drawerActions">
+                  <button className="button primary">Register asset</button>
+                </div>
+              </Form>
+            </Drawer>
+          )}
           <section className="panel">
             <h2>Asset register</h2>
             {assets.map((a) => (

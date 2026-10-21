@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { onboardingCopy as copy } from "@/lib/strings/onboarding";
 import { Field } from "@/components/ui/field";
 import { useEffect, useState } from "react";
 import { authApi } from "@/lib/api";
@@ -61,6 +63,17 @@ export default function Settings() {
           <p>Protect your account with an authenticator app.</p>
         </div>
       </div>
+      {me?.is_super_admin && (
+        <section className="panel">
+          <h2>{copy.securityTitle}</h2>
+          <p>{copy.securityBody}</p>
+          {me.mfa_enabled && (
+            <Link className="button primary" href="/super-admin">
+              {copy.openConsole}
+            </Link>
+          )}
+        </section>
+      )}
       <section className="panel" aria-busy={busy}>
         <h2>Multi-factor authentication</h2>
         <p>

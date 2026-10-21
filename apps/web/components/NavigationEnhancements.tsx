@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Drawer from "./Drawer";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import Link from "next/link";
+import { LockKeyhole } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
   PanelLeftClose,
@@ -102,7 +103,7 @@ export default function NavigationEnhancements({
                 ["super-admin/notifications", "Notifications"],
                 ["super-admin/settings", "Settings"],
               ]
-            ).map(([key, label]) => (
+            ).map(([key, label, , state]) => (
               <Link
                 className="navItem"
                 href={"/" + key}
@@ -111,6 +112,9 @@ export default function NavigationEnhancements({
               >
                 <UiIcon name={moduleIcon(key)} />
                 <span>{label}</span>
+                {state === "locked" && (
+                  <LockKeyhole size={14} aria-label="Locked feature" />
+                )}
               </Link>
             ))}
           </nav>

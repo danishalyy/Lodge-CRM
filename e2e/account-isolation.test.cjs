@@ -344,7 +344,7 @@ test('staff creation queues an invitation without choosing an owner password and
  }finally{await context.close()}
 });
 
-test('disabled modules and HR subfeatures stay hidden without forbidden requests; saving shows a popup',async()=>{
+test('locked modules and hidden HR subfeatures avoid forbidden requests; saving shows a popup',async()=>{
  const lodge='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
  const user={id:'hr-owner',full_name:'Lodge Owner',is_super_admin:false,memberships:[{lodge_id:lodge,permissions:['staff.view','staff.contact.view','staff.hr.view','staff.hr.manage','staff.roster.manage','staff.performance.manage','fuel.view'],entitlements:['staff','staff_hr']}]};
  const {context,page}=await accountPage(user);let saved=false,disabledCalls=0;
@@ -357,10 +357,10 @@ test('disabled modules and HR subfeatures stay hidden without forbidden requests
   });
   await page.goto(base+'/hr');await page.getByRole('heading',{name:'Staff HR',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Roster',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Performance',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Incidents',exact:true}).count(),0);
-  assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),0);
+  assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),1);
   await page.locator('select[name="staff_id"]').selectOption('staff-1');await page.locator('input[name="start_date"]').fill('2026-11-01');await page.locator('input[name="end_date"]').fill('2026-11-02');
   await page.getByRole('button',{name:'Create request',exact:true}).click();await page.getByText('Saved successfully',{exact:true}).waitFor();await page.locator('.taskRow').getByText('Team Member',{exact:true}).waitFor();assert.equal(saved,true);assert.equal(await page.locator('input[name="start_date"]').inputValue(),'');
-  await page.goto(base+'/fuel');await page.waitForURL('**/staff');assert.equal(disabledCalls,0);
+  await page.goto(base+'/fuel');await page.getByRole('heading',{name:'Available on Standard',exact:true}).waitFor();assert.equal(new URL(page.url()).pathname,'/fuel');assert.equal(disabledCalls,0);
  }finally{await context.close()}
 });
 
@@ -469,4 +469,21 @@ test('shared error formatter hides server internals and handles malformed valida
   assert.equal(output.formatApiError(500,{detail:'psycopg SECRET'}).message,copy.formCopy.unavailable);
   assert.deepEqual(output.formatApiError(422,{detail:[null,{loc:['body','email'],msg:'email invalid'}]}).fieldErrors,{email:copy.formCopy.email});
   assert.equal(output.formatApiError(403,{detail:{private:'data'}}).message,copy.formCopy.forbidden);
+});
+
+test('empty lodge shows permission-aware setup and hides single-lodge selector',async()=>{
+ const lodge='setup-lodge';const {context,page,requests}=await accountPage({id:'setup-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:lodge,lodge_name:'New Lodge',role_key:'lodge_admin',permissions:['dashboard.view','units.view','units.manage','guests.view','guests.manage','staff.view','staff.manage','stays.view','stays.manage'],entitlements:['dashboard','units','guests','staff','stays']}]});
+ try {
+  await page.route('**/api/v1/lodges/setup-lodge/dashboard',r=>r.fulfill({json:{lodge:{name:'New Lodge'},metrics:{},events:[]}}));
+  await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'Make this lodge your own'}).waitFor();await page.getByText('0 of 4 essentials ready').waitFor();
+  assert.equal(await page.getByLabel('ACTIVE LODGE',{exact:true}).count(),0);
+  assert.equal(await page.getByText('Operational pulse',{exact:true}).count(),0);
+  assert.equal(requests.filter(x=>x.endsWith('/activities')).length,0);
+  await page.getByRole('link',{name:'Add rooms',exact:true}).click();await page.waitForURL('**/rooms');
+ } finally {await context.close()}
+});
+
+test('maintenance creation uses a focus-managed drawer',async()=>{
+ const {context,page}=await accountPage({id:'maintenance-owner',full_name:'Owner',is_super_admin:false,memberships:[{lodge_id:'maintenance-lodge',permissions:['maintenance.view','maintenance.manage'],entitlements:['maintenance']}]});
+ try {await page.goto(base+'/maintenance');await page.getByRole('button',{name:'+ Add ticket',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByLabel('Title',{exact:true}).fill('Inspect pump');await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.activeElement?.textContent==='+ Add ticket');} finally {await context.close()}
 });

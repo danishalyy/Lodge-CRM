@@ -10,9 +10,9 @@ The latest owner-supplied reference replaces the earlier beige/orange design. Ma
 
 | Token | Dark default | Light alternative |
 | --- | --- | --- |
-| Background | `#1D1E1C` | `#F3F4EF` |
-| Navigation | `rgba(22,23,21,.82)` | `rgba(234,237,228,.86)` |
-| Glass surface | `rgba(39,40,37,.68)` | `rgba(255,255,253,.70)` |
+| Background | `#363636` | `#F3F4EF` |
+| Navigation | `#171717` | `rgba(234,237,228,.86)` |
+| Glass surface | `rgba(39,39,39,.68)` | `rgba(255,255,253,.70)` |
 | Primary text | `#EEEEEB` | `#252820` |
 | Secondary text | `#B2B3AA` | `#575D50` |
 | Accent | `#7F8967` | `#7F8967` |
@@ -31,7 +31,7 @@ Corner tokens: small 8px, inputs/buttons/navigation 9–10px, cards/tables 14px,
 
 ## Glass and motion
 
-Panels, navigation, dialogs and drawers use `backdrop-filter: blur(32px) saturate(110%)`, with prefixed Safari support, translucent charcoal fills and subtle borders. Backdrop blur acts on content behind a surface; keep text and controls sharp. Overlay backdrops blur at 12px. Solid semantic surfaces are the fallback when filtering is unsupported. Keep the base nearly flat, with only a very low-opacity olive wash and restrained grain. No pronounced glows, inner highlights or floating-card movement.
+Panels, navigation, dialogs and drawers use `backdrop-filter: blur(32px) saturate(110%)`, with prefixed Safari support, translucent charcoal fills and subtle borders. Backdrop blur acts on content behind a surface; keep text and controls sharp. Overlay backdrops blur at 12px. Solid semantic surfaces are the fallback when filtering is unsupported. The dark canvas is exactly `#363636` and the sidebar exactly `#171717`. Background meshes and dark-mode grain are disabled; use no olive tint behind the interface. Olive belongs only to interactive accents. No pronounced glows, inner highlights or floating-card movement.
 
 Respect reduced motion and retain shared Framer Motion configuration for page/dialog transitions. Preserve keyboard focus, labels, empty/loading/error states, account-change protection, MFA, permissions and tenant isolation. A visual refresh does not change access policy.
 

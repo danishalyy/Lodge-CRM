@@ -3,14 +3,14 @@
    component uses this single semantic palette. */
 :root {
   color-scheme: dark;
-  --color-charcoal: #1d1e1c;
+  --color-charcoal: #363636;
   --color-olive: #7f8967;
-  --bg-base: #1d1e1c;
-  --surface-glass: rgba(39, 40, 37, 0.68);
-  --surface-navigation: rgba(22, 23, 21, 0.82);
+  --bg-base: #363636;
+  --surface-glass: rgba(39, 39, 39, 0.68);
+  --surface-navigation: #171717;
   --text-primary: #eeeeeb;
-  --text-secondary: #b2b3aa;
-  --text-muted: #a2a49a;
+  --text-secondary: #b3b3b3;
+  --text-muted: #a4a4a4;
   --accent: #7f8967;
   --accent-hover: #929d78;
   --text-accent: #c2cbb0;
@@ -24,7 +24,7 @@
   --card: var(--surface-glass);
   --sec: rgba(255, 255, 255, 0.035);
   --hov: rgba(255, 255, 255, 0.065);
-  --bd: rgba(224, 228, 215, 0.11);
+  --bd: rgba(255, 255, 255, 0.11);
   --tx: var(--text-primary);
   --tx2: var(--text-secondary);
   --tx3: var(--text-muted);
@@ -36,7 +36,7 @@
   --ok: var(--success);
   --selection: rgba(127, 137, 103, 0.22);
   --focus-glow: rgba(162, 176, 132, 0.2);
-  --glass-fallback: #252623;
+  --glass-fallback: #272727;
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.05);
   --radius-sm: 8px;
@@ -50,10 +50,10 @@
   --font-display: var(--font-body);
   /* Compatibility aliases for older operational components. */
   --color-beige: #eeeeeb;
-  --color-gray: #30322d;
-  --color-brown: #1d1e1c;
+  --color-gray: #303030;
+  --color-brown: #363636;
   --color-orange: var(--color-olive);
-  --color-brown-20: rgba(29, 30, 28, 0.2);
+  --color-brown-20: rgba(54, 54, 54, 0.2);
   --color-beige-20: rgba(238, 238, 235, 0.14);
 }
 :root[data-theme="light"] {
@@ -227,7 +227,7 @@ h3 {
   height: 76px;
   padding: 0 38px;
   border-bottom: 1px solid var(--bd);
-  background: rgba(29, 30, 28, 0.48);
+  background: rgba(54, 54, 54, 0.65);
   -webkit-backdrop-filter: blur(32px) saturate(110%);
   backdrop-filter: blur(32px) saturate(110%);
 }
@@ -426,7 +426,7 @@ label.fieldLabel,
 .drawerOverlay,
 .modalOverlay,
 [data-vaul-overlay] {
-  background: rgba(8, 10, 7, 0.45);
+  background: rgba(8, 8, 8, 0.45);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
@@ -551,7 +551,7 @@ select:focus-visible {
   .drawerOverlay,
   .modalOverlay,
   [data-vaul-overlay] {
-    background: rgba(8, 10, 7, 0.86);
+    background: rgba(8, 8, 8, 0.86);
   }
 }
 :root[data-theme="light"] {
@@ -581,7 +581,7 @@ select:focus-visible {
   backdrop-filter: blur(32px);
 }
 .glassOverlay {
-  background: rgba(8, 10, 7, 0.45);
+  background: rgba(8, 8, 8, 0.45);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
@@ -596,8 +596,12 @@ select:focus-visible {
   (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
 ) {
   .glassOverlay {
-    background: rgba(8, 10, 7, 0.86);
+    background: rgba(8, 8, 8, 0.86);
   }
 }
 .collectionToolbar .searchField {border-radius:10px;padding:0 14px;min-height:44px}
 .collectionToolbar .searchField input {border:0;border-radius:0;background:transparent;min-height:42px;padding:10px 0;box-shadow:none}
+
+/* Flat neutral canvas: olive belongs to actions and selection only. */
+.surfaceBackdrop i {display:none}
+:root:not([data-theme="light"]) .grain {display:none}

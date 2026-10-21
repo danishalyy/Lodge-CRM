@@ -2,7 +2,7 @@
 
 Apply the shared warm-neutral, translucent design system to every new or edited screen. Read `../../docs/UI_UX_DESIGN_SYSTEM.md` before introducing a new visual pattern.
 
-- The latest owner reference supersedes earlier beige/orange rules. Use charcoal `#1D1E1C`, olive `#7F8967`, gray reading text, and the semantic dark/light tokens in `app/reference-theme.css`. No orange, purple or bright gradients.
+- The latest owner reference supersedes earlier beige/orange rules. Use exact dark background `#363636` and sidebar `#171717`, olive `#7F8967`, gray reading text, and the semantic dark/light tokens in `app/reference-theme.css`. Keep background layers neutral, with no olive wash or gradient. Olive is reserved for actions and active states. No orange, purple or bright gradients.
 - Inter 400/500/600 is bundled locally. Operational headings use 500 weight at 30px desktop/26px mobile; card headings 16px. Avoid oversized bold display typography.
 - Default to dark on fresh browsers; preserve explicit saved preferences and retain the light alternative.
 - Use the shared 8/10/14/18px radius tokens: cards 14px, inputs/buttons 10px, dialogs 18px. Buttons are no longer pills. Keep the sidebar flush to the left with its divider; cards use 24px padding and 24px gutters, mobile 20px/16px.

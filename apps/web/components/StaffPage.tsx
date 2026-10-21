@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -157,7 +158,7 @@ export default function StaffPage() {
       );
       setNotice(
         "Invitation " +
-          r.delivery_status +
+          readableLabel(r.delivery_status) +
           ". The owner sets their own password.",
       );
       await load();
@@ -181,7 +182,7 @@ export default function StaffPage() {
       );
       setNotice(
         "Replacement invitation " +
-          result.delivery_status +
+          readableLabel(result.delivery_status) +
           ". The previous link no longer works.",
       );
       await load();
@@ -312,7 +313,7 @@ export default function StaffPage() {
                           <StatusPill value={r.account_status || "active"} />
                           {r.delivery_status && (
                             <small className="textSecondary">
-                              Email: {r.delivery_status}
+                              Email: {readableLabel(r.delivery_status)}
                             </small>
                           )}
                           {canManage && r.account_status !== "active" && (

@@ -1,1 +1,19 @@
-export default function ModulePage({title}:{title:string}){return <><div className="pageHeader"><div><span className="eyebrow">LODGE CRM</span><h1>{title}</h1><p>This workspace is not available yet.</p></div></div><section className="panel"><h2>Production migration in progress</h2><p style={{color:'var(--tx2)'}}>Contact your lodge administrator for available services and updates.</p></section></>}
+export default function ModulePage({ title }: { title: string }) {
+  return (
+    <>
+      <div className="pageHeader">
+        <div>
+          <span className="eyebrow">LODGE CRM</span>
+          <h1>{title}</h1>
+          <p>This workspace is not available yet.</p>
+        </div>
+      </div>
+      <section className="panel">
+        <h2>Service not available yet</h2>
+        <p style={{ color: "var(--tx2)" }}>
+          Contact your lodge administrator for available services and updates.
+        </p>
+      </section>
+    </>
+  );
+}

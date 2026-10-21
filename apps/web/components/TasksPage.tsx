@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
@@ -263,7 +265,7 @@ export default function TasksPage() {
                 <td>
                   <StatusPill value={r.priority} />
                 </td>
-                <td>{r.due_at ? new Date(r.due_at).toLocaleString() : "—"}</td>
+                <td>{r.due_at ? formatDateTime(r.due_at) : "—"}</td>
                 <td>
                   <StatusPill value={r.status} />
                 </td>
@@ -273,7 +275,7 @@ export default function TasksPage() {
                       className="button secondary"
                       onClick={() => update(r.id, { status: next[r.status] })}
                     >
-                      {next[r.status]!.replaceAll("_", " ")}
+                      {readableLabel(next[r.status]!)}
                     </button>
                   )}
                 </td>
@@ -354,12 +356,12 @@ export default function TasksPage() {
             </Field>
             <Field label="Priority">
               <select className="select" name="priority">
-                <option>low</option>
+                <option value="low">{readableLabel("low")}</option>
                 <option selected value="normal">
-                  normal
+                  {readableLabel("normal")}
                 </option>
-                <option>high</option>
-                <option>critical</option>
+                <option value="high">{readableLabel("high")}</option>
+                <option value="critical">{readableLabel("critical")}</option>
               </select>
             </Field>
             <Field label="Due">
@@ -445,7 +447,7 @@ export default function TasksPage() {
               <div>
                 <strong>{c.author}</strong>
                 <p>{c.body}</p>
-                <small>{new Date(c.created_at).toLocaleString()}</small>
+                <small>{formatDateTime(c.created_at)}</small>
               </div>
             </div>
           ))}

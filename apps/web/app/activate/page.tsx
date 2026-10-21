@@ -1,4 +1,5 @@
 "use client";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import Link from "next/link";
@@ -129,8 +130,8 @@ export default function Activate() {
               </button>
               <p className="fieldHint">
                 One-time invitation · expires{" "}
-                {new Date(invite.expires_at).toLocaleString()}. Activating signs
-                this browser into your invited account.
+                {formatDateTime(invite.expires_at)}. Activating signs this
+                browser into your invited account.
               </p>
             </Form>
           </>

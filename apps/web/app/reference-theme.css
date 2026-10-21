@@ -633,3 +633,8 @@ select:focus-visible {
 .manualSecret { overflow-wrap: anywhere; }
 .recoveryCodes { margin: 24px 0; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-card, 16px); }
 .recoveryCodes ul { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 16px; padding-left: 20px; }
+.propertyToolbar .searchField { display: flex; align-items: center; gap: 12px; padding: 0 16px; min-height: 44px; }
+.propertyToolbar .searchField input { flex: 1; width: 100%; min-width: 0; min-height: 42px; margin: 0; padding: 10px 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.logoUpload input[type="file"] { max-width: 100%; width: 100%; font: inherit; color: var(--tx2); }
+.logoUpload input[type="file"]::file-selector-button { font: inherit; color: var(--tx); background: var(--sec); border: 1px solid var(--bd); border-radius: var(--radius-md); padding: 10px 16px; margin: 8px 12px 8px 0; cursor: pointer; }
+.summaryBox span { font-size: 14px; line-height: 1.5; }

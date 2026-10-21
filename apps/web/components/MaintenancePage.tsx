@@ -1,4 +1,7 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatMoney } from "@/lib/formatting";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
@@ -297,12 +300,14 @@ export default function MaintenancePage() {
                     </Field>
                     <Field label="Priority">
                       <select className="select" name="priority">
-                        <option>low</option>
+                        <option value="low">{readableLabel("low")}</option>
                         <option selected value="normal">
-                          normal
+                          {readableLabel("normal")}
                         </option>
-                        <option>high</option>
-                        <option>critical</option>
+                        <option value="high">{readableLabel("high")}</option>
+                        <option value="critical">
+                          {readableLabel("critical")}
+                        </option>
                       </select>
                     </Field>
                     {workshop && (
@@ -348,7 +353,7 @@ export default function MaintenancePage() {
                     {i.unit_name || i.vehicle_name || i.category} ·{" "}
                     {i.assigned_staff_name || "Unassigned"}
                     {i.scheduled_for
-                      ? ` · ${new Date(i.scheduled_for).toLocaleString()}`
+                      ? ` · ${formatDateTime(i.scheduled_for)}`
                       : ""}
                   </small>
                 </div>
@@ -361,7 +366,7 @@ export default function MaintenancePage() {
                         className="button secondary"
                         onClick={() => update(i.id, { status: next[i.status] })}
                       >
-                        {next[i.status]!.replaceAll("_", " ")}
+                        {readableLabel(next[i.status]!)}
                       </button>
                     )}{" "}
                     {!["completed", "cancelled"].includes(i.status) && (
@@ -499,7 +504,7 @@ export default function MaintenancePage() {
               <span>
                 {p.part_name} × {p.quantity}
               </span>
-              <strong>{(p.total_cost_cents / 100).toFixed(2)}</strong>
+              <strong>{formatMoney(p.total_cost_cents)}</strong>
             </div>
           ))}
           <Form onSubmit={addPart}>

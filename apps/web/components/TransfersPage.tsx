@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -148,7 +150,7 @@ export default function TransfersPage() {
                 <td>
                   {t.pickup_location} → {t.dropoff_location}
                 </td>
-                <td>{new Date(t.scheduled_at).toLocaleString()}</td>
+                <td>{formatDateTime(t.scheduled_at)}</td>
                 <td>{t.driver_name || "—"}</td>
                 <td>{t.vehicle_name || "—"}</td>
                 <td>
@@ -160,7 +162,7 @@ export default function TransfersPage() {
                       className="button secondary"
                       onClick={() => update(t.id, next[t.status]!)}
                     >
-                      {next[t.status]!.replaceAll("_", " ")}
+                      {readableLabel(next[t.status]!)}
                     </button>
                   ) : (
                     "—"
@@ -213,7 +215,7 @@ export default function TransfersPage() {
                   .filter((s) => !["completed", "cancelled"].includes(s.status))
                   .map((s) => (
                     <option value={s.id} key={s.id}>
-                      {s.guest_name} · {s.status}
+                      {s.guest_name} · {readableLabel(s.status)}
                     </option>
                   ))}
               </select>

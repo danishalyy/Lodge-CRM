@@ -7,11 +7,7 @@ export default function Page() {
         <div>
           <span className="eyebrow">SUPER ADMIN</span>
           <h1>Platform Settings</h1>
-          <p>
-            No placeholder configuration is exposed. Runtime secrets and
-            infrastructure settings are managed through the deployment
-            environment.
-          </p>
+          <p>Manage your SafariOS account security and email delivery.</p>
         </div>
       </div>
       <section className="panel">

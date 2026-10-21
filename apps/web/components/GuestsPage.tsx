@@ -1,4 +1,5 @@
 "use client";
+import { CountryPicker } from "@/components/ui/country-picker";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -261,7 +262,7 @@ export default function GuestsPage() {
               <input className="field" name="phone" />
             </Field>
             <Field label="Nationality">
-              <input className="field" name="nationality" />
+              <CountryPicker name="nationality" />
             </Field>
             <label className="label">
               <input type="checkbox" name="vip" /> VIP / priority guest

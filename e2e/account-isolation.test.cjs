@@ -339,8 +339,8 @@ test('staff creation queues an invitation without choosing an owner password and
   await page.locator('input[name="full_name"]').fill('Staff Owner');await page.locator('input[name="email"]').fill('owner@business.example');
   assert.equal(await page.locator('input[type="password"]').count(),0);
   await page.getByRole('button',{name:'Create and invite',exact:true}).click();
-  await page.getByText('pending_activation',{exact:true}).waitFor();assert.equal(created.invite_role_key,'general_staff');assert.equal(created.email,'owner@business.example');assert.equal(created.password,undefined);
-  await page.getByRole('button',{name:'Resend invitation',exact:true}).click();await page.getByText(/Replacement invitation pending/).waitFor();assert.equal(resends,1);
+  await page.getByText('Awaiting account activation',{exact:true}).waitFor();assert.equal(created.invite_role_key,'general_staff');assert.equal(created.email,'owner@business.example');assert.equal(created.password,undefined);
+  await page.getByRole('button',{name:'Resend invitation',exact:true}).click();await page.getByText(/Replacement invitation Pending/).waitFor();assert.equal(resends,1);
  }finally{await context.close()}
 });
 
@@ -359,7 +359,7 @@ test('locked modules and hidden HR subfeatures avoid forbidden requests; saving 
   assert.equal(await page.getByRole('button',{name:'Roster',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Performance',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Incidents',exact:true}).count(),0);
   assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),1);
   await page.locator('select[name="staff_id"]').selectOption('staff-1');await page.locator('input[name="start_date"]').fill('2026-11-01');await page.locator('input[name="end_date"]').fill('2026-11-02');
-  await page.getByRole('button',{name:'Create request',exact:true}).click();await page.getByText('Saved successfully',{exact:true}).waitFor();await page.locator('.taskRow').getByText('Team Member',{exact:true}).waitFor();assert.equal(saved,true);assert.equal(await page.locator('input[name="start_date"]').inputValue(),'');
+  await page.getByRole('button',{name:'Create request',exact:true}).click();await page.getByText('Leave request created',{exact:true}).waitFor();await page.locator('.taskRow').getByText('Team Member',{exact:true}).waitFor();assert.equal(saved,true);assert.equal(await page.locator('input[name="start_date"]').inputValue(),'');
   await page.goto(base+'/fuel');await page.getByRole('heading',{name:'Available on Standard',exact:true}).waitFor();assert.equal(new URL(page.url()).pathname,'/fuel');assert.equal(disabledCalls,0);
  }finally{await context.close()}
 });
@@ -390,7 +390,7 @@ test('Super Admin creates a lodge group and confirms suspension with action feed
   await page.goto(base+'/super-admin/groups');await page.getByRole('button',{name:'Create group',exact:true}).click();await page.getByLabel('Group name',{exact:true}).fill('Safari Collection');await page.getByLabel('Group Admin name',{exact:true}).fill('Collection Owner');await page.getByLabel('Group Admin email',{exact:true}).fill('owner@business.example');await page.getByLabel('Acacia Lodge',{exact:true}).check();
   await page.getByRole('button',{name:'Create group and invite',exact:true}).click();await page.getByRole('heading',{name:'Safari Collection',exact:true}).waitFor();await page.getByText('Invitation queued',{exact:true}).waitFor();assert.deepEqual(created.lodge_ids,[lodge]);assert.equal(created.admin_email,'owner@business.example');assert.equal(created.password,undefined);
   await page.getByRole('button',{name:'Suspend',exact:true}).click();await page.getByRole('heading',{name:'Suspend group access?',exact:true}).waitFor();assert.equal(suspensions,0);await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(suspensions,0);
-  await page.getByRole('button',{name:'Suspend',exact:true}).click();await page.getByRole('button',{name:'Suspend group',exact:true}).click();await page.getByRole('button',{name:'Restore access',exact:true}).waitFor();assert.equal(suspensions,1);await page.getByText('Saved successfully',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Suspend',exact:true}).click();await page.getByRole('button',{name:'Suspend group',exact:true}).click();await page.getByRole('button',{name:'Restore access',exact:true}).waitFor();assert.equal(suspensions,1);await page.getByText('Lodge group updated',{exact:true}).waitFor();
  }finally{await context.close()}
 });
 
@@ -527,4 +527,50 @@ test('read-only rooms, stays and requests do not call unauthorized lookup endpoi
   const {context,page,requests}=await accountPage({id:'scoped-'+module,full_name:'Reader',is_super_admin:false,memberships:[{lodge_id:'scope-lodge',permissions:[permission],entitlements:[feature,'guests','units','departments','staff']}]});
   try{await page.goto(base+'/'+module);await page.getByRole('heading',{name:title,exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^\+ /}).count(),0);assert.deepEqual(requests.filter(x=>!x.endsWith('/branding')&&!x.endsWith('/'+module)),[]);}finally{await context.close()}
  }
+});
+
+test('lodge registration defaults dates and searchable timezone, formats errors and confirms success',async()=>{
+ const {context,page}=await accountPage({id:'registrar',full_name:'Registrar',is_super_admin:true,mfa_enabled:true,memberships:[]});let calls=0,created;
+ try {
+  await page.route('**/api/v1/platform/lodges',async r=>{
+   if(r.request().method()==='POST'){calls++;const body=r.request().postDataJSON();if(calls===1)return r.fulfill({status:422,json:{detail:[{loc:['body','admin_email'],type:'value_error',msg:'invalid email address'}]}});created=body;return r.fulfill({json:{id:'registered-lodge',activation_email_queued:true,delivery_status:'pending'}})}
+   return r.fulfill({json:created?[{id:'registered-lodge',name:created.name,location:created.location,subscription_status:'Active',subscription:{package:created.package,expiry_date:created.expiry_date}}]:[]});
+  });
+  await page.goto(base+'/super-admin/lodges');await page.getByRole('button',{name:'+ Register lodge',exact:true}).click();
+  assert.equal(await page.getByLabel('Time zone',{exact:true}).inputValue(),await page.evaluate(()=>Intl.DateTimeFormat().resolvedOptions().timeZone));assert.ok(await page.getByLabel('Time zone',{exact:true}).getAttribute('list'));
+  const start=await page.getByLabel('Start date',{exact:true}).inputValue(),expiry=await page.getByLabel('Expiry date',{exact:true}).inputValue();assert.ok(start);assert.equal(Number(expiry.slice(0,4)),Number(start.slice(0,4))+1);
+  await page.getByLabel('Package',{exact:true}).selectOption('Standard');await page.getByText('Expanded lodge workflows, departments, staff HR, feedback and operational coordination.',{exact:true}).waitFor();
+  await page.getByLabel('Lodge name',{exact:true}).fill('Test River Lodge');await page.getByLabel('Full name',{exact:true}).fill('Lodge Owner');await page.getByLabel('Email address',{exact:true}).fill('owner@example.com');
+  await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByText('Enter a valid email address.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Email address',{exact:true}).getAttribute('aria-invalid'),'true');
+  await page.getByLabel('Email address',{exact:true}).fill('newowner@example.com');await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Lodge registered',{exact:true}).waitFor();assert.equal(created.package,'Standard');assert.equal(created.start_date,start);
+ }finally{await context.close()}
+});
+
+test('guest creation uses a country picker and a specific confirmation',async()=>{
+ const {context,page}=await accountPage({id:'guest-writer',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'guest-create',permissions:['guests.view','guests.manage'],entitlements:['guests']}]});let created;
+ try{
+  await page.route('**/api/v1/lodges/guest-create/guests',async r=>{if(r.request().method()==='POST'){created=r.request().postDataJSON();return r.fulfill({json:{id:'guest-1',...created}})}return r.fulfill({json:created?[{id:'guest-1',...created,name:created.first_name+' '+created.last_name,completed_stays:0}]:[]})});
+  await page.goto(base+'/guests');await page.getByRole('button',{name:'+ Guest',exact:true}).click();await page.getByLabel('First name',{exact:true}).fill('Maya');await page.getByLabel('Last name',{exact:true}).fill('Laurent');await page.getByLabel('Nationality',{exact:true}).selectOption('Kenya');await page.getByRole('button',{name:'Create guest',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Guest created',{exact:true}).waitFor();await page.getByText('Maya Laurent',{exact:true}).waitFor();assert.equal(created.nationality,'Kenya');
+ }finally{await context.close()}
+});
+
+test('lodge preferences save only allowed fields and apply date and currency formatting',async()=>{
+ const {context,page}=await accountPage({id:'format-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'format-lodge',role_key:'lodge_admin',permissions:['lodge.settings.manage','fuel.view'],entitlements:['fuel']}]});let preferences={date_format:'locale',currency:'ZAR',timezone:'Africa/Johannesburg'},saved;
+ try{
+  await page.route('**/api/v1/lodges/format-lodge/preferences',async r=>{if(r.request().method()==='PATCH'){saved=r.request().postDataJSON();preferences={...preferences,...saved}}return r.fulfill({json:preferences})});
+  await page.goto(base+'/settings');await page.getByLabel('Date format',{exact:true}).selectOption('dd/MM/yyyy');await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByRole('button',{name:'Save lodge preferences',exact:true}).click();await page.getByText('Lodge preferences saved',{exact:true}).waitFor();assert.deepEqual(saved,{currency:'USD',date_format:'dd/MM/yyyy'});
+  await page.route('**/api/v1/auth/me',r=>r.fulfill({json:{id:'format-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'format-lodge',permissions:['fuel.view'],entitlements:['fuel'],...preferences}]}}));
+  await page.route('**/api/v1/lodges/format-lodge/fuel',r=>r.fulfill({json:[{id:'fuel-1',recorded_at:'2026-10-22T12:00:00Z',litres:10,odometer_km:100,cost_cents:12345,vehicle_name:'Cruiser',fuel_type:'diesel'}]}));
+  await page.goto(base+'/fuel');await page.getByText('$123.45',{exact:true}).waitFor();await page.getByText(/^22\/10\/2026 · (14:00|2:00 PM)$/).waitFor();
+ }finally{await context.close()}
+});
+
+test('date-only values retain their calendar day and event labels hide technical keys',()=>{
+ const vm=require('node:vm');
+ function load(file,extras={}){const exports={};const source=fs.readFileSync(path.join(web,file),'utf8');const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(js,{exports,...extras});return exports}
+ const stored=new Map([['active_user_id','u'],['active_lodge_id','l'],['lodge-format:u:l',JSON.stringify({date_format:'dd/MM/yyyy',timezone:'America/Los_Angeles',currency:'USD'})]]);
+ const formats=load('lib/formatting.ts',{window:{},localStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},navigator:{language:'en-GB'}});
+ assert.equal(formats.formatDate('2026-10-22'),'22/10/2026');assert.equal(formats.formatDate('not-a-date'),'—');
+ formats.storeFormatting({date_format:'yyyy-MM-dd',timezone:'Legacy/Invalid',currency:'USD'});assert.equal(formats.formatDate('2026-10-22'),'2026-10-22');assert.doesNotThrow(()=>formats.formatDateTime('2026-10-22T12:00:00Z'));
+ const labels=load('lib/strings/content.ts');assert.equal(labels.readableLabel('development_link'),'Invitation link ready');assert.equal(labels.eventLabel('lodge.created','lodge.created . lodge').title,'Lodge created');assert.equal(labels.eventLabel('task.completed').title,'Task completed');
 });

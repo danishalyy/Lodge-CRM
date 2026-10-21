@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
@@ -122,13 +124,12 @@ export default function HousekeepingPage() {
           "ready",
           "occupied",
           "cleaning",
-          "cleaning",
           "awaiting_inspection",
           "maintenance",
         ].map((s) => (
           <div className="summaryBox" key={s}>
             <strong>{rooms.filter((r) => r.status === s).length}</strong>
-            <span>{s.replaceAll("_", " ")}</span>
+            <span>{readableLabel(s)}</span>
           </div>
         ))}
       </div>
@@ -154,7 +155,7 @@ export default function HousekeepingPage() {
                       <option value="">Select unit…</option>
                       {rooms.map((r) => (
                         <option key={r.id} value={r.id}>
-                          {r.name} · {r.status}
+                          {r.name} · {readableLabel(r.status)}
                         </option>
                       ))}
                     </select>
@@ -231,11 +232,11 @@ export default function HousekeepingPage() {
             <div className="taskRow" key={j.id}>
               <div>
                 <strong>
-                  {j.unit_name} · {j.job_type.replaceAll("_", " ")}
+                  {j.unit_name} · {readableLabel(j.job_type)}
                 </strong>
                 <small>
                   {j.assigned_staff_name || "Unassigned"} · Due{" "}
-                  {j.due_at ? new Date(j.due_at).toLocaleString() : "—"}
+                  {j.due_at ? formatDateTime(j.due_at) : "—"}
                 </small>
                 {j.linen_notes && <p>{j.linen_notes}</p>}
               </div>
@@ -247,7 +248,7 @@ export default function HousekeepingPage() {
                       className="button secondary"
                       onClick={() => update(j.id, next[j.status]!)}
                     >
-                      {next[j.status]!.replaceAll("_", " ")}
+                      {readableLabel(next[j.status]!)}
                     </button>
                   </div>
                 )}

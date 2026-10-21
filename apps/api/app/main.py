@@ -31,7 +31,7 @@ from .models import (
     GuestFeedback, StaffShift, StaffIncident, StaffPerformanceNote, MealService, MealServiceGuest, TaskAttachment,
 )
 from .schemas import (
-    LodgeBrandingUpdate, ActivateIn, DepartmentCreate, DepartmentUpdate, GuestCreate, GuestRequestCreate,
+    LodgePreferencesUpdate, LodgeBrandingUpdate, ActivateIn, DepartmentCreate, DepartmentUpdate, GuestCreate, GuestRequestCreate,
     GuestRequestUpdate, GuestUpdate, LodgeCreate, LoginIn, MaintenanceCreate,
     MaintenanceUpdate, StaffCreate, StaffUpdate, StayCreate, StayUpdate,
     SubscriptionUpdate, TaskCreate, TaskUpdate, UnitCreate, UnitUpdate, VehicleCreate, VehicleUpdate, VehicleChecklistCreate, FuelCreate, ActivityCreate, ActivityUpdate, TransferCreate, TransferUpdate, WildlifeSightingCreate, WildlifeMediaRegister, MediaUploadRequest, StaffInvite, NotificationPreferenceUpdate, PasswordResetRequestIn, PasswordResetConfirmIn, MfaCodeIn, EntitlementOverrideIn,
@@ -538,6 +538,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 plan_features=sorted(state)
             memberships.append({
                 "lodge_id": str(lodge.id), "lodge_name": lodge.name, "branding":lodge_branding(lodge),
+                "date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone,
                 "role": display_role, "role_key": role.key if role else "", "custom_role_id": str(m.custom_role_id) if m.custom_role_id else None,
                 "department_id": str(m.department_id) if m.department_id else None,
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
@@ -603,6 +604,25 @@ def dashboard(lodge_id: str, user: User = Depends(require_permission("dashboard.
         "metrics":{"guests_in_house":guests_in_house,"arrivals_today":arrivals,"departures_today":departures,"open_tasks":open_tasks,"overdue_tasks":overdue,"maintenance_open":maintenance_open,"activities_today":activities_today,"transfers_today":transfers_today,"vehicles_unavailable":vehicles_unavailable},
         "attention":attention,"events":events,
     }
+
+
+@app.get("/api/v1/lodges/{lodge_id}/preferences")
+def get_lodge_preferences(lodge_id:str,user:User=Depends(require_lodge_access),db:Session=Depends(get_db)):
+    try: lodge=db.get(Lodge,uuid.UUID(str(lodge_id)))
+    except ValueError: raise HTTPException(422,"Invalid lodge identifier")
+    if not lodge: raise HTTPException(404,"Lodge not found")
+    return {"date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone}
+
+
+@app.patch("/api/v1/lodges/{lodge_id}/preferences",dependencies=[Depends(require_csrf)])
+def update_lodge_preferences(lodge_id:str,body:LodgePreferencesUpdate,request:Request,user:User=Depends(require_permission("lodge.settings.manage",write=True)),db:Session=Depends(get_db)):
+    try: lodge=db.get(Lodge,uuid.UUID(str(lodge_id)))
+    except ValueError: raise HTTPException(422,"Invalid lodge identifier")
+    if not lodge: raise HTTPException(404,"Lodge not found")
+    lodge.date_format=body.date_format;lodge.currency=body.currency
+    audit(db,request,lodge.id,user.id,"lodge.preferences_updated","lodge",str(lodge.id))
+    db.commit()
+    return {"date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone}
 
 
 def lodge_branding(lodge: Lodge):

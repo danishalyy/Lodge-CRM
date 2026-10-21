@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -80,9 +82,9 @@ export default function FoodBeveragePage() {
                 <td>
                   <strong>{r.name}</strong>
                   <br />
-                  <small>{r.meal_type}</small>
+                  <small>{readableLabel(r.meal_type)}</small>
                 </td>
-                <td>{new Date(r.scheduled_at).toLocaleString()}</td>
+                <td>{formatDateTime(r.scheduled_at)}</td>
                 <td>{r.location || "—"}</td>
                 <td>{r.expected_guest_count}</td>
                 <td>
@@ -127,12 +129,12 @@ export default function FoodBeveragePage() {
             </Field>
             <Field label="Meal type">
               <select className="select" name="meal_type">
-                <option>breakfast</option>
-                <option>lunch</option>
-                <option>dinner</option>
+                <option value="breakfast">{readableLabel("breakfast")}</option>
+                <option value="lunch">{readableLabel("lunch")}</option>
+                <option value="dinner">{readableLabel("dinner")}</option>
                 <option value="special_dinner">special dinner</option>
-                <option>event</option>
-                <option>other</option>
+                <option value="event">{readableLabel("event")}</option>
+                <option value="other">{readableLabel("other")}</option>
               </select>
             </Field>
             <Field label="Date & time">

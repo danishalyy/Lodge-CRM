@@ -1,4 +1,5 @@
 "use client";
+import LodgePreferences from "@/components/LodgePreferences";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Form } from "@/components/ui/form";
@@ -97,6 +98,7 @@ export default function Settings() {
           )}
         </section>
       )}
+      <LodgePreferences />
       <section className="panel" aria-busy={busy}>
         <h2>{copy.mfa}</h2>
         <p>

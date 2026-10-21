@@ -1,4 +1,8 @@
 "use client";
+import { contentCopy as copy, readableLabel } from "@/lib/strings/content";
+import { TimezonePicker } from "@/components/ui/timezone-picker";
+import { dateInputValue, formatDate } from "@/lib/formatting";
+
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -103,6 +107,7 @@ function LogoField({
 }
 
 export default function SuperAdminLodges() {
+  const [selectedPackage, setSelectedPackage] = useState("Basic");
   const [pendingRemoval, setPendingRemoval] = useState<z.infer<
     typeof brandingSchema
   > | null>(null);
@@ -364,7 +369,11 @@ export default function SuperAdminLodges() {
                 </div>
                 <div>
                   <dt>Valid until</dt>
-                  <dd>{lodge.subscription?.expiry_date || "—"}</dd>
+                  <dd>
+                    {lodge.subscription?.expiry_date
+                      ? formatDate(lodge.subscription.expiry_date)
+                      : "—"}
+                  </dd>
                 </div>
               </dl>
               {lodge.administrator && (
@@ -372,10 +381,9 @@ export default function SuperAdminLodges() {
                   <p className="textSecondary">
                     {lodge.administrator.email}
                     <br />
-                    Account:{" "}
-                    {lodge.administrator.account_status.replaceAll("_", " ")}
+                    Account: {readableLabel(lodge.administrator.account_status)}
                     {lodge.administrator.delivery_status
-                      ? ` · Email: ${lodge.administrator.delivery_status}`
+                      ? ` · Email: ${readableLabel(lodge.administrator.delivery_status)}`
                       : ""}
                   </p>
                   {lodge.administrator.account_status !== "active" && (
@@ -470,11 +478,13 @@ export default function SuperAdminLodges() {
                 </div>
                 <div>
                   <Field label="Time zone">
-                    <input
+                    <TimezonePicker
                       id="property-timezone"
                       className="field"
                       name="timezone"
-                      defaultValue="Africa/Johannesburg"
+                      defaultValue={
+                        Intl.DateTimeFormat().resolvedOptions().timeZone
+                      }
                     />
                   </Field>
                 </div>
@@ -484,12 +494,21 @@ export default function SuperAdminLodges() {
             <section className="formSection">
               <h2>02 / Subscription</h2>
               <Field label="Package">
-                <select id="property-package" className="field" name="pkg">
+                <select
+                  id="property-package"
+                  className="field"
+                  name="pkg"
+                  value={selectedPackage}
+                  onChange={(e) => setSelectedPackage(e.target.value)}
+                >
                   <option>Basic</option>
                   <option>Standard</option>
                   <option>Premium</option>
                 </select>
               </Field>
+              <p className="fieldHint" aria-live="polite">
+                {copy.packageSummaries[selectedPackage]}
+              </p>
               <div className="formGrid">
                 <div>
                   <Field label="Start date">
@@ -497,6 +516,7 @@ export default function SuperAdminLodges() {
                       id="property-start"
                       className="field"
                       name="start"
+                      defaultValue={dateInputValue()}
                       type="date"
                       required
                     />
@@ -508,6 +528,11 @@ export default function SuperAdminLodges() {
                       id="property-expiry"
                       className="field"
                       name="expiry"
+                      defaultValue={dateInputValue(
+                        new Date(
+                          new Date().setFullYear(new Date().getFullYear() + 1),
+                        ),
+                      )}
                       type="date"
                       required
                     />

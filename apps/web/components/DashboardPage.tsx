@@ -1,4 +1,7 @@
 "use client";
+import { formatDateTime, formatDate } from "@/lib/formatting";
+import { eventLabel, readableLabel } from "@/lib/strings/content";
+
 import { useEffect, useMemo, useState } from "react";
 import { lodgeApi, operationsApi } from "@/lib/api";
 import {
@@ -123,7 +126,9 @@ export default function DashboardPage() {
         </div>
       </div>
       <SetupChecklist onEmpty={setEmpty} />
-      {!(empty && Object.values(m).every(value=>value === 0 || value == null)) && (
+      {!(
+        empty && Object.values(m).every((value) => value === 0 || value == null)
+      ) && (
         <>
           <div className="metricGrid dashboardMetrics">
             {[
@@ -295,7 +300,11 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <span>Expiry</span>
-                  <strong>{data?.subscription?.expiry_date || "—"}</strong>
+                  <strong>
+                    {data?.subscription?.expiry_date
+                      ? formatDate(data.subscription.expiry_date)
+                      : "—"}
+                  </strong>
                 </div>
               </div>
             </section>
@@ -319,11 +328,16 @@ export default function DashboardPage() {
                       </span>
                       <div>
                         <strong>
-                          {e.title || e.event_type || "Operational event"}
+                          {
+                            eventLabel(
+                              e.event_type || e.type,
+                              e.title || e.summary,
+                            ).title
+                          }
                         </strong>
                         <small>
                           {e.created_at
-                            ? new Date(e.created_at).toLocaleString()
+                            ? formatDateTime(e.created_at)
                             : e.summary || ""}
                         </small>
                       </div>

@@ -13,6 +13,28 @@ import {
   Bell,
   Menu,
   X,
+  BedDouble,
+  MessageSquare,
+  Star,
+  UserRound,
+  ContactRound,
+  ShieldCheck,
+  Network,
+  Brush,
+  Wrench,
+  UtensilsCrossed,
+  Compass,
+  ArrowLeftRight,
+  Fuel,
+  PawPrint,
+  Binoculars,
+  History,
+  Sparkles,
+  Package,
+  Receipt,
+  ScrollText,
+  Building,
+  CalendarRange,
   type LucideIcon,
 } from "lucide-react";
 const icons: Record<string, LucideIcon> = {
@@ -30,33 +52,46 @@ const icons: Record<string, LucideIcon> = {
   bell: Bell,
   menu: Menu,
   close: X,
+  rooms: BedDouble,
+  requests: MessageSquare,
+  feedback: Star,
+  staff: UserRound,
+  hr: ContactRound,
+  roles: ShieldCheck,
+  departments: Network,
+  housekeeping: Brush,
+  maintenance: Wrench,
+  "food-beverage": UtensilsCrossed,
+  activities: Compass,
+  transfers: ArrowLeftRight,
+  fuel: Fuel,
+  wildlife: PawPrint,
+  ranger: Binoculars,
+  memory: History,
+  "lodge-ai": Sparkles,
+  packages: Package,
+  subscriptions: Receipt,
+  audit: ScrollText,
+  group: Building,
+  stays: CalendarRange,
 };
 export default function UiIcon({ name }: { name: string }) {
   const Icon = icons[name] || ClipboardCheck;
   return <Icon size={19} strokeWidth={1.5} aria-hidden="true" />;
 }
 export function moduleIcon(key: string) {
-  return ["guests", "staff", "hr", "roles"].includes(key)
-    ? "people"
-    : ["rooms", "housekeeping", "lodges"].includes(key)
-      ? "lodge"
-      : ["activities", "stays", "transfers"].includes(key)
-        ? "calendar"
-        : ["fleet", "fuel", "maintenance"].includes(key)
-          ? "fleet"
-          : ["wildlife", "ranger"].includes(key)
-            ? "leaf"
-            : [
-                  "reports",
-                  "memory",
-                  "audit",
-                  "packages",
-                  "subscriptions",
-                ].includes(key)
-              ? "reports"
-              : key === "settings"
-                ? "settings"
-                : key === "dashboard" || key === ""
-                  ? "overview"
-                  : "tasks";
+  const module = key.split("/").at(-1) || "overview";
+  return module === "super-admin" || module === "dashboard"
+    ? "overview"
+    : module === "guests" || module === "users"
+      ? "people"
+      : module === "lodges"
+        ? "lodge"
+        : module === "notifications"
+          ? "bell"
+          : module === "groups"
+            ? "group"
+            : module in icons
+              ? module
+              : "tasks";
 }

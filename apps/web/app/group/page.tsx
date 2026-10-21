@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState, useRef } from "react";
@@ -194,7 +195,7 @@ export default function GroupOverview() {
               <div className="metricGrid">
                 {Object.entries(data.totals).map(([key, value]) => (
                   <section className="metricCard" key={key}>
-                    <span>{key.replaceAll("_", " ")}</span>
+                    <span>{readableLabel(key)}</span>
                     <strong>{String(value)}</strong>
                   </section>
                 ))}
@@ -213,8 +214,7 @@ export default function GroupOverview() {
                     </p>
                     {Object.entries(l.metrics).map(([key, value]) => (
                       <p key={key}>
-                        {key.replaceAll("_", " ")}:{" "}
-                        <strong>{String(value)}</strong>
+                        {readableLabel(key)}: <strong>{String(value)}</strong>
                       </p>
                     ))}
                     {!!l.administrators?.length && (

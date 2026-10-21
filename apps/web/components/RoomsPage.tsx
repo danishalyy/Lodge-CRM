@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -17,7 +18,6 @@ type Room = {
 const statuses = [
   "available",
   "occupied",
-  "cleaning",
   "cleaning",
   "awaiting_inspection",
   "ready",
@@ -104,7 +104,7 @@ export default function RoomsPage() {
             >
               {statuses.map((s) => (
                 <option value={s} key={s}>
-                  {s.replaceAll("_", " ")}
+                  {readableLabel(s)}
                 </option>
               ))}
             </select>

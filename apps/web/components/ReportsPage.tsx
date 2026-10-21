@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatMoney } from "@/lib/formatting";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { intelligenceApi } from "@/lib/api";
@@ -85,7 +87,7 @@ export default function ReportsPage() {
           label: "Maintenance cost",
           feature: "maintenance_workshop",
           value: data.maintenance
-            ? `R ${(data.maintenance.cost_cents / 100).toFixed(2)}`
+            ? formatMoney(data.maintenance.cost_cents)
             : null,
         },
         {
@@ -115,9 +117,7 @@ export default function ReportsPage() {
         {
           label: "Fuel cost",
           feature: "fuel",
-          value: data.fleet
-            ? `R ${(data.fleet.fuel_cost_cents / 100).toFixed(2)}`
-            : null,
+          value: data.fleet ? formatMoney(data.fleet.fuel_cost_cents) : null,
         },
       ].filter((r) => enabled(r.feature, r.value))
     : [];
@@ -270,7 +270,7 @@ export default function ReportsPage() {
                   {Object.entries(data.rooms.by_status || {}).map(
                     ([key, value]) => (
                       <div className="statusTile" key={key}>
-                        <span>{key.replaceAll("_", " ")}</span>
+                        <span>{readableLabel(key)}</span>
                         <strong>{String(value)}</strong>
                       </div>
                     ),

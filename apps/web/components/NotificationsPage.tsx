@@ -1,4 +1,6 @@
 "use client";
+import { formatDateTime } from "@/lib/formatting";
+import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useCallback, useEffect, useState } from "react";
@@ -187,9 +189,9 @@ export default function NotificationsPage() {
                     </div>
                     <p>{n.body}</p>
                     <small>
-                      {new Date(n.created_at).toLocaleString()}
+                      {formatDateTime(n.created_at)}
                       {n.email_status
-                        ? ` · Email ${n.email_status === "sent" ? "accepted by mail server" : n.email_status}`
+                        ? ` · Email ${readableLabel(n.email_status)}`
                         : ""}
                     </small>
                     <div className="notificationActions">

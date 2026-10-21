@@ -1,0 +1,188 @@
+export const contentCopy = {
+  statuses: {
+    development_link: "Invitation link ready",
+    pending_activation: "Awaiting account activation",
+    already_active: "Account already active",
+    in_house: "In house",
+    in_progress: "In progress",
+    awaiting_inspection: "Awaiting inspection",
+    out_of_service: "Out of service",
+    pending: "Pending",
+    active: "Active",
+    inactive: "Inactive",
+    ready: "Ready",
+    cleaning: "Cleaning",
+    occupied: "Occupied",
+    maintenance: "Maintenance",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    upcoming: "Upcoming",
+    arriving: "Arriving",
+    departing: "Departing",
+    open: "Open",
+    assigned: "Assigned",
+    accepted: "Accepted",
+    created: "Created",
+    waiting: "Waiting",
+    resolved: "Resolved",
+    failed: "Delivery needs attention",
+    sent: "Accepted by mail server",
+    queued: "Queued for delivery",
+    sending: "Sending",
+    suppressed: "Delivery not requested",
+    disabled: "Disabled",
+    expired: "Expired",
+    suspended: "Suspended",
+    normal: "Normal",
+    low: "Low",
+    high: "High",
+    critical: "Critical",
+    annual: "Annual leave",
+    sick: "Sick leave",
+    vip: "VIP",
+    unknown: "Not recorded",
+    available: "Available",
+    unavailable: "Unavailable",
+    on_leave: "On leave",
+    off_duty: "Off duty",
+    scheduled: "Scheduled",
+    synced: "Synced",
+    draft: "Draft",
+    new: "New",
+    closed: "Closed",
+    approved: "Approved",
+    rejected: "Rejected",
+    verified: "Verified",
+    enabled: "Enabled",
+    info: "Information",
+    warning: "Needs attention",
+    urgent: "Urgent",
+    email_not_configured: "Invitation link ready",
+    not_configured: "Not configured",
+    delivered: "Delivered",
+    read: "Read",
+    unread: "Unread",
+    archived: "Archived",
+    retry: "Queued for retry",
+    no_email: "No email address",
+    revoked: "Access removed",
+    temporary: "Temporary",
+    permanent: "Permanent",
+    breakfast: "Breakfast",
+    lunch: "Lunch",
+    dinner: "Dinner",
+    special_dinner: "Special dinner",
+    event: "Event",
+    other: "Other",
+    cleaning_required: "Cleaning required",
+    guest_request: "Guest request",
+    turndown: "Turndown",
+    inspection: "Inspection",
+    linen: "Linen",
+    general_staff: "General staff",
+    department_manager: "Department manager",
+    front_office: "Front office",
+    read_only: "Read only",
+    lodge_admin: "Lodge administrator",
+    group_admin: "Group administrator",
+  } as Record<string, string>,
+  resources: {
+    lodge: "Lodge",
+    guest: "Guest",
+    guest_request: "Guest request",
+    staff: "Staff member",
+    task: "Task",
+    stay: "Stay",
+    unit: "Room",
+    department: "Department",
+    vehicle: "Vehicle",
+    fuel: "Fuel record",
+    wildlife: "Wildlife sighting",
+    wildlife_sighting: "Wildlife sighting",
+    maintenance: "Maintenance ticket",
+    housekeeping: "Housekeeping job",
+    subscription: "Subscription",
+    account: "Account",
+    user: "User",
+    mfa: "Account security",
+    notification: "Notification",
+    platform: "Platform",
+    email: "Email",
+    group: "Lodge group",
+  } as Record<string, string>,
+  actions: {
+    created: "created",
+    updated: "updated",
+    removed: "removed",
+    deleted: "removed",
+    enabled: "enabled",
+    disabled: "disabled",
+    registered: "registered",
+    invited: "invited",
+    resent: "resent",
+    verified: "verified",
+    completed: "completed",
+    resolved: "resolved",
+    assigned: "assigned",
+    activated: "activated",
+    preferences_updated: "preferences saved",
+    recovery_used: "recovery code used",
+    recovery_regenerated: "recovery codes replaced",
+    task_created: "task created",
+    override: "access updated",
+  } as Record<string, string>,
+  activity: "Workspace activity updated",
+  eventDescription: (subject: string, action: string) =>
+    `${subject} ${action}. Recorded in your workspace history.`,
+  packageSummaries: {
+    Basic: "Essential guest profiles, rooms, stays and everyday team tasks.",
+    Standard:
+      "Expanded lodge workflows, departments, staff HR, feedback and operational coordination.",
+    Premium:
+      "Expanded operations and reporting, with premium intelligence options where configured.",
+  } as Record<string, string>,
+  timezone: "Search for a time zone",
+  chooseCountry: "Select country…",
+  preferences: "Lodge preferences",
+  preferencesBody:
+    "Choose how dates and monetary amounts appear throughout this lodge. Changing currency does not convert existing amounts.",
+  dateFormat: "Date format",
+  currency: "Currency",
+  savePreferences: "Save lodge preferences",
+  browserDates: "Use viewer’s locale",
+  saved: (resource: string) => `${resource} saved`,
+  created: (resource: string) => `${resource} created`,
+  updated: (resource: string) => `${resource} updated`,
+  removed: (resource: string) => `${resource} removed`,
+};
+export function readableLabel(value: string | null | undefined): string {
+  if (!value) return "—";
+  return (
+    contentCopy.statuses[value.toLowerCase()] ||
+    value.replace(/[_.-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  );
+}
+export function eventLabel(
+  key: string | undefined,
+  summary?: string,
+): { title: string; description: string } {
+  if (
+    summary &&
+    !/^(operational event|[a-z_]+\.[a-z_.]+(?:\s*[·.]\s*[a-z_]+)?)$/i.test(
+      summary,
+    )
+  )
+    return { title: summary, description: summary };
+  if (!key)
+    return { title: contentCopy.activity, description: contentCopy.activity };
+  const [subject, ...parts] = key.split(".");
+  const resource = contentCopy.resources[subject] || readableLabel(subject);
+  const action =
+    contentCopy.actions[parts.join("_")] ||
+    readableLabel(parts.join("_")).toLowerCase() ||
+    "updated";
+  return {
+    title: `${resource} ${action}`,
+    description: contentCopy.eventDescription(resource, action),
+  };
+}

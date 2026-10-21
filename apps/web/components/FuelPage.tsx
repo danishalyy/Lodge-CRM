@@ -1,4 +1,6 @@
 "use client";
+import { formatMoney, formatting } from "@/lib/formatting";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -99,14 +101,12 @@ export default function FuelPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{new Date(r.recorded_at).toLocaleString()}</td>
+                <td>{formatDateTime(r.recorded_at)}</td>
                 <td>{r.vehicle_name}</td>
                 <td>{r.litres.toFixed(2)} L</td>
                 <td>{r.odometer_km.toLocaleString()} km</td>
                 <td>
-                  {r.cost_cents == null
-                    ? "—"
-                    : `R ${(r.cost_cents / 100).toFixed(2)}`}
+                  {r.cost_cents == null ? "—" : formatMoney(r.cost_cents)}
                 </td>
                 <td>{r.recorded_by || "—"}</td>
               </tr>
@@ -180,7 +180,7 @@ export default function FuelPage() {
             </div>
             <div className="inlineForm">
               <div>
-                <Field label="Cost (ZAR)">
+                <Field label={`Cost (${formatting().currency || "ZAR"})`}>
                   <input
                     className="field"
                     name="cost"

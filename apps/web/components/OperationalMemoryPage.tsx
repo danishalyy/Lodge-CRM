@@ -1,4 +1,7 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/formatting";
+import { eventLabel, readableLabel } from "@/lib/strings/content";
+
 import { Field } from "@/components/ui/field";
 import { useEffect, useState } from "react";
 import { intelligenceApi } from "@/lib/api";
@@ -68,13 +71,14 @@ export default function OperationalMemoryPage() {
       <section className="panel">
         {rows.map((e) => (
           <div className="timelineRow" key={e.id}>
-            <time>{new Date(e.created_at).toLocaleDateString()}</time>
+            <time>{formatDate(e.created_at)}</time>
             <span className="timelineDot" />
             <div>
-              <strong>{e.summary}</strong>
+              <strong>{eventLabel(e.event_type, e.summary).title}</strong>
               <small>
-                {new Date(e.created_at).toLocaleString()} · {e.event_type} ·{" "}
-                {e.resource_type}
+                {formatDateTime(e.created_at)} ·{" "}
+                {eventLabel(e.event_type).title} ·{" "}
+                {readableLabel(e.resource_type)}
               </small>
               {e.detail && (
                 <p

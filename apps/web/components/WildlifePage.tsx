@@ -1,4 +1,5 @@
 "use client";
+import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -215,7 +216,7 @@ export default function WildlifePage() {
           <tbody>
             {rows.map((s) => (
               <tr key={s.id}>
-                <td>{new Date(s.observed_at).toLocaleString()}</td>
+                <td>{formatDateTime(s.observed_at)}</td>
                 <td>
                   <strong>{s.species}</strong>
                 </td>

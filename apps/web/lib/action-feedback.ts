@@ -1,3 +1,4 @@
+import { contentCopy } from "./strings/content";
 import { toast } from "sonner";
 export function actionFeedback(path: string, method: string, result: any) {
   if (
@@ -9,8 +10,51 @@ export function actionFeedback(path: string, method: string, result: any) {
     /\/(upload-url|download-url|preview)(\?|$)/.test(path)
   )
     return;
+  const resourceNames: Record<string, string> = {
+    lodges: "Lodge",
+    groups: "Lodge group",
+    guests: "Guest",
+    rooms: "Room",
+    staff: "Staff profile",
+    stays: "Stay",
+    requests: "Guest request",
+    tasks: "Task",
+    departments: "Department",
+    vehicles: "Vehicle",
+    fuel: "Fuel record",
+    activities: "Activity",
+    transfers: "Transfer",
+    wildlife: "Wildlife sighting",
+    "housekeeping-jobs": "Housekeeping job",
+    maintenance: "Maintenance ticket",
+    "maintenance-assets": "Maintenance asset",
+    leaves: "Leave request",
+    credentials: "Credential",
+    training: "Training record",
+    shifts: "Shift",
+    incidents: "Incident",
+    performance: "Performance note",
+    "custom-roles": "Role",
+    feedback: "Guest feedback",
+    meals: "Meal service",
+    checklist: "Checklist item",
+    comments: "Comment",
+    attachments: "Attachment",
+    parts: "Maintenance part",
+  };
+  const segments = path.split("/");
+  const resourceKey = [...segments]
+    .reverse()
+    .find((segment) => resourceNames[segment]);
+  const resource = resourceKey ? resourceNames[resourceKey] : "Record";
   let message =
-    method === "DELETE" ? "Removed successfully" : "Saved successfully";
+    method === "DELETE"
+      ? contentCopy.removed(resource)
+      : method === "POST"
+        ? contentCopy.created(resource)
+        : contentCopy.updated(resource);
+  if (/\/platform\/lodges$/.test(path) && method === "POST")
+    message = "Lodge registered";
   if (
     /\/(invite|invitation|resend)(\/|$)/.test(path) ||
     result?.activation_email_queued
@@ -39,5 +83,8 @@ export function actionFeedback(path: string, method: string, result: any) {
     message = "Session access removed";
   else if (path.endsWith("/mfa/enable")) message = "Authenticator enabled";
   else if (path.endsWith("/mfa/disable")) message = "Authenticator disabled";
+  if (/\/platform\/lodges$/.test(path) && method === "POST")
+    message = "Lodge registered";
+  if (path.endsWith("/preferences")) message = "Lodge preferences saved";
   toast.success(message, { id: `action:${path}` });
 }

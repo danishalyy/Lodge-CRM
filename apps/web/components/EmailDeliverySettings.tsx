@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { useEffect, useState } from "react";
 import { superApi } from "@/lib/api";
 export default function EmailDeliverySettings() {
@@ -105,8 +106,8 @@ export default function EmailDeliverySettings() {
                 {(data.account_deliveries || []).map((r: any) => (
                   <tr key={r.id}>
                     <td>{r.destination}</td>
-                    <td>{r.kind}</td>
-                    <td>{r.status}</td>
+                    <td>{readableLabel(r.kind)}</td>
+                    <td>{readableLabel(r.status)}</td>
                     <td>{r.attempts}</td>
                     <td>{r.last_error || "—"}</td>
                     <td>

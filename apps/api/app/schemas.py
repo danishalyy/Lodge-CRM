@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from uuid import UUID
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
@@ -29,6 +30,15 @@ class LodgeCreate(StrictModel):
     expiry_date: date
     admin_email: EmailStr
     admin_name: str = Field(min_length=2, max_length=180)
+
+
+    @field_validator('timezone')
+    @classmethod
+    def valid_timezone(cls,value):
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try: ZoneInfo(value)
+        except (ZoneInfoNotFoundError,ValueError): raise ValueError('Choose a valid time zone')
+        return value
 
 
 class SubscriptionUpdate(StrictModel):
@@ -582,3 +592,15 @@ class GroupUpdate(StrictModel):
 class LodgeAdminInvite(StrictModel):
     full_name: str = Field(min_length=2,max_length=180)
     email: EmailStr
+
+
+class LodgePreferencesUpdate(StrictModel):
+    date_format: Literal['locale','dd/MM/yyyy','MM/dd/yyyy','yyyy-MM-dd']
+    currency: str = Field(pattern='^[A-Z]{3}$')
+
+    @field_validator('currency')
+    @classmethod
+    def known_currency(cls,value):
+        if value not in {'USD','ZAR','KES','TZS','UGX','NAD','BWP','ZMW','GBP','EUR','INR','AED','PKR','AUD','CAD','MZN','MWK','RWF','SCR','MUR','CHF','JPY','CNY','NZD','SGD','HKD','BRL','SAR','EGP','MAD','NGN','GHS','ETB','ZWL'}:
+            raise ValueError('Choose a supported currency')
+        return value

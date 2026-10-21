@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -133,7 +134,7 @@ export default function Groups() {
               <p>
                 {g.lodge_ids.length} lodges ·{" "}
                 {g.is_active ? "Active" : "Suspended"} ·{" "}
-                {g.administrator.account_status.replaceAll("_", " ")}
+                {readableLabel(g.administrator.account_status)}
               </p>
               <div className="notificationActions">
                 <button

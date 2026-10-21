@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDateTime, formatTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -121,13 +123,14 @@ export default function ActivitiesPage() {
                   <strong>{a.title}</strong>
                   <br />
                   <small>
-                    {a.activity_type} · {a.meeting_point || "No meeting point"}
+                    {readableLabel(a.activity_type)} ·{" "}
+                    {a.meeting_point || "No meeting point"}
                   </small>
                 </td>
                 <td>
-                  {new Date(a.starts_at).toLocaleString()}
+                  {formatDateTime(a.starts_at)}
                   <br />
-                  <small>to {new Date(a.ends_at).toLocaleTimeString()}</small>
+                  <small>to {formatTime(a.ends_at)}</small>
                 </td>
                 <td>{a.guide_name || "—"}</td>
                 <td>{a.vehicle_name || "—"}</td>
@@ -141,7 +144,7 @@ export default function ActivitiesPage() {
                       className="button secondary"
                       onClick={() => update(a.id, next[a.status]!)}
                     >
-                      {next[a.status]!.replaceAll("_", " ")}
+                      {readableLabel(next[a.status]!)}
                     </button>
                   ) : (
                     "—"

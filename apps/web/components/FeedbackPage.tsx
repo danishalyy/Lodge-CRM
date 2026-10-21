@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -139,9 +140,11 @@ export default function FeedbackPage() {
             </Field>
             <Field label="Type">
               <select className="select" name="feedback_type">
-                <option>feedback</option>
-                <option>compliment</option>
-                <option>complaint</option>
+                <option value="feedback">{readableLabel("feedback")}</option>
+                <option value="compliment">
+                  {readableLabel("compliment")}
+                </option>
+                <option value="complaint">{readableLabel("complaint")}</option>
               </select>
             </Field>
             <Field label="Category">

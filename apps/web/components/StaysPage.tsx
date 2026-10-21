@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDate } from "@/lib/formatting";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -133,10 +135,10 @@ export default function StaysPage() {
                 <td>{r.guest_name}</td>
                 <td>{r.unit_name}</td>
                 <td>
-                  {r.arrival_date} {r.expected_arrival_time}
+                  {formatDate(r.arrival_date)} {r.expected_arrival_time}
                 </td>
                 <td>
-                  {r.departure_date} {r.expected_departure_time}
+                  {formatDate(r.departure_date)} {r.expected_departure_time}
                 </td>
                 <td>{r.party_size}</td>
                 <td>
@@ -148,7 +150,7 @@ export default function StaysPage() {
                       className="button secondary"
                       onClick={() => advance(r)}
                     >
-                      Mark {next[r.status]!.replaceAll("_", " ")}
+                      Mark {readableLabel(next[r.status]!)}
                     </button>
                   ) : (
                     <span>—</span>
@@ -196,7 +198,7 @@ export default function StaysPage() {
                   )
                   .map((r) => (
                     <option value={r.id} key={r.id}>
-                      {r.name} · {r.status}
+                      {r.name} · {readableLabel(r.status)}
                     </option>
                   ))}
               </select>

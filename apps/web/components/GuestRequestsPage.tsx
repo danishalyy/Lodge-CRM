@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -149,7 +150,7 @@ export default function GuestRequestsPage() {
               <tr key={r.id}>
                 <td>{r.guest_name}</td>
                 <td>
-                  <strong>{r.request_type}</strong>
+                  <strong>{readableLabel(r.request_type)}</strong>
                   <br />
                   <small>{r.description}</small>
                 </td>

@@ -15,6 +15,7 @@ import {
   getActiveLodgeId,
   setActiveLodgeId,
   superApi,
+  lodgePreferencesApi,
 } from "@/lib/api";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import NavigationEnhancements from "./NavigationEnhancements";
@@ -118,6 +119,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           v.support_entitlements =
             (await superApi.lodgeEntitlements(getActiveLodgeId())).effective ||
             [];
+        if (v.is_super_admin && v.mfa_enabled && getActiveLodgeId())
+          await lodgePreferencesApi.get();
         setMe(v);
         if (!getActiveLodgeId() && v.memberships?.[0])
           setActiveLodgeId(v.memberships[0].lodge_id);
@@ -139,6 +142,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           user.support_entitlements =
             (await superApi.lodgeEntitlements(getActiveLodgeId())).effective ||
             [];
+        if (user.is_super_admin && user.mfa_enabled && getActiveLodgeId())
+          await lodgePreferencesApi.get();
         if (alive) setMe(user);
       } catch {}
     };

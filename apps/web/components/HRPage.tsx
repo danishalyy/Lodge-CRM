@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatDate, formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -143,10 +145,10 @@ export default function HRPage() {
               <StaffSelect />
               <Field label="Type">
                 <select className="select" name="leave_type">
-                  <option>annual</option>
-                  <option>sick</option>
-                  <option>unpaid</option>
-                  <option>other</option>
+                  <option value="annual">{readableLabel("annual")}</option>
+                  <option value="sick">{readableLabel("sick")}</option>
+                  <option value="unpaid">{readableLabel("unpaid")}</option>
+                  <option value="other">{readableLabel("other")}</option>
                 </select>
               </Field>
               <Field label="Start">
@@ -173,7 +175,8 @@ export default function HRPage() {
                 <div>
                   <strong>{x.staff_name}</strong>
                   <small>
-                    {x.leave_type} · {x.start_date} → {x.end_date}
+                    {readableLabel(x.leave_type)} · {formatDate(x.start_date)} →{" "}
+                    {formatDate(x.end_date)}
                   </small>
                 </div>
                 <div>
@@ -254,8 +257,7 @@ export default function HRPage() {
                 <div>
                   <strong>{x.staff_name}</strong>
                   <small>
-                    {new Date(x.starts_at).toLocaleString()} →{" "}
-                    {new Date(x.ends_at).toLocaleString()}
+                    {formatDateTime(x.starts_at)} → {formatDateTime(x.ends_at)}
                   </small>
                 </div>
                 <StatusPill value={x.status} />
@@ -348,10 +350,14 @@ export default function HRPage() {
               </Field>
               <Field label="Status">
                 <select className="select" name="status">
-                  <option>planned</option>
-                  <option>in_progress</option>
-                  <option>completed</option>
-                  <option>expired</option>
+                  <option value="planned">{readableLabel("planned")}</option>
+                  <option value="in_progress">
+                    {readableLabel("in_progress")}
+                  </option>
+                  <option value="completed">
+                    {readableLabel("completed")}
+                  </option>
+                  <option value="expired">{readableLabel("expired")}</option>
                 </select>
               </Field>
               <Field label="Completed">
@@ -411,10 +417,12 @@ export default function HRPage() {
               </Field>
               <Field label="Severity">
                 <select className="select" name="severity">
-                  <option>low</option>
-                  <option selected>normal</option>
-                  <option>high</option>
-                  <option>critical</option>
+                  <option value="low">{readableLabel("low")}</option>
+                  <option selected value="normal">
+                    {readableLabel("normal")}
+                  </option>
+                  <option value="high">{readableLabel("high")}</option>
+                  <option value="critical">{readableLabel("critical")}</option>
                 </select>
               </Field>
               <Field label="Occurred">
@@ -443,7 +451,7 @@ export default function HRPage() {
                     {x.staff_name} · {x.incident_type}
                   </strong>
                   <small>
-                    {new Date(x.occurred_at).toLocaleString()} · {x.description}
+                    {formatDateTime(x.occurred_at)} · {x.description}
                   </small>
                 </div>
                 <StatusPill value={x.severity} />
@@ -470,11 +478,13 @@ export default function HRPage() {
               <StaffSelect />
               <Field label="Type">
                 <select className="select" name="note_type">
-                  <option>review</option>
-                  <option>recognition</option>
-                  <option>coaching</option>
-                  <option>warning</option>
-                  <option>goal</option>
+                  <option value="review">{readableLabel("review")}</option>
+                  <option value="recognition">
+                    {readableLabel("recognition")}
+                  </option>
+                  <option value="coaching">{readableLabel("coaching")}</option>
+                  <option value="warning">{readableLabel("warning")}</option>
+                  <option value="goal">{readableLabel("goal")}</option>
                 </select>
               </Field>
               <Field label="Rating">
@@ -508,7 +518,8 @@ export default function HRPage() {
                     {x.staff_name} · {x.note_type}
                   </strong>
                   <small>
-                    {x.review_date} · {x.rating ? `${x.rating}/5 · ` : ""}
+                    {formatDate(x.review_date)} ·{" "}
+                    {x.rating ? `${x.rating}/5 · ` : ""}
                     {x.notes}
                   </small>
                 </div>

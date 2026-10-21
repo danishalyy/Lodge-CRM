@@ -1,3 +1,4 @@
+import { storeFormatting } from "./formatting";
 import { formCopy } from "./strings/forms";
 import { originatingForm } from "./form-submission";
 import { actionFeedback } from "./action-feedback";
@@ -48,6 +49,10 @@ function bindAccount(user: any) {
     previousLodge !== getActiveLodgeId()
   )
     window.dispatchEvent(new Event("safarios-lodge-changed"));
+  const selected = user.memberships?.find(
+    (membership: any) => membership.lodge_id === getActiveLodgeId(),
+  );
+  if (selected) storeFormatting(selected);
   return user;
 }
 
@@ -649,4 +654,20 @@ export const groupsApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+};
+
+export const lodgePreferencesApi = {
+  get: async () => {
+    const result = await request<any>(lodgePath("preferences"));
+    storeFormatting(result);
+    return result;
+  },
+  update: async (body: { date_format: string; currency: string }) => {
+    const result = await request<any>(lodgePath("preferences"), {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+    storeFormatting(result);
+    return result;
+  },
 };

@@ -1,4 +1,5 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -67,7 +68,7 @@ export default function Page() {
     );
     setNotice(
       "Invitation " +
-        r.delivery_status +
+        readableLabel(r.delivery_status) +
         ". The owner must use their private link to set a password.",
     );
     load();
@@ -167,12 +168,12 @@ export default function Page() {
               cell: ({ row }: any) => (
                 <>
                   <span>
-                    {row.original.account_status ||
+                    {readableLabel(row.original.account_status) ||
                       (row.original.is_active ? "active" : "inactive")}
                   </span>
                   {row.original.delivery_status && (
                     <div className="textSecondary">
-                      Email: {row.original.delivery_status}
+                      Email: {readableLabel(row.original.delivery_status)}
                     </div>
                   )}
                   {!row.original.is_active && (

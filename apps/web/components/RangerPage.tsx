@@ -1,4 +1,6 @@
 "use client";
+import { readableLabel } from "@/lib/strings/content";
+import { formatTime, formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -117,7 +119,7 @@ export default function RangerPage() {
             <div className="metricCard">
               <span>Status</span>
               <strong style={{ fontSize: 14 }}>
-                {data.staff.operational_status.replaceAll("_", " ")}
+                {readableLabel(data.staff.operational_status)}
               </strong>
             </div>
             <div className="metricCard">
@@ -139,7 +141,7 @@ export default function RangerPage() {
                   <span>
                     <strong>{a.title}</strong>
                     <small>
-                      {new Date(a.starts_at).toLocaleTimeString()} ·{" "}
+                      {formatTime(a.starts_at)} ·{" "}
                       {a.vehicle_name || "No vehicle"} ·{" "}
                       {a.meeting_point || "No meeting point"}
                     </small>
@@ -160,9 +162,7 @@ export default function RangerPage() {
                   <span>
                     <strong>{t.title}</strong>
                     <small>
-                      {t.due_at
-                        ? new Date(t.due_at).toLocaleString()
-                        : "No due time"}
+                      {t.due_at ? formatDateTime(t.due_at) : "No due time"}
                     </small>
                   </span>
                   <StatusPill value={t.status} />
@@ -203,7 +203,7 @@ export default function RangerPage() {
                   .map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name || v.registration} · {v.odometer_km} km ·{" "}
-                      {v.status}
+                      {readableLabel(v.status)}
                     </option>
                   ))}
               </select>

@@ -1,5 +1,6 @@
 "use client";
 import { CountryPicker } from "@/components/ui/country-picker";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -24,6 +25,8 @@ type Guest = {
   completed_stays: number;
 };
 export default function GuestsPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("guests.manage");
   const [rows, setRows] = useState<Guest[]>([]),
     [q, setQ] = useState(""),
     [selected, setSelected] = useState<Guest | null>(null),
@@ -97,9 +100,11 @@ export default function GuestsPage() {
             close at hand.
           </p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Guest
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Guest
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <div className="toolbar">
@@ -132,7 +137,9 @@ export default function GuestsPage() {
                 onClick={() => setSelected(g)}
               >
                 <td>
-                  <strong>{g.name}</strong>
+                  <button className="linkButton" onClick={() => setSelected(g)}>
+                    {g.name}
+                  </button>
                   <br />
                   <small>{g.email || g.phone || "—"}</small>
                 </td>
@@ -171,60 +178,77 @@ export default function GuestsPage() {
               ×
             </button>
           </div>
-          <label className="label">
-            <input
-              type="checkbox"
-              checked={selected.vip}
-              onChange={(e) =>
-                setSelected({ ...selected, vip: e.target.checked })
-              }
-            />{" "}
-            VIP / priority guest
-          </label>
-          <Field label="Dietary requirements">
-            <textarea
-              className="textarea"
-              value={selected.dietary_requirements}
-              onChange={(e) =>
-                setSelected({
-                  ...selected,
-                  dietary_requirements: e.target.value,
-                })
-              }
-            />
-          </Field>
-          <Field label="Allergies">
-            <textarea
-              className="textarea"
-              value={selected.allergies}
-              onChange={(e) =>
-                setSelected({ ...selected, allergies: e.target.value })
-              }
-            />
-          </Field>
-          <Field label="Preferences">
-            <textarea
-              className="textarea"
-              value={selected.preferences}
-              onChange={(e) =>
-                setSelected({ ...selected, preferences: e.target.value })
-              }
-            />
-          </Field>
-          <Field label="Internal notes">
-            <textarea
-              className="textarea"
-              value={selected.notes}
-              onChange={(e) =>
-                setSelected({ ...selected, notes: e.target.value })
-              }
-            />
-          </Field>
-          <div className="drawerActions">
-            <button className="button primary" onClick={save}>
-              Save profile
-            </button>
-          </div>
+          <Form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (canManage) void save();
+            }}
+          >
+            <label className="label">
+              <input
+                type="checkbox"
+                name="vip"
+                disabled={!canManage}
+                checked={selected.vip}
+                onChange={(e) =>
+                  setSelected({ ...selected, vip: e.target.checked })
+                }
+              />{" "}
+              VIP / priority guest
+            </label>
+            <Field label="Dietary requirements">
+              <textarea
+                className="textarea"
+                name="dietary_requirements"
+                disabled={!canManage}
+                value={selected.dietary_requirements}
+                onChange={(e) =>
+                  setSelected({
+                    ...selected,
+                    dietary_requirements: e.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label="Allergies">
+              <textarea
+                className="textarea"
+                name="allergies"
+                disabled={!canManage}
+                value={selected.allergies}
+                onChange={(e) =>
+                  setSelected({ ...selected, allergies: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Preferences">
+              <textarea
+                className="textarea"
+                name="preferences"
+                disabled={!canManage}
+                value={selected.preferences}
+                onChange={(e) =>
+                  setSelected({ ...selected, preferences: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Internal notes">
+              <textarea
+                className="textarea"
+                name="notes"
+                disabled={!canManage}
+                value={selected.notes}
+                onChange={(e) =>
+                  setSelected({ ...selected, notes: e.target.value })
+                }
+              />
+            </Field>
+            {canManage && (
+              <div className="drawerActions">
+                <button className="button primary">Save profile</button>
+              </div>
+            )}
+          </Form>
         </Drawer>
       )}
       {open && (

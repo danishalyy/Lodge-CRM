@@ -3097,3 +3097,32 @@ textarea:focus-visible {
 }
 .accountLinkCard h1,.accountLinkCard p{margin:0}
 .accountLinkFooter{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px}
+
+/* SafariOS shared material and geometry tokens. The reference palette maps these
+   into semantic components, so future screens inherit the same visual rhythm. */
+:root {
+  --control-border: #909090;
+  --space-unit: 8px;
+  --space-card: 24px;
+  --space-section: 32px;
+  --space-gap: 24px;
+  --surface-card-radius: 24px;
+  --surface-input-radius: 12px;
+  --surface-modal-radius: 28px;
+  --glass-blur: 32px;
+  --glass-saturation: 115%;
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,.09);
+  --material-shadow: 0 16px 48px rgba(0,0,0,.16);
+  --material-shadow-small: 0 4px 16px rgba(0,0,0,.09);
+  --border: var(--bd);
+  --surface: var(--glass-fallback);
+}
+:root[data-theme="light"] {
+  --control-border: #777777;
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,.8);
+  --material-shadow: 0 12px 40px rgba(27,33,20,.07);
+  --material-shadow-small: 0 4px 16px rgba(27,33,20,.04);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

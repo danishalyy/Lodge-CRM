@@ -25,13 +25,15 @@ Primary buttons use olive with dark text for accessible small-text contrast. Sta
 
 Inter is bundled locally at 400, 500 and 600. UI text is 13–14px; secondary labels 11–12px; screen titles 30px/500, mobile 26px; card titles 16px/500; key numbers 36px/500. Use -0.025em heading tracking and tabular figures. Avoid heavy, oversized headlines in operational screens. Keep 44px mobile touch targets.
 
-The desktop sidebar is flush to the left, 238px wide, with a thin separator and no outer corner rounding. The collapsed rail remains available. The top bar is 76px high. Content padding is 36px vertically and 38px horizontally. Cards have 24px padding and 24px gutters. Mobile uses 20px page/card padding, 16px gutters, focus-managed drawers and the existing bottom navigation.
+Geometry/material tokens live in `app/design-system.css` and are exposed through Tailwind. The palette in `reference-theme.css` maps them into existing components.
 
-Corner tokens: small 8px, inputs/buttons/navigation 9–10px, cards/tables 14px, dialogs/drawers 18px. Avatars remain circular; buttons are no longer pills. Avoid nested double borders and inconsistent corner sizes.
+The desktop sidebar is flush to the left, 238px wide, with a thin separator and no outer corner rounding. The collapsed rail remains available. The top bar is 76px high. Content padding uses the shared 32px section token. Cards have 24px padding and 24px gutters. Mobile uses 20px page/card padding, 16px gutters, focus-managed drawers and the existing bottom navigation.
+
+Corner tokens: small 8px, inputs/buttons 12px, cards/tables 24px, dialogs/drawers 28px. Avatars remain circular; buttons are no longer pills. Avoid nested double borders and inconsistent corner sizes.
 
 ## Glass and motion
 
-Panels, navigation, dialogs and drawers use `backdrop-filter: blur(32px) saturate(110%)`, with prefixed Safari support, translucent charcoal fills and subtle borders. Backdrop blur acts on content behind a surface; keep text and controls sharp. Overlay backdrops blur at 12px. Solid semantic surfaces are the fallback when filtering is unsupported. The dark canvas is exactly `#363636` and the sidebar exactly `#171717`. Background meshes and dark-mode grain are disabled; use no olive tint behind the interface. Olive belongs only to interactive accents. No pronounced glows, inner highlights or floating-card movement.
+Panels, navigation, dialogs and drawers use `backdrop-filter: blur(32px) saturate(115%)`, with prefixed Safari support, translucent charcoal fills and subtle borders. Backdrop blur acts on content behind a surface; keep text and controls sharp. Overlay backdrops blur at 12px. Solid semantic surfaces are the fallback when filtering is unsupported. The dark canvas is exactly `#363636` and the sidebar exactly `#171717`. Background meshes and dark-mode grain are disabled; use no olive tint behind the interface. Olive belongs only to interactive accents. Subtle inset material highlights and layered shadows provide depth; avoid decorative glows or floating-card movement.
 
 Respect reduced motion and retain shared Framer Motion configuration for page/dialog transitions. Preserve keyboard focus, labels, empty/loading/error states, account-change protection, MFA, permissions and tenant isolation. A visual refresh does not change access policy.
 

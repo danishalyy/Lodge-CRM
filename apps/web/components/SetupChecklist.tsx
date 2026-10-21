@@ -32,9 +32,15 @@ export default function SetupChecklist({
       stays: operationsApi.stays.list,
     };
     Promise.all(
-      steps.map(
-        async (step) => [step.key, (await loaders[step.key]()).length] as const,
-      ),
+      steps.map(async (step) => {
+        const records = await loaders[step.key]();
+        return [
+          step.key,
+          step.key === "staff"
+            ? records.filter((record) => record.has_login).length
+            : records.length,
+        ] as const;
+      }),
     )
       .then((entries) => {
         if (!live) return;

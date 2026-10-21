@@ -32,6 +32,13 @@ export default {
         danger: "var(--danger)",
         info: "var(--info)",
       },
+      boxShadow: { glass: "var(--shadow)", "glass-sm": "var(--shadow-sm)" },
+      backdropBlur: { glass: "var(--glass-blur)" },
+      spacing: {
+        card: "var(--space-card)",
+        section: "var(--space-section)",
+        gutter: "var(--space-gap)",
+      },
       borderRadius: {
         sm: "var(--radius-sm)",
         md: "var(--radius-md)",

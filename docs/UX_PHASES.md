@@ -35,3 +35,24 @@ Added migration `0013_lodge_display_preferences`, guarded read/write APIs, a ded
 Validation: **449 API tests passed**, **production build passed**, **30 browser checks passed**, **date-only/legacy-zone/event-label edge-case test passed**, **153-route static guard audit passed**. Dedicated registration, guest creation and preference-saving browser flows pass. The prior raw `pending_activation` browser expectation was updated to its readable equivalent.
 
 Remaining for the final pass: three secondary HR/service-date captions, full requested-width visual checks, token/contrast/focus polish. Supported currencies are the 34 common lodge/business currencies listed by the API and picker; no payment processing or currency conversion is introduced. Full translation into other languages is not included; the new catalogues and Intl-based helpers prepare the copy/display layer for it.
+
+## Phase 5 — Shared visual style and final verification
+
+Added shared material, radius, spacing and shadow tokens in `app/design-system.css`, mapped through the existing reference palette and Tailwind. Cards use 24px corners, controls 12px, dialogs 28px, and glass uses 32px blur with restrained inset highlights/shadows. Kept the owner’s exact `#363636` canvas and `#171717` sidebar, existing olive accents, dark default and saved light preference. Input boundaries and focus rings have stronger contrast; solid surfaces remain available without backdrop filtering and reduced-motion behavior remains. Removed a legacy inner drawer scroll/animation layer that clipped focus rings and blocked sticky action footers. Corrected mobile radius overrides and the nested lodge-search input border.
+
+Finished secondary HR/service-date formatting and explicit confirmation-dialog focus restoration. The final form audit also connected guest-profile editing to shared inline validation, made profile opening keyboard-accessible and protected read-only controls. Setup progress counts invited staff accounts rather than profiles without login access.
+
+Validation: **449 API tests passed**, **production build passed**, **33 browser/unit checks passed**. After the last checklist-only adjustment, the setup browser check passed again against a fresh production build. The browser suite checks 375, 768, 1366 and 1440px in light/dark themes, including dialog containment, focus trapping, visible sticky actions, overflow, material tokens and automated WCAG A/AA checks on representative registration/guest flows. Existing login, activation, MFA, branding, account isolation, role/feature gating, notifications and group flows pass. **153-route guard audit: 0 issues. Production dependency audit: 0 vulnerabilities.** Screenshots for all requested width/theme combinations are in `docs/screenshots/`.
+
+Remaining: real-device Safari/Firefox review and production deployment/email delivery verification have not been performed. Browser checks use Chromium and controlled API fixtures; PostgreSQL integration tests cover the API separately. The access-review action provides administrator/provider instructions because no support destination is configured. Full language translations and currency conversion remain outside this change; supported display options are documented in Phase 4. These results are not a blanket production certification.
+
+## Updating an existing local checkout
+
+The release includes Alembic migrations `0012_mfa_recovery_codes` and `0013_lodge_display_preferences`. From the repository root, use the existing environment file:
+
+```sh
+git pull origin main
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+```
+
+The Compose migration service applies `alembic upgrade head` before the API starts. Existing MFA users can generate their first recovery codes in Account Security using their current password and authenticator. New enrollments receive codes during confirmation. Lodge/Group Admins can change date/currency presentation in Account Security → Lodge preferences.

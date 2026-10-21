@@ -16,9 +16,9 @@ A lodge can belong to one group. To move it, remove it from its current group be
 
 ## Disabled features
 
-Navigation, mobile menus and command search use effective server entitlements, including Super Admin overrides. Disabled screens are omitted. Opening a disabled screen’s saved URL returns the user to an available workspace screen without mounting the disabled page. Role-denied access remains protected separately.
+Navigation, mobile menus and command search use effective server entitlements, including Super Admin overrides. Role-authorized screens whose package/feature is disabled appear locked. Opening one keeps its URL and shows an access-review screen without mounting the disabled module or calling its endpoints. Role-denied access remains protected separately.
 
-HR roster, confidential incidents/performance, advanced task controls, task attachments, workshop/assets and advanced housekeeping controls and report sections follow their own feature gates. The app avoids loading disabled subfeatures alongside enabled ones. The workspace refreshes access on focus and periodically; a server feature denial refreshes current capabilities and hides the affected view rather than displaying the raw subscription error. Server-side subscription, permission and tenant guards remain in force.
+HR roster, confidential incidents/performance, advanced task controls, task attachments, workshop/assets and advanced housekeeping controls and report sections follow their own feature gates. The app avoids loading disabled subfeatures alongside enabled ones. The workspace refreshes access on focus and periodically; a server feature denial refreshes current capabilities and replaces the affected module with the locked access-review screen rather than displaying a raw subscription error. Server-side subscription, permission and tenant guards remain in force.
 
 ## Action popups
 

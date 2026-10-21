@@ -1,7 +1,7 @@
 "use client";
 import { readableLabel } from "@/lib/strings/content";
 import { formatMoney } from "@/lib/formatting";
-import { formatDateTime } from "@/lib/formatting";
+import { formatDateTime, formatDate } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
@@ -467,7 +467,10 @@ export default function MaintenancePage() {
                     {a.asset_code} · {a.name}
                   </strong>
                   <small>
-                    {a.category} · Next service {a.next_service_date || "—"}
+                    {a.category} · Next service{" "}
+                    {a.next_service_date
+                      ? formatDate(a.next_service_date)
+                      : "—"}
                   </small>
                 </div>
                 <StatusPill value={a.status} />

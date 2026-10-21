@@ -315,7 +315,8 @@ export default function HRPage() {
                     {x.staff_name} · {x.name}
                   </strong>
                   <small>
-                    {x.credential_type} · Expiry {x.expiry_date || "—"}
+                    {x.credential_type} · Expiry{" "}
+                    {x.expiry_date ? formatDate(x.expiry_date) : "—"}
                   </small>
                 </div>
               </div>
@@ -378,7 +379,8 @@ export default function HRPage() {
                     {x.staff_name} · {x.title}
                   </strong>
                   <small>
-                    {x.provider || "—"} · Renewal {x.renewal_due_date || "—"}
+                    {x.provider || "—"} · Renewal{" "}
+                    {x.renewal_due_date ? formatDate(x.renewal_due_date) : "—"}
                   </small>
                 </div>
                 <StatusPill value={x.status} />

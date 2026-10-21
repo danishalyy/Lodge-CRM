@@ -37,12 +37,12 @@
   --selection: rgba(127, 137, 103, 0.22);
   --focus-glow: rgba(162, 176, 132, 0.2);
   --glass-fallback: #272727;
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
-  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.05);
+  --shadow: var(--material-shadow);
+  --shadow-sm: var(--material-shadow-small);
   --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-md: var(--surface-input-radius);
+  --radius-lg: var(--surface-card-radius);
+  --radius-xl: var(--surface-modal-radius);
   --radius-pill: 9999px;
   --font-body:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -75,8 +75,8 @@
   --bd: rgba(44, 54, 33, 0.16);
   --selection: rgba(127, 137, 103, 0.16);
   --glass-fallback: #f7f8f3;
-  --shadow: 0 8px 28px rgba(27, 33, 20, 0.04);
-  --shadow-sm: 0 4px 14px rgba(27, 33, 20, 0.03);
+  --shadow: var(--material-shadow);
+  --shadow-sm: var(--material-shadow-small);
 }
 html,
 body {
@@ -194,8 +194,8 @@ h3 {
   background: var(--side);
   box-shadow: none;
   gap: 24px;
-  -webkit-backdrop-filter: blur(32px) saturate(110%);
-  backdrop-filter: blur(32px) saturate(110%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
 .sidebar nav {
   gap: 4px;
@@ -228,19 +228,19 @@ h3 {
   padding: 0 38px;
   border-bottom: 1px solid var(--bd);
   background: rgba(54, 54, 54, 0.65);
-  -webkit-backdrop-filter: blur(32px) saturate(110%);
-  backdrop-filter: blur(32px) saturate(110%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
 :root[data-theme="light"] .topbar {
   background: rgba(243, 244, 239, 0.6);
 }
 .content {
   max-width: 1600px;
-  padding: 36px 38px 48px;
+  padding: var(--space-section) var(--space-section) 48px;
 }
 .pageHeader {
   gap: 24px;
-  margin-bottom: 26px;
+  margin-bottom: var(--space-section);
   align-items: center;
 }
 .pageHeader p {
@@ -262,16 +262,16 @@ h3 {
   background: var(--surface-glass);
   border: 1px solid var(--bd);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), var(--glass-highlight);
   background-image: none;
-  -webkit-backdrop-filter: blur(32px) saturate(110%);
-  backdrop-filter: blur(32px) saturate(110%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
 .panel,
 .card,
 .propertyCard,
 .metricCard {
-  padding: 24px;
+  padding: var(--space-card);
 }
 .panel.tableWrap,
 .panel:has(> .tableWrap) {
@@ -301,7 +301,7 @@ button.primary,
 .iconButton,
 .avatarButton,
 .closeButton {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   box-shadow: none;
   min-height: 42px;
 }
@@ -345,7 +345,7 @@ button.primary:hover {
   border-radius: 50%;
   background: var(--selection);
 }
-input:not([type="checkbox"]):not([type="radio"]),
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 select,
 textarea,
 .field,
@@ -354,7 +354,7 @@ textarea,
 .roleSelect {
   border-radius: var(--radius-md);
   background: var(--sec);
-  border-color: var(--bd);
+  border-color: var(--control-border);
   font-size: 14px;
   padding: 11px 13px;
   min-height: 44px;
@@ -410,17 +410,17 @@ label.fieldLabel,
 }
 .metricIcon,
 .propertyLogo {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--selection);
   color: var(--text-accent);
 }
 .glassDialog,
 .confirmationDialog {
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   padding: 28px;
 }
 .glassDrawer {
-  border-radius: 18px 0 0 18px;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   padding: 28px;
 }
 .drawerOverlay,
@@ -483,7 +483,7 @@ select:focus-visible {
     padding: 0 20px;
   }
   .glassDrawer {
-    border-radius: 18px 18px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     padding: 24px;
   }
   .bottomTabs {
@@ -569,7 +569,7 @@ select:focus-visible {
 .searchField,
 .searchButton,
 .propertyFilters {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .propertyCard h2 {
   font-size: 18px;
@@ -616,7 +616,7 @@ select:focus-visible {
 .formField .fieldLabel { display: block; margin: 0 0 8px; }
 .formField .field, .formField .textarea { margin-bottom: 0; }
 .fieldError { margin-top: 8px; font-size: 13px; line-height: 1.5; }
-.formField [aria-invalid="true"] { border-color: var(--danger, #e4a395); }
+.formField [aria-invalid="true"] { border-color: var(--danger, #e4a395) !important; }
 .passwordField { position: relative; }
 .passwordField .field { padding-right: 52px; }
 .passwordToggle { position: absolute; top: 28px; right: 4px; width: 44px; height: 44px; }
@@ -638,3 +638,27 @@ select:focus-visible {
 .logoUpload input[type="file"] { max-width: 100%; width: 100%; font: inherit; color: var(--tx2); }
 .logoUpload input[type="file"]::file-selector-button { font: inherit; color: var(--tx); background: var(--sec); border: 1px solid var(--bd); border-radius: var(--radius-md); padding: 10px 16px; margin: 8px 12px 8px 0; cursor: pointer; }
 .summaryBox span { font-size: 14px; line-height: 1.5; }
+
+/* Focus and material layers stay readable in both themes and without filtering. */
+.formField { width: 100%; }
+.field:focus-visible, .select:focus-visible, .textarea:focus-visible, .button:focus-visible, .iconButton:focus-visible, .navItem:focus-visible {
+  outline: 2px solid var(--ac); outline-offset: 3px; box-shadow: 0 0 0 5px var(--focus-glow);
+}
+.drawerActions { background: var(--surface); border-top: 1px solid var(--bd); gap: 12px; }
+.panel > .panel { margin-top: var(--space-gap); }
+.recoveryCodes { border-color: var(--bd); }
+@media (max-width: 767px) {
+  .glassDrawer { padding: 24px 20px max(24px, env(safe-area-inset-bottom)); }
+  .field, .select, .textarea, .iconButton, .closeButton { min-height: 44px; }
+  .drawerActions { bottom: -24px; flex-wrap: wrap; }
+  .drawerActions > .button { flex: 1; }
+  .recoveryCodes { padding: 20px; }
+  .recoveryCodes ul { grid-template-columns: 1fr; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel, .card, .metricCard, .propertyCard, .glassDialog, .glassDrawer, .commandPalette, .bottomTabs { background: var(--glass-fallback); }
+}
+
+.glassDialog .drawer, .glassDrawer .drawer { overflow: visible; animation: none; transform: none; }
+.collectionToolbar .searchField input[type="search"] { border: 0; border-radius: 0; background: transparent; padding: 10px 0; margin: 0; box-shadow: none; }
+.collectionToolbar .searchField:focus-within { outline: 2px solid var(--ac); outline-offset: 3px; }

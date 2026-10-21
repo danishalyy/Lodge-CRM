@@ -184,7 +184,7 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
   assert.equal(await page.locator('.surfaceBackdrop i').first().evaluate(el=>getComputedStyle(el).display),'none');
   assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(238, 238, 235)');
   assert.equal(await page.locator('.propertyCard').count(),0);
-  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(32px) saturate(1.1)');
+  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(32px) saturate(1.15)');
   const primary=page.getByRole('button',{name:/Register lodge/});
   assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(127, 137, 103)',text:'rgb(21, 24, 16)'});
   assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Inter"?(?:,|$)/);
@@ -273,7 +273,7 @@ test('removing a lodge logo requires confirmation before any write',async()=>{
   await page.getByRole('checkbox',{name:'Remove existing logo'}).check();
   await page.getByRole('button',{name:'Save branding',exact:true}).click();
   await page.getByRole('heading',{name:'Remove this lodge logo?',exact:true}).waitFor();assert.equal(writes,0);
-  await page.getByRole('button',{name:'Cancel',exact:true}).last().click();assert.equal(writes,0);
+  await page.getByRole('button',{name:'Cancel',exact:true}).last().click();assert.equal(writes,0);await page.waitForFunction(()=>document.activeElement?.textContent==='Save branding');
   await page.getByRole('button',{name:'Save branding',exact:true}).click();
   await page.getByRole('button',{name:'Confirm removal',exact:true}).click();
   await page.getByRole('heading',{name:'Manage branding',exact:true}).waitFor({state:'hidden'});assert.equal(writes,1);
@@ -474,6 +474,7 @@ test('shared error formatter hides server internals and handles malformed valida
 test('empty lodge shows permission-aware setup and hides single-lodge selector',async()=>{
  const lodge='setup-lodge';const {context,page,requests}=await accountPage({id:'setup-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:lodge,lodge_name:'New Lodge',role_key:'lodge_admin',permissions:['dashboard.view','units.view','units.manage','guests.view','guests.manage','staff.view','staff.manage','stays.view','stays.manage'],entitlements:['dashboard','units','guests','staff','stays']}]});
  try {
+  await page.route('**/api/v1/lodges/setup-lodge/staff',r=>r.fulfill({json:[{id:'profile-only',full_name:'Profile without an account',has_login:false}]}));
   await page.route('**/api/v1/lodges/setup-lodge/dashboard',r=>r.fulfill({json:{lodge:{name:'New Lodge'},metrics:{},events:[]}}));
   await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'Make this lodge your own'}).waitFor();await page.getByText('0 of 4 essentials ready').waitFor();
   assert.equal(await page.getByLabel('ACTIVE LODGE',{exact:true}).count(),0);
@@ -573,4 +574,48 @@ test('date-only values retain their calendar day and event labels hide technical
  assert.equal(formats.formatDate('2026-10-22'),'22/10/2026');assert.equal(formats.formatDate('not-a-date'),'—');
  formats.storeFormatting({date_format:'yyyy-MM-dd',timezone:'Legacy/Invalid',currency:'USD'});assert.equal(formats.formatDate('2026-10-22'),'2026-10-22');assert.doesNotThrow(()=>formats.formatDateTime('2026-10-22T12:00:00Z'));
  const labels=load('lib/strings/content.ts');assert.equal(labels.readableLabel('development_link'),'Invitation link ready');assert.equal(labels.eventLabel('lodge.created','lodge.created . lodge').title,'Lodge created');assert.equal(labels.eventLabel('task.completed').title,'Task completed');
+});
+
+test('premium shared surfaces stay accessible at all requested widths and both themes',async()=>{
+ const lodges={id:'visual-admin',full_name:'Visual Admin',is_super_admin:true,mfa_enabled:true,memberships:[]};
+ const {context,page}=await accountPage(lodges);
+ try{
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+   await page.setViewportSize({width,height:1000});await page.addInitScript(theme=>localStorage.setItem('theme',theme),theme);
+   await page.goto(base+'/super-admin/lodges');await page.getByRole('button',{name:'+ Register lodge',exact:true}).click();await page.getByLabel('Lodge name',{exact:true}).waitFor();
+   await page.waitForTimeout(450);
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`page overflow at ${width}/${theme}`);
+   const dialog=page.getByRole('dialog');const box=await dialog.boundingBox();assert.ok(box&&box.x>=-1&&box.x+box.width<=width+1,`dialog overflow at ${width}/${theme}`);
+   await dialog.evaluate(el=>{const controls=[...el.querySelectorAll('button,input,select,textarea,a[href]')].filter(x=>!x.disabled&&x.tabIndex>=0&&x.getClientRects().length);controls[controls.length-1].focus()});await page.keyboard.press('Tab');assert.ok(await dialog.evaluate(el=>el.contains(document.activeElement)),'dialog must trap keyboard focus');
+   const submitBox=await page.getByRole('button',{name:'Register lodge',exact:true}).boundingBox();assert.ok(submitBox&&submitBox.y>=0&&submitBox.y+submitBox.height<=1001,`sticky action offscreen at ${width}/${theme}`);
+   const material=await dialog.evaluate(el=>({radius:parseFloat(getComputedStyle(el).borderTopLeftRadius),blur:getComputedStyle(el).backdropFilter}));assert.ok(material.radius>=24);assert.match(material.blur,/blur/);
+   await page.getByLabel('Lodge name',{exact:true}).focus();await page.screenshot({path:path.join(web,`../../docs/screenshots/safarios-registration-${width}-${theme}.png`),fullPage:true});
+   if(width===375||width===1440){const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`registration accessibility at ${width}/${theme}`)}
+   await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+  }
+ }finally{await context.close()}
+ const {context:guestContext,page:guestPage}=await accountPage({id:'visual-lodge',full_name:'Lodge Admin',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'visual-lodge',role_key:'lodge_admin',permissions:['guests.view','guests.manage'],entitlements:['guests']}]});
+ try{
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+   await guestPage.setViewportSize({width,height:1000});await guestPage.addInitScript(theme=>localStorage.setItem('theme',theme),theme);await guestPage.goto(base+'/guests');await guestPage.getByRole('button',{name:'+ Guest',exact:true}).click();await guestPage.getByLabel('Nationality',{exact:true}).waitFor();await guestPage.waitForTimeout(450);
+   assert.ok(await guestPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`guest page overflow at ${width}/${theme}`);
+   const guestAction=await guestPage.getByRole('button',{name:'Create guest',exact:true}).boundingBox();assert.ok(guestAction&&guestAction.y>=0&&guestAction.y+guestAction.height<=1001,`guest sticky action offscreen at ${width}/${theme}`);
+   await guestPage.screenshot({path:path.join(web,`../../docs/screenshots/safarios-guest-${width}-${theme}.png`),fullPage:true});
+   if(width===375||width===1440){const violations=(await new AxeBuilder({page:guestPage}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`guest accessibility at ${width}/${theme}`)}
+   await guestPage.keyboard.press('Escape');await guestPage.getByRole('dialog').waitFor({state:'hidden'});
+  }
+ }finally{await guestContext.close()}
+});
+
+test('guest profile edits show inline errors and read-only accounts cannot edit',async()=>{
+ const guest={id:'guest-profile',name:'Maya Laurent',first_name:'Maya',last_name:'Laurent',phone:'',nationality:'Kenya',vip:false,dietary_requirements:'',allergies:'',preferences:'',notes:'',completed_stays:0};
+ for(const manage of [true,false]){
+  const {context,page}=await accountPage({id:'profile-'+manage,full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'profile-lodge',permissions:['guests.view',...(manage?['guests.manage']:[])],entitlements:['guests']}]});let writes=0;
+  try{
+   await page.route('**/api/v1/lodges/profile-lodge/guests**',async r=>{if(r.request().method()==='PATCH'){writes++;return r.fulfill({status:422,json:{detail:[{loc:['body','notes'],type:'string_too_long',ctx:{max_length:4000}}]}})}return r.fulfill({json:[guest]})});
+   await page.goto(base+'/guests');await page.getByRole('button',{name:'Maya Laurent',exact:true}).click();await page.getByRole('dialog').waitFor();
+   if(manage){await page.getByLabel('Internal notes',{exact:true}).fill('Updated notes');await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByText('Use no more than 4000 characters.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Internal notes',{exact:true}).getAttribute('aria-invalid'),'true');assert.equal(writes,1)}
+   else {assert.equal(await page.getByRole('button',{name:'Save profile',exact:true}).count(),0);assert.equal(await page.getByLabel('Internal notes',{exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'+ Guest',exact:true}).count(),0);assert.equal(writes,0)}
+  }finally{await context.close()}
+ }
 });

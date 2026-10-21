@@ -610,3 +610,15 @@ select:focus-visible {
 @media(max-width:640px){.groupTopbar{padding:20px;gap:16px}.groupTopbar .topActions{flex-wrap:wrap}}
 
 .groupAdministrators{margin-top:24px;border-top:1px solid var(--bd);padding-top:20px}.groupAdministrator{padding:12px 0}.groupAdministrator p{margin:6px 0;overflow-wrap:anywhere}
+
+/* Shared form anatomy: label, control, hint and inline validation. */
+.formField { min-width: 0; margin-bottom: 16px; }
+.formField .fieldLabel { display: block; margin: 0 0 8px; }
+.formField .field, .formField .textarea { margin-bottom: 0; }
+.fieldError { margin-top: 8px; font-size: 13px; line-height: 1.5; }
+.formField [aria-invalid="true"] { border-color: var(--danger, #e4a395); }
+.passwordField { position: relative; }
+.passwordField .field { padding-right: 52px; }
+.passwordToggle { position: absolute; top: 28px; right: 4px; width: 44px; height: 44px; }
+
+.requiredMarker::before { content: " *"; }

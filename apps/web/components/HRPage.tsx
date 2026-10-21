@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { operationsApi } from "@/lib/api";
@@ -57,14 +59,16 @@ export default function HRPage() {
     void load();
   }, [rosterEnabled, performanceEnabled]);
   const StaffSelect = () => (
-    <select className="select" name="staff_id" required>
-      <option value="">Select staff…</option>
-      {staff.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.full_name}
-        </option>
-      ))}
-    </select>
+    <Field label="Staff member">
+      <select className="select" name="staff_id" required>
+        <option value="">Select staff…</option>
+        {staff.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.full_name}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
   async function submit(
     e: FormEvent<HTMLFormElement>,
@@ -125,7 +129,7 @@ export default function HRPage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>New leave request</h2>
-            <form
+            <Form
               onSubmit={(e) =>
                 submit(e, operationsApi.hr.leaves.create, (f) => ({
                   staff_id: String(f.get("staff_id")),
@@ -137,21 +141,30 @@ export default function HRPage() {
               }
             >
               <StaffSelect />
-              <label className="label">Type</label>
-              <select className="select" name="leave_type">
-                <option>annual</option>
-                <option>sick</option>
-                <option>unpaid</option>
-                <option>other</option>
-              </select>
-              <label className="label">Start</label>
-              <input className="field" type="date" name="start_date" required />
-              <label className="label">End</label>
-              <input className="field" type="date" name="end_date" required />
-              <label className="label">Notes</label>
-              <textarea className="textarea" name="notes" />
+              <Field label="Type">
+                <select className="select" name="leave_type">
+                  <option>annual</option>
+                  <option>sick</option>
+                  <option>unpaid</option>
+                  <option>other</option>
+                </select>
+              </Field>
+              <Field label="Start">
+                <input
+                  className="field"
+                  type="date"
+                  name="start_date"
+                  required
+                />
+              </Field>
+              <Field label="End">
+                <input className="field" type="date" name="end_date" required />
+              </Field>
+              <Field label="Notes">
+                <textarea className="textarea" name="notes" />
+              </Field>
               <button className="button primary">Create request</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Leave records</h2>
@@ -201,7 +214,7 @@ export default function HRPage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>Schedule shift</h2>
-            <form
+            <Form
               onSubmit={(e) =>
                 submit(e, operationsApi.hr.shifts.create, (f) => ({
                   staff_id: String(f.get("staff_id")),
@@ -212,24 +225,27 @@ export default function HRPage() {
               }
             >
               <StaffSelect />
-              <label className="label">Starts</label>
-              <input
-                className="field"
-                type="datetime-local"
-                name="starts_at"
-                required
-              />
-              <label className="label">Ends</label>
-              <input
-                className="field"
-                type="datetime-local"
-                name="ends_at"
-                required
-              />
-              <label className="label">Notes</label>
-              <textarea className="textarea" name="notes" />
+              <Field label="Starts">
+                <input
+                  className="field"
+                  type="datetime-local"
+                  name="starts_at"
+                  required
+                />
+              </Field>
+              <Field label="Ends">
+                <input
+                  className="field"
+                  type="datetime-local"
+                  name="ends_at"
+                  required
+                />
+              </Field>
+              <Field label="Notes">
+                <textarea className="textarea" name="notes" />
+              </Field>
               <button className="button primary">Schedule shift</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Roster</h2>
@@ -252,7 +268,7 @@ export default function HRPage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>Add credential</h2>
-            <form
+            <Form
               onSubmit={(e) =>
                 submit(e, operationsApi.hr.credentials.create, (f) => ({
                   staff_id: String(f.get("staff_id")),
@@ -267,20 +283,26 @@ export default function HRPage() {
               }
             >
               <StaffSelect />
-              <label className="label">Type</label>
-              <input className="field" name="credential_type" required />
-              <label className="label">Name</label>
-              <input className="field" name="name" required />
-              <label className="label">Issuer</label>
-              <input className="field" name="issuer" />
-              <label className="label">Reference</label>
-              <input className="field" name="reference_number" />
-              <label className="label">Issued</label>
-              <input className="field" type="date" name="issued_date" />
-              <label className="label">Expiry</label>
-              <input className="field" type="date" name="expiry_date" />
+              <Field label="Type">
+                <input className="field" name="credential_type" required />
+              </Field>
+              <Field label="Name">
+                <input className="field" name="name" required />
+              </Field>
+              <Field label="Issuer">
+                <input className="field" name="issuer" />
+              </Field>
+              <Field label="Reference">
+                <input className="field" name="reference_number" />
+              </Field>
+              <Field label="Issued">
+                <input className="field" type="date" name="issued_date" />
+              </Field>
+              <Field label="Expiry">
+                <input className="field" type="date" name="expiry_date" />
+              </Field>
               <button className="button primary">Save credential</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Credentials</h2>
@@ -303,7 +325,7 @@ export default function HRPage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>Add training</h2>
-            <form
+            <Form
               onSubmit={(e) =>
                 submit(e, operationsApi.hr.training.create, (f) => ({
                   staff_id: String(f.get("staff_id")),
@@ -318,23 +340,28 @@ export default function HRPage() {
               }
             >
               <StaffSelect />
-              <label className="label">Training</label>
-              <input className="field" name="title" required />
-              <label className="label">Provider</label>
-              <input className="field" name="provider" />
-              <label className="label">Status</label>
-              <select className="select" name="status">
-                <option>planned</option>
-                <option>in_progress</option>
-                <option>completed</option>
-                <option>expired</option>
-              </select>
-              <label className="label">Completed</label>
-              <input className="field" type="date" name="completed_date" />
-              <label className="label">Renewal due</label>
-              <input className="field" type="date" name="renewal_due_date" />
+              <Field label="Training">
+                <input className="field" name="title" required />
+              </Field>
+              <Field label="Provider">
+                <input className="field" name="provider" />
+              </Field>
+              <Field label="Status">
+                <select className="select" name="status">
+                  <option>planned</option>
+                  <option>in_progress</option>
+                  <option>completed</option>
+                  <option>expired</option>
+                </select>
+              </Field>
+              <Field label="Completed">
+                <input className="field" type="date" name="completed_date" />
+              </Field>
+              <Field label="Renewal due">
+                <input className="field" type="date" name="renewal_due_date" />
+              </Field>
               <button className="button primary">Save training</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Training records</h2>
@@ -358,7 +385,7 @@ export default function HRPage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>Record incident</h2>
-            <form
+            <Form
               onSubmit={(e) =>
                 submit(e, operationsApi.hr.incidents.create, (f) => ({
                   staff_id: String(f.get("staff_id")),
@@ -374,33 +401,38 @@ export default function HRPage() {
               }
             >
               <StaffSelect />
-              <label className="label">Type</label>
-              <input
-                className="field"
-                name="incident_type"
-                defaultValue="operational"
-                required
-              />
-              <label className="label">Severity</label>
-              <select className="select" name="severity">
-                <option>low</option>
-                <option selected>normal</option>
-                <option>high</option>
-                <option>critical</option>
-              </select>
-              <label className="label">Occurred</label>
-              <input
-                className="field"
-                type="datetime-local"
-                name="occurred_at"
-                required
-              />
-              <label className="label">Description</label>
-              <textarea className="textarea" name="description" required />
-              <label className="label">Action taken</label>
-              <textarea className="textarea" name="action_taken" />
+              <Field label="Type">
+                <input
+                  className="field"
+                  name="incident_type"
+                  defaultValue="operational"
+                  required
+                />
+              </Field>
+              <Field label="Severity">
+                <select className="select" name="severity">
+                  <option>low</option>
+                  <option selected>normal</option>
+                  <option>high</option>
+                  <option>critical</option>
+                </select>
+              </Field>
+              <Field label="Occurred">
+                <input
+                  className="field"
+                  type="datetime-local"
+                  name="occurred_at"
+                  required
+                />
+              </Field>
+              <Field label="Description">
+                <textarea className="textarea" name="description" required />
+              </Field>
+              <Field label="Action taken">
+                <textarea className="textarea" name="action_taken" />
+              </Field>
               <button className="button primary">Record incident</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Incident history</h2>
@@ -424,7 +456,7 @@ export default function HRPage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>Add performance note</h2>
-            <form
+            <Form
               onSubmit={(e) =>
                 submit(e, operationsApi.hr.performance.create, (f) => ({
                   staff_id: String(f.get("staff_id")),
@@ -436,32 +468,36 @@ export default function HRPage() {
               }
             >
               <StaffSelect />
-              <label className="label">Type</label>
-              <select className="select" name="note_type">
-                <option>review</option>
-                <option>recognition</option>
-                <option>coaching</option>
-                <option>warning</option>
-                <option>goal</option>
-              </select>
-              <label className="label">Rating</label>
-              <select className="select" name="rating">
-                <option value="">Not scored</option>
-                {[1, 2, 3, 4, 5].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-              <label className="label">Review date</label>
-              <input
-                className="field"
-                type="date"
-                name="review_date"
-                required
-              />
-              <label className="label">Notes</label>
-              <textarea className="textarea" name="notes" required />
+              <Field label="Type">
+                <select className="select" name="note_type">
+                  <option>review</option>
+                  <option>recognition</option>
+                  <option>coaching</option>
+                  <option>warning</option>
+                  <option>goal</option>
+                </select>
+              </Field>
+              <Field label="Rating">
+                <select className="select" name="rating">
+                  <option value="">Not scored</option>
+                  {[1, 2, 3, 4, 5].map((x) => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Review date">
+                <input
+                  className="field"
+                  type="date"
+                  name="review_date"
+                  required
+                />
+              </Field>
+              <Field label="Notes">
+                <textarea className="textarea" name="notes" required />
+              </Field>
               <button className="button primary">Save note</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Performance history</h2>

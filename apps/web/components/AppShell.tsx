@@ -1,4 +1,5 @@
 "use client";
+import { Field } from "@/components/ui/field";
 import { WorkspaceAccessContext } from "@/lib/workspace-access";
 import NotificationBell from "./NotificationBell";
 import Link from "next/link";
@@ -317,21 +318,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <SafariBrand />
         {me.memberships?.length > 0 && (
           <div className="roleBox">
-            <label>ACTIVE LODGE</label>
-            <select
-              className="roleSelect"
-              value={realMembership?.lodge_id || ""}
-              onChange={(e) => {
-                setActiveLodgeId(e.target.value);
-                location.reload();
-              }}
-            >
-              {me.memberships.map((m: any) => (
-                <option value={m.lodge_id} key={m.lodge_id}>
-                  {m.lodge_name}
-                </option>
-              ))}
-            </select>
+            <Field label="ACTIVE LODGE">
+              <select
+                className="roleSelect"
+                value={realMembership?.lodge_id || ""}
+                onChange={(e) => {
+                  setActiveLodgeId(e.target.value);
+                  location.reload();
+                }}
+              >
+                {me.memberships.map((m: any) => (
+                  <option value={m.lodge_id} key={m.lodge_id}>
+                    {m.lodge_name}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
         )}
         <div className="lodgeMini">

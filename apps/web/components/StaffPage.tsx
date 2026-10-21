@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "./Drawer";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
@@ -213,15 +215,14 @@ export default function StaffPage() {
       )}
       {devLink && (
         <div className="panel">
-          <label htmlFor="development-link" className="label">
-            Private development invitation · share only with the account owner
-          </label>
-          <textarea
-            id="development-link"
-            className="textarea"
-            readOnly
-            value={devLink}
-          />
+          <Field label="Private development invitation · share only with the account owner">
+            <textarea
+              id="development-link"
+              className="textarea"
+              readOnly
+              value={devLink}
+            />
+          </Field>
           <button className="button" onClick={() => setDevLink("")}>
             Hide link
           </button>
@@ -265,6 +266,7 @@ export default function StaffPage() {
                         disabled={!canManage}
                         value={r.operational_status}
                         onChange={(e) => status(r.id, e.target.value)}
+                        aria-label="Status"
                       >
                         <option value="available">Available</option>
                         <option value="on_shift">On shift</option>
@@ -291,6 +293,7 @@ export default function StaffPage() {
                               setError(e.message);
                             }
                           }}
+                          aria-label="Custom role"
                         >
                           <option value="">System role</option>
                           {customRoles
@@ -363,48 +366,60 @@ export default function StaffPage() {
                 password. Gmail and business addresses are supported.
               </div>
             </div>
-            <button className="closeButton" onClick={() => setOpen(false)}>
+            <button
+              className="closeButton"
+              onClick={() => setOpen(false)}
+              aria-label="Close dialog"
+              type="button"
+            >
               ×
             </button>
           </div>
-          <form onSubmit={create}>
-            <label className="label">Full name</label>
-            <input className="field" name="full_name" required />
-            <label className="label">Employee code</label>
-            <input className="field" name="employee_code" />
-            <label className="label">Department</label>
-            <select className="select" name="department_id">
-              <option value="">No department</option>
-              {deps
-                .filter((d) => d.is_active)
-                .map((d) => (
-                  <option value={d.id} key={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-            </select>
-            <label className="label">Job title</label>
-            <input className="field" name="job_title" />
-            <label className="label">Supervisor</label>
-            <select className="select" name="supervisor_staff_id">
-              <option value="">No supervisor</option>
-              {rows
-                .filter((s) => s.employment_status === "active")
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
-                  </option>
-                ))}
-            </select>
-            <label className="label">Hire date</label>
-            <input className="field" type="date" name="hire_date" />
-            <label className="label">Email</label>
-            <input
-              className="field"
-              type="email"
-              name="email"
-              required={inviteOnCreate}
-            />
+          <Form onSubmit={create}>
+            <Field label="Full name">
+              <input className="field" name="full_name" required />
+            </Field>
+            <Field label="Employee code">
+              <input className="field" name="employee_code" />
+            </Field>
+            <Field label="Department">
+              <select className="select" name="department_id">
+                <option value="">No department</option>
+                {deps
+                  .filter((d) => d.is_active)
+                  .map((d) => (
+                    <option value={d.id} key={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Job title">
+              <input className="field" name="job_title" />
+            </Field>
+            <Field label="Supervisor">
+              <select className="select" name="supervisor_staff_id">
+                <option value="">No supervisor</option>
+                {rows
+                  .filter((s) => s.employment_status === "active")
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Hire date">
+              <input className="field" type="date" name="hire_date" />
+            </Field>
+            <Field label="Email">
+              <input
+                className="field"
+                type="email"
+                name="email"
+                required={inviteOnCreate}
+              />
+            </Field>
             <label className="checkRow">
               <input
                 type="checkbox"
@@ -415,26 +430,28 @@ export default function StaffPage() {
             </label>
             {inviteOnCreate && (
               <>
-                <label className="label">Account role</label>
-                <select
-                  className="select"
-                  name="role_key"
-                  defaultValue="general_staff"
-                >
-                  {inviteRoles.map(([k, n]) => (
-                    <option key={k} value={k}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                <Field label="Account role">
+                  <select
+                    className="select"
+                    name="role_key"
+                    defaultValue="general_staff"
+                  >
+                    {inviteRoles.map(([k, n]) => (
+                      <option key={k} value={k}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
                 <p className="sub">
                   An expiring private link is emailed to this address. You never
                   choose or see their password.
                 </p>
               </>
             )}
-            <label className="label">Phone</label>
-            <input className="field" name="phone" />
+            <Field label="Phone">
+              <input className="field" name="phone" />
+            </Field>
             <div className="drawerActions">
               <button className="button primary" disabled={busy}>
                 {busy
@@ -444,7 +461,7 @@ export default function StaffPage() {
                     : "Create staff profile"}
               </button>
             </div>
-          </form>
+          </Form>
         </Drawer>
       )}
       {inviteStaff && (
@@ -460,14 +477,17 @@ export default function StaffPage() {
             <button
               className="closeButton"
               onClick={() => setInviteStaff(null)}
+              aria-label="Close dialog"
+              type="button"
             >
               ×
             </button>
           </div>
           {devLink ? (
             <>
-              <label className="label">Development activation link</label>
-              <textarea className="textarea" readOnly value={devLink} />
+              <Field label="Development activation link">
+                <textarea className="textarea" readOnly value={devLink} />
+              </Field>
               <p className="sub">
                 Share this private activation link securely with the staff
                 member.
@@ -490,27 +510,29 @@ export default function StaffPage() {
               </div>
             </>
           ) : (
-            <form onSubmit={invite}>
-              <label className="label">Login email</label>
-              <input
-                className="field"
-                value={inviteStaff.email || ""}
-                readOnly
-              />
-              <label className="label">Role</label>
-              <select className="select" name="role_key" required>
-                {inviteRoles.map(([k, n]) => (
-                  <option key={k} value={k}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+            <Form onSubmit={invite}>
+              <Field label="Login email">
+                <input
+                  className="field"
+                  value={inviteStaff.email || ""}
+                  readOnly
+                />
+              </Field>
+              <Field label="Role">
+                <select className="select" name="role_key" required>
+                  {inviteRoles.map(([k, n]) => (
+                    <option key={k} value={k}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               <div className="drawerActions">
                 <button className="button primary" disabled={busy}>
                   {busy ? "Queuing…" : "Send invitation"}
                 </button>
               </div>
-            </form>
+            </Form>
           )}
         </Drawer>
       )}

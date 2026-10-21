@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Drawer as Vaul } from "vaul";
@@ -10,6 +10,20 @@ export default function Drawer({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  const returnFocus = useRef<HTMLElement | null>(
+    typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
+  useEffect(() => {
+    return () => {
+      const target = returnFocus.current;
+      requestAnimationFrame(() => {
+        if (target?.isConnected) target.focus();
+      });
+    };
+  }, []);
   const reduced = useReducedMotion();
   const [mobile, setMobile] = useState(false);
   useEffect(() => {

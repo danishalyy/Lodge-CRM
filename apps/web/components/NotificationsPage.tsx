@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { useCallback, useEffect, useState } from "react";
 import { Bell, Archive, CheckCheck, RefreshCw } from "lucide-react";
 import { accountNotificationsApi } from "@/lib/api";
@@ -140,20 +142,19 @@ export default function NotificationsPage() {
               />
               Unread only
             </label>
-            <label className="sr-only" htmlFor="notification-priority">
-              Filter by priority
-            </label>
-            <select
-              id="notification-priority"
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value)}
-            >
-              <option value="">All priorities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="normal">Normal</option>
-              <option value="low">Low</option>
-            </select>
+            <Field label="Filter by priority">
+              <select
+                id="notification-priority"
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value)}
+              >
+                <option value="">All priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+            </Field>
             <button
               className="iconButton"
               aria-label="Refresh notifications"
@@ -250,7 +251,7 @@ export default function NotificationsPage() {
               password recovery.
             </p>
           )}
-          <form onSubmit={save}>
+          <Form onSubmit={save}>
             <label className="checkRow">
               <span>Email operational notifications</span>
               <input
@@ -261,26 +262,25 @@ export default function NotificationsPage() {
                 }
               />
             </label>
-            <label className="fieldLabel" htmlFor="notification-email-priority">
-              Minimum email priority
-            </label>
-            <select
-              id="notification-email-priority"
-              className="field"
-              value={prefs.email_min_severity}
-              onChange={(e) =>
-                setPrefs({ ...prefs, email_min_severity: e.target.value })
-              }
-            >
-              <option value="low">All updates</option>
-              <option value="normal">Normal and above</option>
-              <option value="high">High and critical</option>
-              <option value="critical">Critical only</option>
-            </select>
+            <Field label="Minimum email priority">
+              <select
+                id="notification-email-priority"
+                className="field"
+                value={prefs.email_min_severity}
+                onChange={(e) =>
+                  setPrefs({ ...prefs, email_min_severity: e.target.value })
+                }
+              >
+                <option value="low">All updates</option>
+                <option value="normal">Normal and above</option>
+                <option value="high">High and critical</option>
+                <option value="critical">Critical only</option>
+              </select>
+            </Field>
             <button className="button primary" disabled={saving}>
               {saving ? "Saving…" : "Save preferences"}
             </button>
-          </form>
+          </Form>
         </section>
       </div>
     </>

@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { FormEvent, useEffect, useState } from "react";
 import StatusPill from "./StatusPill";
@@ -209,83 +211,93 @@ export default function MaintenancePage() {
           {canManage && (
             <section className="card formCard">
               <h2>Create maintenance ticket</h2>
-              <form onSubmit={submit}>
-                <label className="label">Title</label>
-                <input className="field" name="title" required />
-                <label className="label">Description</label>
-                <textarea className="textarea" name="description" />
-                <label className="label">Category</label>
-                <input className="field" name="category" />
+              <Form onSubmit={submit}>
+                <Field label="Title">
+                  <input className="field" name="title" required />
+                </Field>
+                <Field label="Description">
+                  <textarea className="textarea" name="description" />
+                </Field>
+                <Field label="Category">
+                  <input className="field" name="category" />
+                </Field>
                 {workshop && (
                   <>
-                    <label className="label">Asset</label>
-                    <select className="select" name="asset_id">
-                      <option value="">No registered asset</option>
-                      {assets.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.asset_code} · {a.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Field label="Asset">
+                      <select className="select" name="asset_id">
+                        <option value="">No registered asset</option>
+                        {assets.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.asset_code} · {a.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
                   </>
                 )}
-                <label className="label">Room / unit</label>
-                <select className="select" name="unit_id">
-                  <option value="">Not room-related</option>
-                  {rooms.map((r) => (
-                    <option value={r.id} key={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-                <label className="label">Vehicle</label>
-                <select className="select" name="vehicle_id">
-                  <option value="">Not vehicle-related</option>
-                  {vehicles.map((v) => (
-                    <option value={v.id} key={v.id}>
-                      {v.name || v.registration}
-                    </option>
-                  ))}
-                </select>
-                <label className="label">Assign to</label>
-                <select className="select" name="assigned_staff_id">
-                  <option value="">Unassigned</option>
-                  {staff
-                    .filter((s) => s.employment_status === "active")
-                    .map((s) => (
-                      <option value={s.id} key={s.id}>
-                        {s.full_name}
+                <Field label="Room / unit">
+                  <select className="select" name="unit_id">
+                    <option value="">Not room-related</option>
+                    {rooms.map((r) => (
+                      <option value={r.id} key={r.id}>
+                        {r.name}
                       </option>
                     ))}
-                </select>
-                <label className="label">Priority</label>
-                <select className="select" name="priority">
-                  <option>low</option>
-                  <option selected value="normal">
-                    normal
-                  </option>
-                  <option>high</option>
-                  <option>critical</option>
-                </select>
+                  </select>
+                </Field>
+                <Field label="Vehicle">
+                  <select className="select" name="vehicle_id">
+                    <option value="">Not vehicle-related</option>
+                    {vehicles.map((v) => (
+                      <option value={v.id} key={v.id}>
+                        {v.name || v.registration}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Assign to">
+                  <select className="select" name="assigned_staff_id">
+                    <option value="">Unassigned</option>
+                    {staff
+                      .filter((s) => s.employment_status === "active")
+                      .map((s) => (
+                        <option value={s.id} key={s.id}>
+                          {s.full_name}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="Priority">
+                  <select className="select" name="priority">
+                    <option>low</option>
+                    <option selected value="normal">
+                      normal
+                    </option>
+                    <option>high</option>
+                    <option>critical</option>
+                  </select>
+                </Field>
                 {workshop && (
                   <>
-                    <label className="label">Scheduled for</label>
-                    <input
-                      className="field"
-                      type="datetime-local"
-                      name="scheduled_for"
-                    />
-                    <label className="label">Repeat every N days</label>
-                    <input
-                      className="field"
-                      type="number"
-                      min="1"
-                      name="recurrence_interval_days"
-                    />
+                    <Field label="Scheduled for">
+                      <input
+                        className="field"
+                        type="datetime-local"
+                        name="scheduled_for"
+                      />
+                    </Field>
+                    <Field label="Repeat every N days">
+                      <input
+                        className="field"
+                        type="number"
+                        min="1"
+                        name="recurrence_interval_days"
+                      />
+                    </Field>
                   </>
                 )}
                 <button className="button primary">Create ticket</button>
-              </form>
+              </Form>
             </section>
           )}
           <section className="panel">
@@ -344,44 +356,52 @@ export default function MaintenancePage() {
         <div className="twoCol">
           <section className="card formCard">
             <h2>Register asset</h2>
-            <form onSubmit={createAsset}>
-              <label className="label">Asset code</label>
-              <input className="field" name="asset_code" required />
-              <label className="label">Name</label>
-              <input className="field" name="name" required />
-              <label className="label">Category</label>
-              <input className="field" name="category" />
-              <label className="label">Unit</label>
-              <select className="select" name="unit_id">
-                <option value="">None</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-              <label className="label">Vehicle</label>
-              <select className="select" name="vehicle_id">
-                <option value="">None</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name || v.registration}
-                  </option>
-                ))}
-              </select>
-              <label className="label">Service interval days</label>
-              <input
-                className="field"
-                type="number"
-                min="1"
-                name="service_interval_days"
-              />
-              <label className="label">Next service</label>
-              <input className="field" type="date" name="next_service_date" />
-              <label className="label">Notes</label>
-              <textarea className="textarea" name="notes" />
+            <Form onSubmit={createAsset}>
+              <Field label="Asset code">
+                <input className="field" name="asset_code" required />
+              </Field>
+              <Field label="Name">
+                <input className="field" name="name" required />
+              </Field>
+              <Field label="Category">
+                <input className="field" name="category" />
+              </Field>
+              <Field label="Unit">
+                <select className="select" name="unit_id">
+                  <option value="">None</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Vehicle">
+                <select className="select" name="vehicle_id">
+                  <option value="">None</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name || v.registration}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Service interval days">
+                <input
+                  className="field"
+                  type="number"
+                  min="1"
+                  name="service_interval_days"
+                />
+              </Field>
+              <Field label="Next service">
+                <input className="field" type="date" name="next_service_date" />
+              </Field>
+              <Field label="Notes">
+                <textarea className="textarea" name="notes" />
+              </Field>
               <button className="button primary">Register asset</button>
-            </form>
+            </Form>
           </section>
           <section className="panel">
             <h2>Asset register</h2>
@@ -414,7 +434,12 @@ export default function MaintenancePage() {
                 history.
               </div>
             </div>
-            <button className="closeButton" onClick={() => setSelected(null)}>
+            <button
+              className="closeButton"
+              onClick={() => setSelected(null)}
+              aria-label="Close dialog"
+              type="button"
+            >
               ×
             </button>
           </div>
@@ -427,30 +452,34 @@ export default function MaintenancePage() {
               <strong>{(p.total_cost_cents / 100).toFixed(2)}</strong>
             </div>
           ))}
-          <form onSubmit={addPart}>
-            <label className="label">Part</label>
-            <input className="field" name="part_name" required />
-            <label className="label">Quantity</label>
-            <input
-              className="field"
-              type="number"
-              min="1"
-              name="quantity"
-              defaultValue="1"
-              required
-            />
-            <label className="label">Unit cost</label>
-            <input
-              className="field"
-              type="number"
-              step="0.01"
-              min="0"
-              name="unit_cost"
-            />
-            <label className="label">Notes</label>
-            <textarea className="textarea" name="notes" />
+          <Form onSubmit={addPart}>
+            <Field label="Part">
+              <input className="field" name="part_name" required />
+            </Field>
+            <Field label="Quantity">
+              <input
+                className="field"
+                type="number"
+                min="1"
+                name="quantity"
+                defaultValue="1"
+                required
+              />
+            </Field>
+            <Field label="Unit cost">
+              <input
+                className="field"
+                type="number"
+                step="0.01"
+                min="0"
+                name="unit_cost"
+              />
+            </Field>
+            <Field label="Notes">
+              <textarea className="textarea" name="notes" />
+            </Field>
             <button className="button primary">Add part</button>
-          </form>
+          </Form>
         </Drawer>
       )}
     </>

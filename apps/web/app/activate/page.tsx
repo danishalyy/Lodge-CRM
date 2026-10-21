@@ -1,5 +1,8 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import Link from "next/link";
+import { PasswordField } from "@/components/ui/password-field";
 import { FormEvent, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { authApi, setActiveLodgeId } from "@/lib/api";
@@ -92,33 +95,22 @@ export default function Activate() {
               Invitation for {invite.email_hint}. Choose your own SafariOS
               password. Your administrator cannot see it.
             </p>
-            <form onSubmit={submit}>
-              <label className="fieldLabel" htmlFor="activation-password">
-                New password
-              </label>
-              <input
+            <Form onSubmit={submit}>
+              <PasswordField
+                label="New password"
+                rules
                 id="activation-password"
-                className="field"
-                type="password"
                 minLength={12}
                 maxLength={200}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
-                aria-describedby="password-guidance"
               />
-              <p id="password-guidance" className="fieldHint">
-                Use at least 12 characters. A unique passphrase is a good
-                choice.
-              </p>
-              <label className="fieldLabel" htmlFor="activation-confirm">
-                Confirm password
-              </label>
-              <input
+              <PasswordField
+                label="Confirm password"
+                rules
                 id="activation-confirm"
-                className="field"
-                type="password"
                 minLength={12}
                 maxLength={200}
                 required
@@ -140,7 +132,7 @@ export default function Activate() {
                 {new Date(invite.expires_at).toLocaleString()}. Activating signs
                 this browser into your invited account.
               </p>
-            </form>
+            </Form>
           </>
         ) : (
           <>

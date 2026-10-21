@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import { groupsApi, superApi } from "@/lib/api";
 import Drawer from "@/components/Drawer";
@@ -98,15 +100,14 @@ export default function Groups() {
       )}
       {link && (
         <section className="panel">
-          <label htmlFor="group-dev-link" className="label">
-            Private development invitation
-          </label>
-          <textarea
-            id="group-dev-link"
-            className="textarea"
-            readOnly
-            value={link}
-          />
+          <Field label="Private development invitation">
+            <textarea
+              id="group-dev-link"
+              className="textarea"
+              readOnly
+              value={link}
+            />
+          </Field>
           <button className="button" onClick={() => setLink("")}>
             Hide link
           </button>
@@ -204,42 +205,39 @@ export default function Groups() {
               ×
             </button>
           </div>
-          <form onSubmit={save}>
-            <label className="label" htmlFor="group-name">
-              Group name
-            </label>
-            <input
-              id="group-name"
-              className="field"
-              name="name"
-              required
-              minLength={2}
-              maxLength={180}
-              defaultValue={edit.name || ""}
-            />
+          <Form onSubmit={save}>
+            <Field label="Group name">
+              <input
+                id="group-name"
+                className="field"
+                name="name"
+                required
+                minLength={2}
+                maxLength={180}
+                defaultValue={edit.name || ""}
+              />
+            </Field>
             {!edit.id && (
               <>
-                <label htmlFor="group-admin-name" className="label">
-                  Group Admin name
-                </label>
-                <input
-                  id="group-admin-name"
-                  name="admin_name"
-                  className="field"
-                  minLength={2}
-                  maxLength={180}
-                  required
-                />
-                <label htmlFor="group-admin-email" className="label">
-                  Group Admin email
-                </label>
-                <input
-                  id="group-admin-email"
-                  name="admin_email"
-                  className="field"
-                  type="email"
-                  required
-                />
+                <Field label="Group Admin name">
+                  <input
+                    id="group-admin-name"
+                    name="admin_name"
+                    className="field"
+                    minLength={2}
+                    maxLength={180}
+                    required
+                  />
+                </Field>
+                <Field label="Group Admin email">
+                  <input
+                    id="group-admin-email"
+                    name="admin_email"
+                    className="field"
+                    type="email"
+                    required
+                  />
+                </Field>
                 <p className="fieldHint">
                   The owner sets their own password through an invitation. Use a
                   separate email from any Lodge Admin or staff account.
@@ -288,7 +286,7 @@ export default function Groups() {
                     : "Create group and invite"}
               </button>
             </div>
-          </form>
+          </Form>
         </Drawer>
       )}
     </>

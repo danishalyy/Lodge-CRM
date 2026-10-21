@@ -416,3 +416,57 @@ test('scoped reports hide unavailable feature sections and handle restricted dat
   await page.getByRole('button',{name:'Run report',exact:true}).click();await page.getByText('Report updated',{exact:true}).waitFor();await page.getByText('Tasks completed',{exact:true}).waitFor();
  }finally{await context.close()}
 });
+
+test('login uses inline validation, password visibility and human API errors',async()=>{
+  const context=await browser.newContext();const page=await context.newPage();
+  try {
+    let calls=0;
+    await page.route('**/api/v1/auth/login',async route=>{calls++;await route.fulfill({status:422,json:{detail:[{type:'value_error',loc:['body','email'],msg:'value is not a valid email address',input:'private'}]}})});
+    await page.goto(base+'/login');
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();
+    await page.getByText('This field is required.').first().waitFor();assert.equal(calls,0);
+    await page.getByLabel('Email',{exact:true}).fill('owner@example.com');
+    await page.getByLabel('Password',{exact:true}).fill('long-test-passphrase');
+    await page.getByRole('button',{name:'Show password',exact:true}).click();
+    assert.equal(await page.getByLabel('Password',{exact:true}).getAttribute('type'),'text');
+    await page.getByRole('button',{name:'Hide password',exact:true}).click();
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();
+    await page.getByText('Enter a valid email address.',{exact:true}).waitFor();
+    assert.equal(await page.getByLabel('Email',{exact:true}).getAttribute('aria-invalid'),'true');
+    assert.equal(await page.getByText('value_error',{exact:false}).count(),0);
+    assert.equal(await page.locator('form').getAttribute('novalidate'),'');
+  } finally {await context.close()}
+});
+
+test('guest drawer labels, inline server validation and focus return',async()=>{
+  const user={id:'guest-admin',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'guest-lodge',role_key:'lodge_admin',permissions:['guests.view','guests.manage'],entitlements:['guests']}]};
+  const {context,page}=await accountPage(user);
+  try {
+    let calls=0;
+    await page.route('**/api/v1/lodges/guest-lodge/guests',async route=>{
+      if(route.request().method()==='POST'){calls++;await route.fulfill({status:422,json:{detail:[{loc:['body','email'],type:'value_error',msg:'invalid email'}]}})}else await route.fulfill({json:[]});
+    });
+    await page.goto(base+'/guests');await page.getByRole('button',{name:'+ Guest',exact:true}).click();
+    await page.getByRole('button',{name:'Create guest',exact:true}).click();
+    await page.getByText('This field is required.').first().waitFor();assert.equal(calls,0);
+    await page.getByLabel('First name',{exact:false}).fill('Maya');await page.getByLabel('Last name',{exact:false}).fill('Laurent');
+    await page.getByLabel('Email',{exact:true}).fill('maya@example.com');
+    assert.equal(await page.getByLabel('Phone',{exact:true}).getAttribute('type'),'tel');
+    await page.getByRole('button',{name:'Create guest',exact:true}).click();
+    await page.getByText('Enter a valid email address.',{exact:true}).waitFor();
+    await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
+    await page.waitForFunction(()=>document.activeElement?.textContent==='+ Guest');
+  } finally {await context.close()}
+});
+
+test('shared error formatter hides server internals and handles malformed validation details',()=>{
+  const source=fs.readFileSync(path.join(web,'lib/api.ts'),'utf8');
+  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  const copySource=fs.readFileSync(path.join(web,'lib/strings/forms.ts'),'utf8');
+  const copyJs=ts.transpileModule(copySource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  const copy={};new Function('exports',copyJs)(copy);
+  const output={};new Function('exports','require',js)(output,name=>name.includes('strings/forms')?copy:name.includes('action-feedback')?{actionFeedback:()=>{}}:name.includes('form-submission')?{originatingForm:()=>null}:{toast:{}});
+  assert.equal(output.formatApiError(500,{detail:'psycopg SECRET'}).message,copy.formCopy.unavailable);
+  assert.deepEqual(output.formatApiError(422,{detail:[null,{loc:['body','email'],msg:'email invalid'}]}).fieldErrors,{email:copy.formCopy.email});
+  assert.equal(output.formatApiError(403,{detail:{private:'data'}}).message,copy.formCopy.forbidden);
+});

@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "@/components/Drawer";
 import { superApi } from "@/lib/api";
@@ -130,15 +132,14 @@ export default function Page() {
       )}
       {devLink && (
         <section className="panel">
-          <label className="label" htmlFor="admin-dev-link">
-            Private development invitation
-          </label>
-          <textarea
-            id="admin-dev-link"
-            className="textarea"
-            readOnly
-            value={devLink}
-          />
+          <Field label="Private development invitation">
+            <textarea
+              id="admin-dev-link"
+              className="textarea"
+              readOnly
+              value={devLink}
+            />
+          </Field>
           <button className="button" onClick={() => setDevLink("")}>
             Hide link
           </button>
@@ -207,28 +208,26 @@ export default function Page() {
             This person will have platform-wide administrative access. MFA is
             required before they can manage the platform.
           </p>
-          <form onSubmit={invite}>
-            <label className="label" htmlFor="platform-invite-name">
-              Full name
-            </label>
-            <input
-              id="platform-invite-name"
-              className="field"
-              name="full_name"
-              minLength={2}
-              maxLength={180}
-              required
-            />
-            <label className="label" htmlFor="platform-invite-email">
-              Gmail or business email
-            </label>
-            <input
-              id="platform-invite-email"
-              className="field"
-              type="email"
-              name="email"
-              required
-            />
+          <Form onSubmit={invite}>
+            <Field label="Full name">
+              <input
+                id="platform-invite-name"
+                className="field"
+                name="full_name"
+                minLength={2}
+                maxLength={180}
+                required
+              />
+            </Field>
+            <Field label="Gmail or business email">
+              <input
+                id="platform-invite-email"
+                className="field"
+                type="email"
+                name="email"
+                required
+              />
+            </Field>
             <p>
               The owner receives an expiring link and chooses their own
               password.
@@ -241,7 +240,7 @@ export default function Page() {
             <button className="button primary" disabled={busy}>
               {busy ? "Queuing…" : "Send invitation"}
             </button>
-          </form>
+          </Form>
         </Drawer>
       )}
     </>

@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -169,15 +171,14 @@ export default function GroupOverview() {
         )}
         {link && (
           <section className="panel">
-            <label className="label" htmlFor="group-invite-link">
-              Private development invitation
-            </label>
-            <textarea
-              id="group-invite-link"
-              className="textarea"
-              readOnly
-              value={link}
-            />
+            <Field label="Private development invitation">
+              <textarea
+                id="group-invite-link"
+                className="textarea"
+                readOnly
+                value={link}
+              />
+            </Field>
             <button className="button" onClick={() => setLink("")}>
               Hide link
             </button>
@@ -347,27 +348,25 @@ export default function GroupOverview() {
               Access is limited to {invite.name}. The owner chooses their own
               password.
             </p>
-            <form onSubmit={send}>
-              <label className="label" htmlFor="lodge-admin-name">
-                Full name
-              </label>
-              <input
-                id="lodge-admin-name"
-                name="full_name"
-                className="field"
-                minLength={2}
-                required
-              />
-              <label className="label" htmlFor="lodge-admin-email">
-                Email
-              </label>
-              <input
-                id="lodge-admin-email"
-                name="email"
-                type="email"
-                className="field"
-                required
-              />
+            <Form onSubmit={send}>
+              <Field label="Full name">
+                <input
+                  id="lodge-admin-name"
+                  name="full_name"
+                  className="field"
+                  minLength={2}
+                  required
+                />
+              </Field>
+              <Field label="Email">
+                <input
+                  id="lodge-admin-email"
+                  name="email"
+                  type="email"
+                  className="field"
+                  required
+                />
+              </Field>
               {error && (
                 <p role="alert" className="dangerText">
                   {error}
@@ -378,7 +377,7 @@ export default function GroupOverview() {
                   {busy ? "Queuing…" : "Send invitation"}
                 </button>
               </div>
-            </form>
+            </Form>
           </Drawer>
         )}
       </div>

@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import { operationsApi } from "@/lib/api";
 const bases = [
@@ -67,19 +69,22 @@ export default function RolesPage() {
       <div className="twoCol">
         <section className="card formCard">
           <h2>Create role</h2>
-          <form onSubmit={create}>
-            <label className="label">Role name</label>
-            <input className="field" name="name" required />
-            <label className="label">Base operational scope</label>
-            <select className="select" name="base_role_key">
-              {bases.map(([k, n]) => (
-                <option key={k} value={k}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            <label className="label">Description</label>
-            <textarea className="textarea" name="description" />
+          <Form onSubmit={create}>
+            <Field label="Role name">
+              <input className="field" name="name" required />
+            </Field>
+            <Field label="Base operational scope">
+              <select className="select" name="base_role_key">
+                {bases.map(([k, n]) => (
+                  <option key={k} value={k}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Description">
+              <textarea className="textarea" name="description" />
+            </Field>
             <label className="label">Permissions</label>
             <div style={{ maxHeight: 360, overflow: "auto" }}>
               {perms.map((p) => (
@@ -103,7 +108,7 @@ export default function RolesPage() {
               ))}
             </div>
             <button className="button primary">Create custom role</button>
-          </form>
+          </Form>
         </section>
         <section className="panel">
           <h2>Configured roles</h2>

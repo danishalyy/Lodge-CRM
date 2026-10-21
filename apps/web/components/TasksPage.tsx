@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "./Drawer";
@@ -292,83 +294,98 @@ export default function TasksPage() {
                 Create real operational work and optionally make it recurring.
               </div>
             </div>
-            <button className="closeButton" onClick={() => setOpen(false)}>
+            <button
+              className="closeButton"
+              onClick={() => setOpen(false)}
+              aria-label="Close dialog"
+              type="button"
+            >
               ×
             </button>
           </div>
-          <form onSubmit={create}>
-            <label className="label">Title</label>
-            <input className="field" name="title" required />
-            <label className="label">Description</label>
-            <textarea className="textarea" name="description" />
-            <label className="label">Department</label>
-            <select className="select" name="department_id">
-              <option value="">No department</option>
-              {deps.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            <label className="label">Assign staff</label>
-            <select className="select" name="assigned_staff_id">
-              <option value="">Unassigned</option>
-              {staff
-                .filter((s) => s.employment_status === "active")
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
+          <Form onSubmit={create}>
+            <Field label="Title">
+              <input className="field" name="title" required />
+            </Field>
+            <Field label="Description">
+              <textarea className="textarea" name="description" />
+            </Field>
+            <Field label="Department">
+              <select className="select" name="department_id">
+                <option value="">No department</option>
+                {deps.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
                   </option>
                 ))}
-            </select>
-            <label className="label">Guest</label>
-            <select className="select" name="guest_id">
-              <option value="">None</option>
-              {guests.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
+              </select>
+            </Field>
+            <Field label="Assign staff">
+              <select className="select" name="assigned_staff_id">
+                <option value="">Unassigned</option>
+                {staff
+                  .filter((s) => s.employment_status === "active")
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Guest">
+              <select className="select" name="guest_id">
+                <option value="">None</option>
+                {guests.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Room / unit">
+              <select className="select" name="unit_id">
+                <option value="">None</option>
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Priority">
+              <select className="select" name="priority">
+                <option>low</option>
+                <option selected value="normal">
+                  normal
                 </option>
-              ))}
-            </select>
-            <label className="label">Room / unit</label>
-            <select className="select" name="unit_id">
-              <option value="">None</option>
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            <label className="label">Priority</label>
-            <select className="select" name="priority">
-              <option>low</option>
-              <option selected value="normal">
-                normal
-              </option>
-              <option>high</option>
-              <option>critical</option>
-            </select>
-            <label className="label">Due</label>
-            <input className="field" type="datetime-local" name="due_at" />
+                <option>high</option>
+                <option>critical</option>
+              </select>
+            </Field>
+            <Field label="Due">
+              <input className="field" type="datetime-local" name="due_at" />
+            </Field>
             {advanced && (
               <>
-                <label className="label">Repeat every N days</label>
-                <input
-                  className="field"
-                  type="number"
-                  min="1"
-                  name="recurrence_interval_days"
-                />
-                <label className="label">Stop recurrence after</label>
-                <input
-                  className="field"
-                  type="date"
-                  name="recurrence_end_date"
-                />
+                <Field label="Repeat every N days">
+                  <input
+                    className="field"
+                    type="number"
+                    min="1"
+                    name="recurrence_interval_days"
+                  />
+                </Field>
+                <Field label="Stop recurrence after">
+                  <input
+                    className="field"
+                    type="date"
+                    name="recurrence_end_date"
+                  />
+                </Field>
               </>
             )}
             <button className="button primary">Create task</button>
-          </form>
+          </Form>
         </Drawer>
       )}
       {selected && (
@@ -378,7 +395,12 @@ export default function TasksPage() {
               <h1>{selected.title}</h1>
               <div className="sub">{selected.description}</div>
             </div>
-            <button className="closeButton" onClick={() => setSelected(null)}>
+            <button
+              className="closeButton"
+              onClick={() => setSelected(null)}
+              aria-label="Close dialog"
+              type="button"
+            >
               ×
             </button>
           </div>
@@ -405,15 +427,17 @@ export default function TasksPage() {
             </label>
           ))}
           {advanced && canManage && (
-            <form onSubmit={addChecklist} style={{ marginTop: 12 }}>
-              <input
-                className="field"
-                name="label"
-                placeholder="Add required checklist item"
-                required
-              />
+            <Form onSubmit={addChecklist} style={{ marginTop: 12 }}>
+              <Field label="Add required checklist item">
+                <input
+                  className="field"
+                  name="label"
+                  placeholder="Add required checklist item"
+                  required
+                />
+              </Field>
               <button className="button secondary">Add item</button>
-            </form>
+            </Form>
           )}
           <h2 style={{ marginTop: 24 }}>Comments</h2>
           {comments.map((c) => (
@@ -426,15 +450,17 @@ export default function TasksPage() {
             </div>
           ))}
           {advanced && (canManage || canOwnManage) && (
-            <form onSubmit={addComment}>
-              <textarea
-                className="textarea"
-                name="body"
-                placeholder="Add operational note or comment"
-                required
-              />
+            <Form onSubmit={addComment}>
+              <Field label="Add operational note or comment">
+                <textarea
+                  className="textarea"
+                  name="body"
+                  placeholder="Add operational note or comment"
+                  required
+                />
+              </Field>
               <button className="button primary">Add comment</button>
-            </form>
+            </Form>
           )}
           {attachmentsEnabled && <h2 style={{ marginTop: 24 }}>Attachments</h2>}
           {attachmentsEnabled &&
@@ -454,16 +480,18 @@ export default function TasksPage() {
               </div>
             ))}
           {attachmentsEnabled && (canManage || canOwnManage) && (
-            <form onSubmit={uploadAttachment}>
-              <input
-                className="field"
-                type="file"
-                name="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
-                required
-              />
+            <Form onSubmit={uploadAttachment}>
+              <Field label="Attachment">
+                <input
+                  className="field"
+                  type="file"
+                  name="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+                  required
+                />
+              </Field>
               <button className="button secondary">Upload attachment</button>
-            </form>
+            </Form>
           )}
         </Drawer>
       )}

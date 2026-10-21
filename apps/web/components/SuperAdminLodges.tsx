@@ -1,4 +1,6 @@
 "use client";
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import { API_URL, setActiveLodgeId, superApi } from "@/lib/api";
 import Drawer from "./Drawer";
@@ -84,15 +86,14 @@ function LogoField({
         )}
       </div>
       <div>
-        <label className="fieldLabel" htmlFor="lodge-logo">
-          Lodge logo
-        </label>
-        <input
-          id="lodge-logo"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(e) => onChange(e.target.files?.[0] || null)}
-        />
+        <Field label="Lodge logo">
+          <input
+            id="lodge-logo"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => onChange(e.target.files?.[0] || null)}
+          />
+        </Field>
         <p className="fieldHint">
           PNG, JPEG or WebP · up to 256 KB. SafariOS branding stays visible.
         </p>
@@ -443,80 +444,74 @@ export default function SuperAdminLodges() {
               <UiIcon name="close" />
             </button>
           </div>
-          <form onSubmit={add}>
+          <Form onSubmit={add}>
             <section className="formSection">
               <h2>01 / Property identity</h2>
-              <label className="fieldLabel" htmlFor="property-name">
-                Lodge name
-              </label>
-              <input
-                id="property-name"
-                className="field"
-                name="name"
-                required
-                maxLength={180}
-                placeholder="e.g. Acacia River Lodge"
-              />
+              <Field label="Lodge name">
+                <input
+                  id="property-name"
+                  className="field"
+                  name="name"
+                  required
+                  maxLength={180}
+                  placeholder="e.g. Acacia River Lodge"
+                />
+              </Field>
               <div className="formGrid">
                 <div>
-                  <label className="fieldLabel" htmlFor="property-location">
-                    Location
-                  </label>
-                  <input
-                    id="property-location"
-                    className="field"
-                    name="location"
-                    placeholder="Region, country"
-                  />
+                  <Field label="Location">
+                    <input
+                      id="property-location"
+                      className="field"
+                      name="location"
+                      placeholder="Region, country"
+                    />
+                  </Field>
                 </div>
                 <div>
-                  <label className="fieldLabel" htmlFor="property-timezone">
-                    Time zone
-                  </label>
-                  <input
-                    id="property-timezone"
-                    className="field"
-                    name="timezone"
-                    defaultValue="Africa/Johannesburg"
-                  />
+                  <Field label="Time zone">
+                    <input
+                      id="property-timezone"
+                      className="field"
+                      name="timezone"
+                      defaultValue="Africa/Johannesburg"
+                    />
+                  </Field>
                 </div>
               </div>
               <LogoField preview={preview} onChange={choose} />
             </section>
             <section className="formSection">
               <h2>02 / Subscription</h2>
-              <label className="fieldLabel" htmlFor="property-package">
-                Package
-              </label>
-              <select id="property-package" className="field" name="pkg">
-                <option>Basic</option>
-                <option>Standard</option>
-                <option>Premium</option>
-              </select>
+              <Field label="Package">
+                <select id="property-package" className="field" name="pkg">
+                  <option>Basic</option>
+                  <option>Standard</option>
+                  <option>Premium</option>
+                </select>
+              </Field>
               <div className="formGrid">
                 <div>
-                  <label className="fieldLabel" htmlFor="property-start">
-                    Start date
-                  </label>
-                  <input
-                    id="property-start"
-                    className="field"
-                    name="start"
-                    type="date"
-                    required
-                  />
+                  <Field label="Start date">
+                    <input
+                      id="property-start"
+                      className="field"
+                      name="start"
+                      type="date"
+                      required
+                    />
+                  </Field>
                 </div>
                 <div>
-                  <label className="fieldLabel" htmlFor="property-expiry">
-                    Expiry date
-                  </label>
-                  <input
-                    id="property-expiry"
-                    className="field"
-                    name="expiry"
-                    type="date"
-                    required
-                  />
+                  <Field label="Expiry date">
+                    <input
+                      id="property-expiry"
+                      className="field"
+                      name="expiry"
+                      type="date"
+                      required
+                    />
+                  </Field>
                 </div>
               </div>
               <p className="fieldHint">
@@ -526,25 +521,23 @@ export default function SuperAdminLodges() {
             </section>
             <section className="formSection">
               <h2>03 / Lodge administrator</h2>
-              <label className="fieldLabel" htmlFor="admin-name">
-                Full name
-              </label>
-              <input
-                id="admin-name"
-                className="field"
-                name="admin_name"
-                required
-              />
-              <label className="fieldLabel" htmlFor="admin-email">
-                Email address
-              </label>
-              <input
-                id="admin-email"
-                className="field"
-                name="admin_email"
-                type="email"
-                required
-              />
+              <Field label="Full name">
+                <input
+                  id="admin-name"
+                  className="field"
+                  name="admin_name"
+                  required
+                />
+              </Field>
+              <Field label="Email address">
+                <input
+                  id="admin-email"
+                  className="field"
+                  name="admin_email"
+                  type="email"
+                  required
+                />
+              </Field>
               <p className="fieldHint">
                 Use a separate account from your Super Admin login.
               </p>
@@ -567,7 +560,7 @@ export default function SuperAdminLodges() {
                 {busy ? "Registering…" : "Register lodge"}
               </button>
             </div>
-          </form>
+          </Form>
         </Drawer>
       )}
       <ConfirmDialog
@@ -598,7 +591,7 @@ export default function SuperAdminLodges() {
               <UiIcon name="close" />
             </button>
           </div>
-          <form
+          <Form
             noValidate
             onSubmit={brandForm.handleSubmit((values) => {
               if (removeLogo) setPendingRemoval(values);
@@ -606,18 +599,17 @@ export default function SuperAdminLodges() {
             })}
           >
             <section className="formSection">
-              <label className="fieldLabel" htmlFor="brand-display-name">
-                Workspace display name
-              </label>
-              <input
-                id="brand-display-name"
-                className="field"
-                {...brandForm.register("display_name")}
-                aria-invalid={!!brandForm.formState.errors.display_name}
-                aria-describedby="brand-name-error"
-                maxLength={180}
-                required
-              />
+              <Field label="Workspace display name">
+                <input
+                  id="brand-display-name"
+                  className="field"
+                  {...brandForm.register("display_name")}
+                  aria-invalid={!!brandForm.formState.errors.display_name}
+                  aria-describedby="brand-name-error"
+                  maxLength={180}
+                  required
+                />
+              </Field>
               <p id="brand-name-error" className="dangerText" role="alert">
                 {brandForm.formState.errors.display_name?.message}
               </p>
@@ -669,7 +661,7 @@ export default function SuperAdminLodges() {
                 {busy ? "Saving…" : "Save branding"}
               </button>
             </div>
-          </form>
+          </Form>
         </Drawer>
       )}
     </>

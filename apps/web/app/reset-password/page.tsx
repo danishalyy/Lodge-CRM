@@ -1,5 +1,8 @@
 "use client";
+import { PasswordField } from "@/components/ui/password-field";
 
+import { Field } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { FormEvent, Suspense, useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
@@ -46,7 +49,7 @@ function ResetPasswordForm() {
         padding: 24,
       }}
     >
-      <form
+      <Form
         className="panel"
         onSubmit={submit}
         style={{ width: "min(430px,100%)" }}
@@ -59,13 +62,10 @@ function ResetPasswordForm() {
           MFA is enabled.
         </p>
         {!token && <p className="dangerText">Reset token is missing.</p>}
-        <label className="fieldLabel" htmlFor="reset-password">
-          New password
-        </label>
-        <input
+        <PasswordField
+          label="New password"
+          rules
           id="reset-password"
-          className="field"
-          type="password"
           required
           minLength={12}
           maxLength={200}
@@ -73,13 +73,10 @@ function ResetPasswordForm() {
           onChange={(e) => setPw(e.target.value)}
           autoComplete="new-password"
         />
-        <label className="fieldLabel" htmlFor="reset-confirm">
-          Confirm password
-        </label>
-        <input
+        <PasswordField
+          label="Confirm password"
+          rules
           id="reset-confirm"
-          className="field"
-          type="password"
           required
           minLength={12}
           maxLength={200}
@@ -95,7 +92,7 @@ function ResetPasswordForm() {
         <button className="button primary full" disabled={busy || !token}>
           {busy ? "Updating…" : "Update password"}
         </button>
-      </form>
+      </Form>
     </main>
   );
 }

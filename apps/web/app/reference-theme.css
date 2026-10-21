@@ -1,0 +1,603 @@
+/* Current SafariOS reference: quiet charcoal, mineral gray and muted olive.
+   Loaded after legacy component styles so every existing and future shared
+   component uses this single semantic palette. */
+:root {
+  color-scheme: dark;
+  --color-charcoal: #1d1e1c;
+  --color-olive: #7f8967;
+  --bg-base: #1d1e1c;
+  --surface-glass: rgba(39, 40, 37, 0.68);
+  --surface-navigation: rgba(22, 23, 21, 0.82);
+  --text-primary: #eeeeeb;
+  --text-secondary: #b2b3aa;
+  --text-muted: #a2a49a;
+  --accent: #7f8967;
+  --accent-hover: #929d78;
+  --text-accent: #c2cbb0;
+  --premium: var(--text-primary);
+  --success: #b9c8a3;
+  --warning: #d2bc95;
+  --danger: #e1aca4;
+  --info: #bbc8c0;
+  --bg: var(--bg-base);
+  --side: var(--surface-navigation);
+  --card: var(--surface-glass);
+  --sec: rgba(255, 255, 255, 0.035);
+  --hov: rgba(255, 255, 255, 0.065);
+  --bd: rgba(224, 228, 215, 0.11);
+  --tx: var(--text-primary);
+  --tx2: var(--text-secondary);
+  --tx3: var(--text-muted);
+  --ac: var(--text-accent);
+  --ac2: var(--text-accent);
+  --acText: #151810;
+  --red: var(--danger);
+  --amb: var(--warning);
+  --ok: var(--success);
+  --selection: rgba(127, 137, 103, 0.22);
+  --focus-glow: rgba(162, 176, 132, 0.2);
+  --glass-fallback: #252623;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.05);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 9999px;
+  --font-body:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: var(--font-body);
+  --font-display: var(--font-body);
+  /* Compatibility aliases for older operational components. */
+  --color-beige: #eeeeeb;
+  --color-gray: #30322d;
+  --color-brown: #1d1e1c;
+  --color-orange: var(--color-olive);
+  --color-brown-20: rgba(29, 30, 28, 0.2);
+  --color-beige-20: rgba(238, 238, 235, 0.14);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-base: #f3f4ef;
+  --surface-glass: rgba(255, 255, 253, 0.7);
+  --surface-navigation: rgba(234, 237, 228, 0.86);
+  --text-primary: #252820;
+  --text-secondary: #575d50;
+  --text-muted: #606658;
+  --text-accent: #4b593b;
+  --premium: var(--text-primary);
+  --success: #435d36;
+  --warning: #725728;
+  --danger: #934a42;
+  --info: #415e54;
+  --sec: rgba(44, 54, 33, 0.035);
+  --hov: rgba(44, 54, 33, 0.07);
+  --bd: rgba(44, 54, 33, 0.16);
+  --selection: rgba(127, 137, 103, 0.16);
+  --glass-fallback: #f7f8f3;
+  --shadow: 0 8px 28px rgba(27, 33, 20, 0.04);
+  --shadow-sm: 0 4px 14px rgba(27, 33, 20, 0.03);
+}
+html,
+body {
+  background: var(--bg-base);
+  font-family: var(--font-body);
+}
+body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.pageHeader h1,
+.authCard h1,
+.drawerHead h1,
+.confirmationDialog h2 {
+  font-family: var(--font-heading) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.025em !important;
+}
+h1,
+.pageHeader h1 {
+  font-size: 30px;
+  line-height: 1.25;
+}
+h2,
+.panel h2,
+.card h2 {
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+h3 {
+  font-size: 14px;
+}
+.authStatement h1 {
+  font-size: 48px !important;
+  font-weight: 500 !important;
+  line-height: 1.12 !important;
+}
+.authCard h1,
+.drawerHead h1 {
+  font-size: 28px;
+}
+.metricCard strong,
+.statValue,
+.metricValue,
+.ringCenter strong {
+  color: var(--tx);
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.metricCard strong,
+.statValue,
+.metricValue {
+  font-size: 36px;
+}
+.eyebrow,
+.navSection,
+.panelKicker,
+.platformBadge > span {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.safariBrand strong {
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.safariMark,
+.safariBrand strong span {
+  color: var(--tx);
+}
+.surfaceBackdrop {
+  background: var(--bg-base);
+}
+.surfaceBackdrop i {
+  opacity: 0.025;
+  animation: none;
+  background: radial-gradient(ellipse, var(--color-olive), transparent 70%);
+}
+.surfaceBackdrop i:nth-child(2),
+.surfaceBackdrop i:nth-child(3) {
+  display: none;
+}
+.grain {
+  opacity: 0.009;
+}
+.appShell {
+  grid-template-columns: 238px minmax(0, 1fr);
+}
+.sidebar {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 238px;
+  padding: 28px 23px 20px;
+  border: 0;
+  border-right: 1px solid var(--bd);
+  border-radius: 0;
+  background: var(--side);
+  box-shadow: none;
+  gap: 24px;
+  -webkit-backdrop-filter: blur(32px) saturate(110%);
+  backdrop-filter: blur(32px) saturate(110%);
+}
+.sidebar nav {
+  gap: 4px;
+}
+.sidebar .navItem {
+  min-height: 42px;
+  padding: 10px 12px;
+  font-size: 13px;
+  gap: 12px;
+  border-radius: 9px;
+  font-weight: 400;
+}
+.sidebar nav .navItem.active {
+  background: var(--selection);
+  box-shadow: none;
+  color: var(--tx);
+}
+.sidebar .navItem.active .navIcon {
+  color: var(--tx);
+}
+.lodgeMini,
+.platformBadge,
+.roleSelect {
+  border-radius: 11px;
+  background: transparent;
+  box-shadow: none;
+}
+.topbar {
+  height: 76px;
+  padding: 0 38px;
+  border-bottom: 1px solid var(--bd);
+  background: rgba(29, 30, 28, 0.48);
+  -webkit-backdrop-filter: blur(32px) saturate(110%);
+  backdrop-filter: blur(32px) saturate(110%);
+}
+:root[data-theme="light"] .topbar {
+  background: rgba(243, 244, 239, 0.6);
+}
+.content {
+  max-width: 1600px;
+  padding: 36px 38px 48px;
+}
+.pageHeader {
+  gap: 24px;
+  margin-bottom: 26px;
+  align-items: center;
+}
+.pageHeader p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 10px;
+  color: var(--tx2);
+}
+.panel,
+.card,
+.metricCard,
+.propertyCard,
+.authCard,
+.premiumPanel,
+.glassDialog,
+.glassDrawer,
+.commandPalette,
+.bottomTabs {
+  background: var(--surface-glass);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  background-image: none;
+  -webkit-backdrop-filter: blur(32px) saturate(110%);
+  backdrop-filter: blur(32px) saturate(110%);
+}
+.panel,
+.card,
+.propertyCard,
+.metricCard {
+  padding: 24px;
+}
+.panel.tableWrap,
+.panel:has(> .tableWrap) {
+  padding: 0;
+}
+.propertyCard:hover,
+.card:hover,
+.metricCard:hover,
+.panel:hover {
+  transform: none;
+  background: var(--surface-glass);
+}
+.panelHeader {
+  padding: 20px 24px;
+}
+.panelHeader h2 {
+  font-size: 16px;
+}
+.panelHeader p,
+.sub,
+.fieldHint {
+  line-height: 1.6;
+}
+.button,
+.primaryButton,
+button.primary,
+.iconButton,
+.avatarButton,
+.closeButton {
+  border-radius: 10px;
+  box-shadow: none;
+  min-height: 42px;
+}
+.button,
+.primaryButton {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 400;
+  gap: 8px;
+  background: var(--sec);
+  border: 1px solid var(--bd);
+}
+.button.primary,
+.primaryButton,
+button.primary {
+  background: var(--accent);
+  color: var(--acText);
+  border-color: transparent;
+  background-image: none;
+}
+.button.primary:hover,
+.primaryButton:hover,
+button.primary:hover {
+  background: var(--accent-hover);
+  filter: none;
+  box-shadow: none;
+}
+.button:hover {
+  transform: none;
+}
+.iconButton,
+.avatarButton {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  background: transparent;
+  border-color: transparent;
+}
+.avatar,
+.avatarButton {
+  border-radius: 50%;
+  background: var(--selection);
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+.field,
+.select,
+.textarea,
+.roleSelect {
+  border-radius: var(--radius-md);
+  background: var(--sec);
+  border-color: var(--bd);
+  font-size: 14px;
+  padding: 11px 13px;
+  min-height: 44px;
+}
+label.fieldLabel,
+.label {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+.tableWrap {
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  background: transparent;
+}
+.dataTable th {
+  background: var(--sec);
+  font-size: 12px;
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 13px 18px;
+  color: var(--tx2);
+}
+.dataTable td {
+  font-size: 13px;
+  padding: 18px;
+  border-color: var(--bd);
+  line-height: 1.55;
+}
+.dataTable td strong {
+  font-weight: 500;
+}
+.dataTable tbody tr:hover {
+  background: var(--sec);
+}
+.statusPill,
+.badge,
+.tag,
+.chip {
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 4px 9px;
+}
+.metricGrid,
+.propertyGrid,
+.dashboardGrid,
+.notificationLayout {
+  gap: 24px;
+}
+.metricIcon,
+.propertyLogo {
+  border-radius: 10px;
+  background: var(--selection);
+  color: var(--text-accent);
+}
+.glassDialog,
+.confirmationDialog {
+  border-radius: 18px;
+  padding: 28px;
+}
+.glassDrawer {
+  border-radius: 18px 0 0 18px;
+  padding: 28px;
+}
+.drawerOverlay,
+.modalOverlay,
+[data-vaul-overlay] {
+  background: rgba(8, 10, 7, 0.45);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.notificationItem {
+  padding: 22px 0;
+}
+.notificationTitle h2 {
+  font-size: 16px;
+}
+.notificationPriority {
+  background: var(--selection);
+  color: var(--text-accent);
+}
+.notificationCount {
+  background: var(--accent);
+  color: var(--acText);
+}
+.accountLinkCard {
+  padding: 32px;
+  gap: 18px;
+}
+.accountLinkCard form {
+  gap: 12px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-color: var(--text-accent);
+  box-shadow: 0 0 0 5px var(--focus-glow);
+}
+@media (min-width: 1024px) {
+  :root[data-sidebar="collapsed"] .appShell {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+  :root[data-sidebar="collapsed"] .sidebar {
+    width: 80px;
+    padding: 28px 12px;
+  }
+}
+@media (max-width: 1023px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    display: none;
+  }
+  .content {
+    padding: 24px 20px 100px;
+  }
+  .topbar {
+    height: 72px;
+    padding: 0 20px;
+  }
+  .glassDrawer {
+    border-radius: 18px 18px 0 0;
+    padding: 24px;
+  }
+  .bottomTabs {
+    border-radius: 14px;
+    padding: 8px;
+    bottom: 12px;
+  }
+}
+@media (max-width: 640px) {
+  .pageHeader h1,
+  h1 {
+    font-size: 26px;
+  }
+  .authStatement h1 {
+    font-size: 36px !important;
+  }
+  .pageHeader {
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .panel,
+  .card,
+  .propertyCard,
+  .metricCard {
+    padding: 20px;
+  }
+  .panel.tableWrap,
+  .panel:has(> .tableWrap) {
+    padding: 0;
+  }
+  .accountLinkCard {
+    padding: 24px;
+  }
+  .dataTable th,
+  .dataTable td {
+    padding: 14px;
+  }
+  .metricGrid,
+  .propertyGrid,
+  .dashboardGrid,
+  .notificationLayout {
+    gap: 16px;
+  }
+  .button {
+    min-height: 44px;
+  }
+}
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .panel,
+  .card,
+  .metricCard,
+  .propertyCard,
+  .authCard,
+  .premiumPanel,
+  .glassDialog,
+  .glassDrawer,
+  .commandPalette,
+  .bottomTabs,
+  .sidebar,
+  .topbar {
+    background: var(--glass-fallback);
+  }
+  .drawerOverlay,
+  .modalOverlay,
+  [data-vaul-overlay] {
+    background: rgba(8, 10, 7, 0.86);
+  }
+}
+:root[data-theme="light"] {
+  --acText: #151810;
+}
+.collapseSidebar {
+  left: 198px;
+  top: 24px;
+}
+:root[data-sidebar="collapsed"] .collapseSidebar {
+  left: 48px;
+  top: 22px;
+}
+.propertyToolbar .searchField,
+.searchField,
+.searchButton,
+.propertyFilters {
+  border-radius: 10px;
+}
+.propertyCard h2 {
+  font-size: 18px;
+  font-weight: 500;
+}
+.glassToast {
+  border-radius: 12px !important;
+  -webkit-backdrop-filter: blur(32px);
+  backdrop-filter: blur(32px);
+}
+.glassOverlay {
+  background: rgba(8, 10, 7, 0.45);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.glassDialog .drawer,
+.glassDrawer .drawer {
+  padding: 0;
+}
+.glassDrawer .drawerHandle {
+  margin: 0 auto 20px;
+}
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glassOverlay {
+    background: rgba(8, 10, 7, 0.86);
+  }
+}
+.collectionToolbar .searchField {border-radius:10px;padding:0 14px;min-height:44px}
+.collectionToolbar .searchField input {border:0;border-radius:0;background:transparent;min-height:42px;padding:10px 0;box-shadow:none}

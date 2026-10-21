@@ -177,25 +177,28 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
  try{
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(252, 246, 236)');
-  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(39, 34, 26)');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(29, 30, 28)');
+  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(238, 238, 235)');
+  assert.equal(await page.locator('.propertyCard').count(),0);
+  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(32px) saturate(1.1)');
   const primary=page.getByRole('button',{name:/Register lodge/});
-  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(210, 148, 45)',text:'rgb(39, 34, 26)'});
-  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Archivo"?(?:,|$)/);
-  assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Archivo/);
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(127, 137, 103)',text:'rgb(21, 24, 16)'});
+  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Inter"?(?:,|$)/);
+  assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Inter/);
 
-  assert.equal(await page.locator('.sidebar').evaluate(el=>Math.round(el.getBoundingClientRect().left)),16);
+  assert.equal(await page.locator('.sidebar').evaluate(el=>Math.round(el.getBoundingClientRect().left)),0);
   await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
   assert.equal(await page.locator('html').getAttribute('data-sidebar'),'collapsed');
+  assert.equal(await page.evaluate(()=>{const button=document.querySelector('.collapseSidebar').getBoundingClientRect(),mark=document.querySelector('.sidebar .safariMark').getBoundingClientRect();return button.left>=mark.right}),true,'collapsed navigation control must not overlap the brand');
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Toggle light and dark theme'}).click();
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(39, 34, 26)');
-  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(210, 148, 45)',text:'rgb(39, 34, 26)'});
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(243, 244, 239)');
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(127, 137, 103)',text:'rgb(21, 24, 16)'});
 
   await page.reload();await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('navigation',{name:'Quick navigation'}).waitFor({state:'visible'});
   await page.getByRole('button',{name:'More',exact:true}).click();
@@ -232,9 +235,13 @@ test('branding validates inline, reduced motion is respected, and glass screensh
   assert.equal(await page.locator('.surfaceBackdrop i').first().evaluate(el=>getComputedStyle(el).animationName),'none');
   fs.mkdirSync(path.resolve(__dirname,'../docs/screenshots'),{recursive:true});
   const capture=async name=>{await page.waitForTimeout(200);await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots',name),fullPage:true,animations:'disabled'})};
+  assert.equal(await page.locator('.collectionToolbar .searchField').evaluate(el=>getComputedStyle(el).borderRadius),'10px');
+  assert.ok(await page.locator('.collectionToolbar .searchField').evaluate(el=>el.getBoundingClientRect().height<=48));
   await capture('safarios-lodges.png');
   const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
   await page.getByRole('button',{name:'Manage branding',exact:true}).click();
+  assert.equal(await page.locator('.glassOverlay').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(12px)');
+  assert.equal(await page.locator('.glassDialog .drawer').evaluate(el=>getComputedStyle(el).paddingLeft),'0px');
   await page.getByLabel('Workspace display name').fill('   ');await page.getByRole('button',{name:'Save branding',exact:true}).click();
   await page.getByText('Enter a workspace name.',{exact:true}).waitFor();
   await page.getByLabel('Workspace display name').fill('Acacia River Lodge');await page.getByLabel('Workspace display name').blur();
@@ -282,7 +289,7 @@ test('invitation preview keeps token out of URLs and owner chooses matching pass
   });
   await page.goto(base+'/activate#token='+token);
   await page.getByText('Acacia Lodge',{exact:true}).waitFor();assert.equal(new URL(page.url()).hash,'');
-  await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-invitation-light.png'),fullPage:true});
+  await page.evaluate(()=>document.documentElement.dataset.theme='light');await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-invitation-light.png'),fullPage:true});
   await page.getByLabel('New password',{exact:true}).fill('My own private passphrase 42!');
   await page.getByLabel('Confirm password',{exact:true}).fill('A different passphrase 42!');
   await page.getByRole('button',{name:/activate|set.*password/i}).click();
@@ -305,7 +312,7 @@ test('notification inbox updates unread count, archives and saves private prefer
   });
   await page.goto(base+'/super-admin/notifications');await page.getByRole('heading',{name:'Task needs attention'}).waitFor();
   await page.getByRole('link',{name:'Notifications, 1 unread'}).waitFor();
-  await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-notifications-light.png'),fullPage:true});
+  await page.evaluate(()=>document.documentElement.dataset.theme='light');await page.screenshot({path:path.join(web,'../../docs/screenshots/safarios-notifications-light.png'),fullPage:true});
   await page.getByRole('button',{name:'Mark read',exact:true}).click();await page.getByRole('link',{name:'Notifications',exact:true}).first().waitFor();
   await page.getByLabel('Email operational notifications').uncheck();await page.getByRole('button',{name:'Save preferences'}).click();await page.getByText('Notification preferences saved',{exact:true}).waitFor();assert.equal(saved.email_enabled,false);
   await page.getByRole('button',{name:'Archive Task needs attention'}).click();await page.getByRole('heading',{name:'No notifications here yet'}).waitFor();

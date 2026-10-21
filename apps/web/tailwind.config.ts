@@ -5,12 +5,14 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Archivo", "-apple-system", "sans-serif"],
-        heading: ["Archivo", "-apple-system", "sans-serif"],
-        label: ["Archivo Narrow", "Archivo", "sans-serif"],
-        display: ["Archivo", "-apple-system", "sans-serif"],
+        sans: ["Inter", "-apple-system", "sans-serif"],
+        heading: ["Inter", "-apple-system", "sans-serif"],
+        label: ["Inter", "sans-serif"],
+        display: ["Inter", "-apple-system", "sans-serif"],
       },
       colors: {
+        charcoal: "var(--color-charcoal)",
+        olive: "var(--color-olive)",
         beige: "var(--color-beige)",
         gray: "var(--color-gray)",
         brown: "var(--color-brown)",

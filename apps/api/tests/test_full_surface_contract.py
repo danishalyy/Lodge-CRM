@@ -178,13 +178,17 @@ def test_web_api_has_csrf_header_support_and_credentials():
 
 
 def test_ui_has_glass_design_tokens_and_reduced_motion():
-    css=(WEB/'app'/'design-system.css').read_text().lower()
-    assert '--color-brown: #27221a' in css
-    assert '--bg-base: var(--color-brown)' in css
+    css=(WEB/'app'/'reference-theme.css').read_text().lower()
+    legacy=(WEB/'app'/'design-system.css').read_text().lower()
+    layout=(WEB/'app'/'layout.tsx').read_text()
+    assert '--bg-base: #1d1e1c' in css
+    assert '--color-olive: #7f8967' in css
     assert '--surface-glass:' in css and 'backdrop-filter:' in css
     assert '@supports not' in css and 'data-theme="light"' in css
-    assert 'prefers-reduced-motion' in css
-    assert 'transition' in css
+    assert 'prefers-reduced-motion' in legacy
+    assert 'transition' in legacy
+    assert '@fontsource/inter/' in layout
+    assert layout.index('"./reference-theme.css"') > layout.index('"./design-system.css"')
 
 
 def test_dashboard_has_calendar_and_charts_components():

@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -25,6 +26,8 @@ const next: Record<string, string | undefined> = {
   departing: "completed",
 };
 export default function StaysPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("stays.manage");
   const [rows, setRows] = useState<Stay[]>([]),
     [guests, setGuests] = useState<Guest[]>([]),
     [rooms, setRooms] = useState<Room[]>([]),
@@ -34,8 +37,14 @@ export default function StaysPage() {
     try {
       const [s, g, r] = await Promise.all([
         operationsApi.stays.list<Stay[]>(),
-        lodgeApi.guests(),
-        lodgeApi.rooms(),
+        canManage &&
+        access.feature("guests") &&
+        access.permission("guests.view")
+          ? lodgeApi.guests()
+          : Promise.resolve([]),
+        canManage && access.feature("units") && access.permission("units.view")
+          ? lodgeApi.rooms()
+          : Promise.resolve([]),
       ]);
       setRows(s);
       setGuests(g);
@@ -89,15 +98,17 @@ export default function StaysPage() {
             confidence.
           </p>
         </div>
-        <button
-          className="button primary"
-          onClick={() => setOpen(true)}
-          disabled={!guests.length || !rooms.length}
-        >
-          + Stay
-        </button>
+        {canManage && (
+          <button
+            className="button primary"
+            onClick={() => setOpen(true)}
+            disabled={!guests.length || !rooms.length}
+          >
+            + Stay
+          </button>
+        )}
       </div>
-      {(!guests.length || !rooms.length) && (
+      {canManage && (!guests.length || !rooms.length) && (
         <div className="panel">
           <p>Create at least one guest and one room before creating a stay.</p>
         </div>
@@ -132,7 +143,7 @@ export default function StaysPage() {
                   <StatusPill value={r.status} />
                 </td>
                 <td>
-                  {next[r.status] ? (
+                  {canManage && next[r.status] ? (
                     <button
                       className="button secondary"
                       onClick={() => advance(r)}

@@ -1,4 +1,5 @@
 "use client";
+import MfaPrompt from "./MfaPrompt";
 import LockedFeature from "./LockedFeature";
 import { LockKeyhole } from "lucide-react";
 import { Field } from "@/components/ui/field";
@@ -449,6 +450,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <div className="content">
+          {!me.mfa_enabled &&
+            !me.is_super_admin &&
+            membership?.role_key === "lodge_admin" &&
+            path !== "/settings" && <MfaPrompt key={me.id} userId={me.id} />}
           {membership?.subscription_status === "Expired" && (
             <section className="expiryBanner">
               <strong>Subscription expired</strong>

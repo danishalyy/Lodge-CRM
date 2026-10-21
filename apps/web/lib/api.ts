@@ -216,10 +216,20 @@ const tenantCollection = (name: string) => ({
 });
 
 export const authApi = {
-  login: (email: string, password: string, otp?: string) =>
+  login: (
+    email: string,
+    password: string,
+    otp?: string,
+    recovery_code?: string,
+  ) =>
     request("/api/v1/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password, otp: otp || undefined }),
+      body: JSON.stringify({
+        email,
+        password,
+        otp: otp || undefined,
+        recovery_code: recovery_code || undefined,
+      }),
     }),
   previewInvitation: (token: string) =>
     request<any>("/api/v1/auth/invitations/preview", {
@@ -251,6 +261,11 @@ export const authApi = {
     request<any>("/api/v1/auth/mfa/confirm", {
       method: "POST",
       body: JSON.stringify({ code }),
+    }),
+  mfaRegenerate: (code: string, current_password: string) =>
+    request<any>("/api/v1/auth/mfa/recovery-codes", {
+      method: "POST",
+      body: JSON.stringify({ code, current_password }),
     }),
   mfaDisable: (code: string, current_password: string) =>
     request<any>("/api/v1/auth/mfa/disable", {

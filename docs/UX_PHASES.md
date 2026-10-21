@@ -15,3 +15,13 @@ Added a permission/feature-aware setup checklist with progress and one next prim
 Validation: **435 API tests passed**, **production build passed**, **24 browser checks passed**. Updated the static CSRF/credentials source assertion to accept formatting/quote changes without changing its security expectations. Added fresh-lodge and maintenance-drawer browser checks; locked-feature tests confirm no disabled endpoint request occurs.
 
 Remaining: access review provides administrator/provider instructions rather than sending a support message (no support contact configured). Setup progress uses existing authorized list endpoints; no new aggregate API or customer data is introduced. Security recovery and final content/visual work follow below.
+
+## Phase 3 — Security UX
+
+Added locally generated authenticator QR images, ten one-time recovery codes at enrollment, private text downloads, password-plus-fresh-TOTP regeneration, and a recovery-code login option. Codes contain 80 random bits, are stored only as account-bound SHA-256 hashes, never returned by account reads, and are consumed under the existing account row lock. Regeneration replaces old codes; disabling MFA clears them; authenticator replay prevention remains. Added migration `0012_mfa_recovery_codes`. Its narrowly scoped INSERT-only audit policy permits only the authenticated account’s own named MFA events; existing audit read isolation and append-only protection are retained. Failed MFA attempts contribute to the existing account lockout.
+
+Lodge Admin MFA reminders are optional/dismissible. Read-only Rooms controls and Stays/Requests auxiliary lookups now honor both feature and permission checks; housekeeping/maintenance lookups use the same restriction.
+
+Validation: **441 API tests passed**, **production build passed**, **27 browser checks passed**, **151-route guard audit passed (0 issues)**. Integration tests verify hashed/private codes, one-time and concurrent consumption, password/CSRF requirements, replacement, cross-account rejection and disable cleanup. Browser checks exercise QR rendering, code download, regeneration, one-time display, recovery login and forbidden-lookup prevention.
+
+Remaining: already-enrolled accounts must use Security settings to generate their first recovery codes. Recovery codes are intentionally unrecoverable after closing/reloading; regenerate them if lost while authenticator access remains. Operators must apply the new migration before running the updated API. No real email or external QR service is used by tests.

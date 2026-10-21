@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -27,6 +28,8 @@ const next: Record<string, string | undefined> = {
   waiting: "in_progress",
 };
 export default function GuestRequestsPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("requests.manage");
   const [rows, setRows] = useState<Req[]>([]),
     [guests, setGuests] = useState<Guest[]>([]),
     [deps, setDeps] = useState<Department[]>([]),
@@ -37,9 +40,19 @@ export default function GuestRequestsPage() {
     try {
       const [r, g, d, s] = await Promise.all([
         operationsApi.requests.list<Req[]>(),
-        lodgeApi.guests(),
-        operationsApi.departments.list<Department[]>(),
-        operationsApi.staff.list<Staff[]>(),
+        canManage &&
+        access.feature("guests") &&
+        access.permission("guests.view")
+          ? lodgeApi.guests()
+          : Promise.resolve([]),
+        canManage &&
+        access.feature("departments") &&
+        access.permission("departments.view")
+          ? operationsApi.departments.list<Department[]>()
+          : Promise.resolve([]),
+        canManage && access.feature("staff") && access.permission("staff.view")
+          ? operationsApi.staff.list<Staff[]>()
+          : Promise.resolve([]),
       ]);
       setRows(r);
       setGuests(g);
@@ -102,15 +115,17 @@ export default function GuestRequestsPage() {
             through to completion.
           </p>
         </div>
-        <button
-          className="button primary"
-          onClick={() => setOpen(true)}
-          disabled={!guests.length}
-        >
-          + Request
-        </button>
+        {canManage && (
+          <button
+            className="button primary"
+            onClick={() => setOpen(true)}
+            disabled={!guests.length}
+          >
+            + Request
+          </button>
+        )}
       </div>
-      {!guests.length && (
+      {canManage && !guests.length && (
         <div className="panel">
           Create a guest before recording a guest request.
         </div>
@@ -152,35 +167,38 @@ export default function GuestRequestsPage() {
                 <td>
                   {r.task_id ? (
                     "Created"
-                  ) : (
+                  ) : canManage && access.feature("tasks") ? (
                     <button
                       className="button secondary"
                       onClick={() => createTask(r.id)}
                     >
                       Create task
                     </button>
+                  ) : (
+                    "—"
                   )}
                 </td>
                 <td>
-                  {!["resolved", "cancelled"].includes(r.status) && (
-                    <>
-                      <button
-                        className="button secondary"
-                        onClick={() =>
-                          next[r.status] &&
-                          update(r.id, { status: next[r.status] })
-                        }
-                      >
-                        {next[r.status]?.replaceAll("_", " ") || "Update"}
-                      </button>{" "}
-                      <button
-                        className="button secondary"
-                        onClick={() => resolve(r)}
-                      >
-                        Resolve
-                      </button>
-                    </>
-                  )}
+                  {canManage &&
+                    !["resolved", "cancelled"].includes(r.status) && (
+                      <>
+                        <button
+                          className="button secondary"
+                          onClick={() =>
+                            next[r.status] &&
+                            update(r.id, { status: next[r.status] })
+                          }
+                        >
+                          {next[r.status]?.replaceAll("_", " ") || "Update"}
+                        </button>{" "}
+                        <button
+                          className="button secondary"
+                          onClick={() => resolve(r)}
+                        >
+                          Resolve
+                        </button>
+                      </>
+                    )}
                 </td>
               </tr>
             ))}

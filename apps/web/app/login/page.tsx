@@ -1,6 +1,7 @@
 "use client";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
+import { securityCopy as security } from "@/lib/strings/security";
 import Link from "next/link";
 import { PasswordField } from "@/components/ui/password-field";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -14,6 +15,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [recovery, setRecovery] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
   const [needsOtp, setNeedsOtp] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22,7 +25,12 @@ export default function Login() {
     setBusy(true);
     setError("");
     try {
-      await authApi.login(email, password, needsOtp ? otp : undefined);
+      await authApi.login(
+        email,
+        password,
+        needsOtp && !recovery ? otp : undefined,
+        needsOtp && recovery ? recoveryCode : undefined,
+      );
       const me = await authApi.me();
       if (me.memberships?.[0]) setActiveLodgeId(me.memberships[0].lodge_id);
       router.replace(accountHome(me));
@@ -99,20 +107,50 @@ export default function Login() {
           />
           {needsOtp && (
             <>
-              <Field label="Authenticator code">
-                <input
-                  id="login-code"
-                  className="field otpField"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  required
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  autoComplete="one-time-code"
-                  placeholder="000000"
-                />
-              </Field>
+              {recovery ? (
+                <Field
+                  label={security.recoveryLabel}
+                  helper={security.recoveryHint}
+                >
+                  <input
+                    className="field"
+                    name="recovery_code"
+                    required
+                    minLength={20}
+                    maxLength={40}
+                    autoComplete="off"
+                    value={recoveryCode}
+                    onChange={(e) => setRecoveryCode(e.target.value)}
+                  />
+                </Field>
+              ) : (
+                <Field label="Authenticator code">
+                  <input
+                    id="login-code"
+                    className="field otpField"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    required
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    autoComplete="one-time-code"
+                    placeholder="000000"
+                  />
+                </Field>
+              )}
+              <button
+                type="button"
+                className="button"
+                onClick={() => {
+                  setRecovery(!recovery);
+                  setError("");
+                  setOtp("");
+                  setRecoveryCode("");
+                }}
+              >
+                {recovery ? security.useAuthenticator : security.useRecovery}
+              </button>
             </>
           )}
           {error && (

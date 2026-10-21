@@ -487,3 +487,44 @@ test('maintenance creation uses a focus-managed drawer',async()=>{
  const {context,page}=await accountPage({id:'maintenance-owner',full_name:'Owner',is_super_admin:false,memberships:[{lodge_id:'maintenance-lodge',permissions:['maintenance.view','maintenance.manage'],entitlements:['maintenance']}]});
  try {await page.goto(base+'/maintenance');await page.getByRole('button',{name:'+ Add ticket',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByLabel('Title',{exact:true}).fill('Inspect pump');await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.activeElement?.textContent==='+ Add ticket');} finally {await context.close()}
 });
+
+test('MFA enrolment renders a local QR, shows codes once, downloads and regenerates',async()=>{
+ let enabled=false,regenerated=0;const user={id:'mfa-owner',full_name:'Owner',is_super_admin:true,mfa_enabled:false,memberships:[]};
+ const {context,page}=await accountPage(user);const codes=Array.from({length:10},(_,i)=>`ABCDE-ABCDE-ABCDE-${String(i).padStart(5,'0')}`);
+ try{
+  await page.route('**/api/v1/auth/me',r=>r.fulfill({json:{...user,mfa_enabled:enabled}}));
+  await page.route('**/api/v1/auth/mfa/**',async r=>{const p=new URL(r.request().url()).pathname;assert.equal(r.request().method(),'POST');
+   if(p.endsWith('/setup'))return r.fulfill({json:{secret:'JBSWY3DPEHPK3PXP',otpauth_uri:'otpauth://totp/SafariOS%3Aowner%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=SafariOS'}});
+   if(p.endsWith('/confirm')){enabled=true;return r.fulfill({json:{enabled:true,recovery_codes:codes}})}
+   if(p.endsWith('/recovery-codes')){regenerated++;assert.equal(r.request().postDataJSON().current_password,'Secure-test-passphrase');return r.fulfill({json:{recovery_codes:codes.map(x=>x.replace('ABCDE','BCDEF'))}})}
+   throw Error('Unexpected MFA request');
+  });
+  await page.goto(base+'/settings');await page.getByText('Your invitation is activated.',{exact:false}).waitFor();
+  await page.getByRole('button',{name:'Set up authenticator',exact:true}).click();
+  const qr=page.getByRole('img',{name:'SafariOS authenticator setup QR code',exact:true});await qr.waitFor();assert.match(await qr.getAttribute('src'),/^data:image\/png;base64,/);
+  await page.getByLabel('6-digit authenticator code',{exact:true}).fill('123456');await page.getByRole('button',{name:'Confirm MFA',exact:true}).click();
+  await page.getByRole('heading',{name:'Save your recovery codes',exact:true}).waitFor();
+  const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'Download recovery codes',exact:true}).click();const download=await downloading;
+  assert.equal(download.suggestedFilename(),'safarios-recovery-codes.txt');const contents=fs.readFileSync(await download.path(),'utf8');assert.ok(contents.includes(codes[9]));
+  assert.equal(await page.evaluate(code=>JSON.stringify(localStorage).includes(code),codes[0]),false);
+  await page.getByRole('button',{name:'I have saved my codes',exact:true}).click();assert.equal(await page.getByText(codes[0],{exact:true}).count(),0);
+  await page.getByRole('button',{name:'Generate new recovery codes',exact:true}).click();await page.getByLabel('6-digit authenticator code',{exact:true}).fill('234567');await page.getByLabel('Current password',{exact:true}).fill('Secure-test-passphrase');await page.getByRole('button',{name:'Generate new recovery codes',exact:true}).click();await page.getByText(codes[0].replace('ABCDE','BCDEF'),{exact:true}).waitFor();assert.equal(regenerated,1);
+  await page.reload();await page.getByRole('heading',{name:'Security settings',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Save your recovery codes',exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('login offers a recovery code after the password challenge',async()=>{
+ const {context,page}=await accountPage({id:'mfa-user',full_name:'User',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'mfa-lodge',permissions:['tasks.view'],entitlements:['tasks']}]});let body;
+ try{
+  await page.route('**/api/v1/auth/login',async r=>{body=r.request().postDataJSON();return body.recovery_code?r.fulfill({json:{ok:true}}):r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}})});
+  await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('owner@example.com');await page.getByLabel('Password',{exact:true}).fill('Secure-test-passphrase');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('button',{name:'Use a recovery code',exact:true}).click();
+  await page.getByLabel('Recovery code',{exact:true}).fill('ABCDE-ABCDE-ABCDE-ABCDE');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL('**/tasks');assert.equal(body.recovery_code,'ABCDE-ABCDE-ABCDE-ABCDE');assert.equal(body.otp,undefined);
+ }finally{await context.close()}
+});
+
+test('read-only rooms, stays and requests do not call unauthorized lookup endpoints',async()=>{
+ for(const [module,feature,permission,title] of [['rooms','units','units.view','Rooms & Units'],['stays','stays','stays.view','Stays'],['requests','guest_requests','requests.view','Guest Requests']]){
+  const {context,page,requests}=await accountPage({id:'scoped-'+module,full_name:'Reader',is_super_admin:false,memberships:[{lodge_id:'scope-lodge',permissions:[permission],entitlements:[feature,'guests','units','departments','staff']}]});
+  try{await page.goto(base+'/'+module);await page.getByRole('heading',{name:title,exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^\+ /}).count(),0);assert.deepEqual(requests.filter(x=>!x.endsWith('/branding')&&!x.endsWith('/'+module)),[]);}finally{await context.close()}
+ }
+});

@@ -277,6 +277,31 @@ def _verify_totp_once(user:User, code:str)->bool:
     return False
 
 
+def _recovery_hash(user:User, code:str)->str:
+    normalized=''.join(code.upper().split()).replace('-','')
+    return hashlib.sha256(f"{user.id}:{normalized}".encode()).hexdigest()
+
+
+def _new_recovery_codes(user:User)->list[str]:
+    codes=[]
+    for _ in range(10):
+        raw=secrets.token_hex(10).upper()
+        codes.append('-'.join(raw[index:index+5] for index in range(0,20,5)))
+    user.mfa_recovery_hashes=[_recovery_hash(user,code) for code in codes]
+    return codes
+
+
+def _consume_recovery_code(user:User,code:str)->bool:
+    # Caller holds a FOR UPDATE account lock; consumption and login commit together.
+    candidate=_recovery_hash(user,code)
+    hashes=list(user.mfa_recovery_hashes or [])
+    for stored in hashes:
+        if secrets.compare_digest(candidate,stored):
+            user.mfa_recovery_hashes=[value for value in hashes if value!=stored]
+            return True
+    return False
+
+
 @app.post("/api/v1/auth/login")
 def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     rate_limit_login(request, body.email)
@@ -311,8 +336,17 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
             if staff and staff.employment_status!="active": raise HTTPException(403,"Account access is unavailable")
             if not membership_for(db,user,str(membership.lodge_id)):raise HTTPException(403,'Account access is unavailable')
     if user.mfa_enabled_at:
-        if not body.otp: raise HTTPException(401, "MFA_REQUIRED")
-        if not _verify_totp_once(user,body.otp): raise HTTPException(401, "Invalid or already-used MFA code")
+        if body.otp and body.recovery_code: raise HTTPException(422,"Use either an authenticator code or a recovery code")
+        if not body.otp and not body.recovery_code: raise HTTPException(401, "MFA_REQUIRED")
+        valid=_consume_recovery_code(user,body.recovery_code) if body.recovery_code else _verify_totp_once(user,body.otp)
+        if not valid:
+            user.failed_login_count=(user.failed_login_count or 0)+1
+            if user.failed_login_count>=5:
+                user.locked_until=now+timedelta(minutes=15);user.failed_login_count=0
+            db.commit()
+            raise HTTPException(401, "Invalid or already-used MFA code")
+        set_rls_context(db,None,False,str(user.id))
+        audit(db,request,None,user.id,"mfa.recovery_used" if body.recovery_code else "mfa.verified","account",str(user.id))
     user.failed_login_count=0;user.locked_until=None;db.commit()
     clear_login_limit(request, body.email)
     create_session(db, user, response)
@@ -405,21 +439,38 @@ def mfa_setup(user:User=Depends(current_user),db:Session=Depends(get_db)):
 
 
 @app.post("/api/v1/auth/mfa/confirm",dependencies=[Depends(require_csrf)])
-def mfa_confirm(body:MfaCodeIn,user:User=Depends(current_user),db:Session=Depends(get_db)):
+def mfa_confirm(body:MfaCodeIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
     db.refresh(user, with_for_update=True)
+    if user.mfa_enabled_at: raise HTTPException(409,"MFA is already enabled")
     if not user.mfa_secret_encrypted: raise HTTPException(409,"MFA setup has not been started")
     if not _verify_totp_once(user,body.code): raise HTTPException(422,"Invalid or already-used MFA code")
-    user.mfa_enabled_at=datetime.now(timezone.utc);db.commit();return {"enabled":True}
+    user.mfa_enabled_at=datetime.now(timezone.utc)
+    codes=_new_recovery_codes(user)
+    audit(db,request,None,user.id,"mfa.enabled","account",str(user.id))
+    db.commit();return {"enabled":True,"recovery_codes":codes}
 
 
 @app.post("/api/v1/auth/mfa/disable",dependencies=[Depends(require_csrf)])
-def mfa_disable(body:MfaDisableIn,user:User=Depends(current_user),db:Session=Depends(get_db)):
+def mfa_disable(body:MfaDisableIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
     db.refresh(user, with_for_update=True)
     if user.is_super_admin: raise HTTPException(409,"Super Admin MFA cannot be disabled")
     if not user.mfa_enabled_at or not user.mfa_secret_encrypted: return {"enabled":False}
     if not verify_password(body.current_password,user.password_hash): raise HTTPException(403,"Current password is incorrect")
     if not _verify_totp_once(user,body.code): raise HTTPException(422,"Invalid or already-used MFA code")
-    user.mfa_enabled_at=None;user.mfa_secret_encrypted=None;user.mfa_last_timestep=None;db.commit();return {"enabled":False}
+    user.mfa_enabled_at=None;user.mfa_secret_encrypted=None;user.mfa_last_timestep=None;user.mfa_recovery_hashes=[]
+    audit(db,request,None,user.id,"mfa.disabled","account",str(user.id))
+    db.commit();return {"enabled":False}
+
+@app.post("/api/v1/auth/mfa/recovery-codes",dependencies=[Depends(require_csrf)])
+def regenerate_mfa_recovery_codes(body:MfaDisableIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
+    db.refresh(user, with_for_update=True)
+    if not user.mfa_enabled_at: raise HTTPException(409,"Enable MFA before generating recovery codes")
+    if not verify_password(body.current_password,user.password_hash): raise HTTPException(403,"Current password is incorrect")
+    if not _verify_totp_once(user,body.code): raise HTTPException(422,"Invalid or already-used MFA code")
+    codes=_new_recovery_codes(user)
+    audit(db,request,None,user.id,"mfa.recovery_regenerated","account",str(user.id))
+    db.commit()
+    return {"recovery_codes":codes}
 
 @app.post("/api/v1/auth/change-password",dependencies=[Depends(require_csrf)])
 def change_password(body:ChangePasswordIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):

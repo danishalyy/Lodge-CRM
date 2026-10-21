@@ -46,8 +46,10 @@ export default function HousekeepingPage() {
       setCanManage(manage);
 
       const [r, s, j] = await Promise.all([
-        access.feature("units") ? lodgeApi.rooms() : Promise.resolve([]),
-        manage && access.feature("staff")
+        access.feature("units") && access.permission("units.view")
+          ? lodgeApi.rooms()
+          : Promise.resolve([]),
+        manage && access.feature("staff") && access.permission("staff.view")
           ? operationsApi.staff.list().catch(() => [])
           : Promise.resolve([]),
         operationsApi.housekeeping.list(),

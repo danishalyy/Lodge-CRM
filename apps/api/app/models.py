@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 import uuid
 from sqlalchemy import LargeBinary, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index, Numeric
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -23,6 +23,7 @@ class User(Base):
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mfa_recovery_hashes: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
     mfa_last_timestep: Mapped[int | None] = mapped_column(Integer, nullable=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

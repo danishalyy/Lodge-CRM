@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -24,6 +25,8 @@ const statuses = [
   "out_of_service",
 ];
 export default function RoomsPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("units.manage");
   const [rows, setRows] = useState<Room[]>([]),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
@@ -68,9 +71,11 @@ export default function RoomsPage() {
           <h1>Rooms & Units</h1>
           <p>Authoritative room inventory and live operational status.</p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Room / Unit
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Room / Unit
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <div className="roomGrid">
@@ -94,6 +99,7 @@ export default function RoomsPage() {
               className="select"
               value={r.status}
               onChange={(e) => update(r.id, e.target.value)}
+              disabled={!canManage}
               aria-label="Status"
             >
               {statuses.map((s) => (

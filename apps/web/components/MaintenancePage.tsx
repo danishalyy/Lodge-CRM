@@ -67,11 +67,13 @@ export default function MaintenancePage() {
 
       const [i, r, s, v, a] = await Promise.all([
         lodgeApi.maintenance(),
-        access.feature("units") ? lodgeApi.rooms() : Promise.resolve([]),
-        manage && access.feature("staff")
+        access.feature("units") && access.permission("units.view")
+          ? lodgeApi.rooms()
+          : Promise.resolve([]),
+        manage && access.feature("staff") && access.permission("staff.view")
           ? operationsApi.staff.list<Staff[]>()
           : Promise.resolve([]),
-        access.feature("fleet")
+        access.feature("fleet") && access.permission("vehicles.view")
           ? operationsApi.vehicles.list<Vehicle[]>()
           : Promise.resolve([]),
         assetManage && ws

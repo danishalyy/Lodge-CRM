@@ -11,6 +11,7 @@ class LoginIn(StrictModel):
     email: EmailStr
     password: str = Field(min_length=10, max_length=200)
     otp: str | None = Field(default=None, pattern="^[0-9]{6}$")
+    recovery_code: str | None = Field(default=None, min_length=20, max_length=40)
 
 
 class ActivateIn(StrictModel):

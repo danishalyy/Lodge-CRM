@@ -24,6 +24,7 @@ from .providers.base import ProviderUnavailable
 from .limits import admission
 from .safety import SYSTEM, redact
 from . import tools
+from .memory import verify_sources
 
 router = APIRouter()
 
@@ -184,6 +185,9 @@ def messages(
         .order_by(AIMessage.created_at.desc(), AIMessage.id)
         .limit(100)
     ).all()
+    verify_sources(
+        [source for row in rows for source in row.sources], db, ctx, lodge_id, request
+    )
     return [message_payload(row) for row in reversed(rows)]
 
 
@@ -222,6 +226,7 @@ def send_message(
                         AIMessage.role == "assistant",
                     )
                 )
+                verify_sources(answer.sources, db, ctx, lodge_id, request)
                 return message_payload(answer)
             raise HTTPException(
                 409,
@@ -293,6 +298,7 @@ def send_message(
                         raise HTTPException(
                             409, "Your access changed. Start a new conversation"
                         )
+                    verify_sources(sources, db, ctx, lodge_id, request)
                     answer = AIMessage(
                         lodge_id=lodge_id,
                         user_id=user.id,
@@ -367,7 +373,7 @@ def send_message(
                 db.commit()
                 rejected_tool = None
                 source = {
-                    "kind": "live",
+                    "kind": tools.REGISTRY[call.name].source_kind,
                     "label": tools.REGISTRY[call.name].label,
                     "lodge_id": str(lodge_id),
                     "partial": bool(result.get("partial")),
@@ -377,6 +383,20 @@ def send_message(
                     "tool": call.name,
                     "retrieved_at": datetime.now(timezone.utc).isoformat(),
                 }
+                if source["kind"] == "memory":
+                    source["period"] = result["period"]
+                    source["references"] = [
+                        {
+                            key: row[key]
+                            for key in (
+                                "id",
+                                "resource_type",
+                                "resource_id",
+                                "recorded_at",
+                            )
+                        }
+                        for row in result.get("items", [])
+                    ]
                 sources.append(source)
                 prompt.extend(
                     [

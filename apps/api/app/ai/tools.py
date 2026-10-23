@@ -55,8 +55,27 @@ class Arguments(BaseModel):
     search: str | None = Field(default=None, max_length=80)
     on_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     overdue_only: bool = False
+    start_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    resource_type: (
+        Literal[
+            "task",
+            "maintenance",
+            "unit",
+            "vehicle",
+            "housekeeping",
+            "guest_request",
+            "activity",
+            "transfer",
+        ]
+        | None
+    ) = None
+    resource_id: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    )
 
-    @field_validator("on_date")
+    @field_validator("on_date", "start_date", "end_date")
     @classmethod
     def validate_day(cls, value):
         if value:
@@ -74,9 +93,20 @@ class Tool:
     suggestion: str
     filters: tuple = ("limit", "status", "search")
     extra_permissions: tuple = ()
+    source_kind: str = "live"
 
 
 REGISTRY = {
+    "get_operational_history": Tool(
+        "memory.view",
+        "ai",
+        "operational_memory",
+        (),
+        "Recorded operational history",
+        "What operational changes were recorded in the last week?",
+        ("limit", "search", "start_date", "end_date", "resource_type", "resource_id"),
+        source_kind="memory",
+    ),
     "get_dashboard_summary": Tool(
         "dashboard.view",
         "dashboard",
@@ -325,6 +355,31 @@ def clean(value):
     return value
 
 
+def read_rows(tool, args, db, ctx, lodge_id, bound=101):
+    """Reuse the authoritative record scopes for both live and historical adapters.
+
+    Caller must apply permission/feature guards before invoking this internal reader.
+    """
+    from .. import main
+
+    kwargs = {"lodge_id": str(lodge_id), "user": ctx.user, "db": db}
+    if tool.handler == "tasks":
+        kwargs.update(status=args.status, assignee_id=None, limit=bound, offset=0)
+    elif tool.handler == "stays":
+        kwargs.update(limit=bound, offset=0)
+    elif tool.handler in {
+        "rooms",
+        "requests_list",
+        "maintenance_list",
+        "list_housekeeping_jobs",
+        "list_vehicles",
+    }:
+        kwargs["limit"] = bound
+    elif tool.handler == "list_notifications":
+        kwargs.update(unread_only=False, limit=bound)
+    return getattr(main, tool.handler)(**kwargs)
+
+
 def execute(name, arguments, db, ctx, lodge_id, request):
     # Re-authenticate independently for every invocation; never trust the orchestrator's earlier decision.
     ctx = guard(db, ctx.user, lodge_id, request)
@@ -361,6 +416,11 @@ def execute(name, arguments, db, ctx, lodge_id, request):
         },
         "source": tool.label,
     }
+    if name == "get_operational_history":
+        from .memory import read_history
+
+        output.update(read_history(args, db, ctx, lodge_id, request, zone, today))
+        return clean(output)
     handler = getattr(main, tool.handler)
     if name == "get_dashboard_summary":
         raw = handler(lodge_id=str(lodge_id), user=ctx.user, db=db)
@@ -425,22 +485,7 @@ def execute(name, arguments, db, ctx, lodge_id, request):
             and entitlement_enabled(db, str(lodge_id), f)
         }
         return clean(output)
-    kwargs = {"lodge_id": str(lodge_id), "user": ctx.user, "db": db}
-    if tool.handler == "tasks":
-        kwargs.update(status=args.status, assignee_id=None, limit=101, offset=0)
-    elif tool.handler == "stays":
-        kwargs.update(limit=101, offset=0)
-    elif tool.handler in {
-        "rooms",
-        "requests_list",
-        "maintenance_list",
-        "list_housekeeping_jobs",
-        "list_vehicles",
-    }:
-        kwargs["limit"] = 101
-    elif tool.handler == "list_notifications":
-        kwargs.update(unread_only=False, limit=101)
-    rows = handler(**kwargs)
+    rows = read_rows(tool, args, db, ctx, lodge_id)
     partial = (
         len(rows) >= 101
         if tool.handler not in {"list_activities", "list_transfers", "list_fuel"}

@@ -53,7 +53,7 @@ Real vLLM acceptance remains manual until a GPU endpoint is supplied: test opera
 
 ## Implemented read-only operational tools
 
-The base `ai` capability now supports fifteen registered read tools: dashboard, tasks, rooms, current stays, arrivals, departures, requests, housekeeping, maintenance, vehicles, fuel logs, activities, transfers, private notifications and report metrics. The registry is code-defined; permissions, plan grants and lodge exceptions remain database-defined. Suggestions come from authorised registered tools, not frontend role/package lists.
+The base `ai` capability now supports fifteen live operational read tools: dashboard, tasks, rooms, current stays, arrivals, departures, requests, housekeeping, maintenance, vehicles, fuel logs, activities, transfers, private notifications and report metrics. The registry is code-defined; permissions, plan grants and lodge exceptions remain database-defined. Suggestions come from authorised registered tools, not frontend role/package lists.
 
 Adapters invoke the existing permission dependency explicitly and reuse operational handlers and their scopes. Five previously unbounded list handlers accept an optional finite limit for adapters while preserving the existing default behaviour of normal screens. Tool responses include the selected lodge, lodge time zone/current day, allowlisted fields and explicit partial-page flags. Date/search filters apply to bounded retrieved pages; when partial, answers must not claim a complete inventory or a zero result across the whole lodge. Use deterministic dashboard/report metrics for supported full-scope counts. Dashboard counts that represent stays are labelled as stays, not fabricated guest totals. Assigned-work base scopes cannot use lodge-wide dashboard/report aggregates.
 
@@ -61,7 +61,7 @@ Guest names are limited to permitted stay/arrival records; contact, dietary/medi
 
 Invalid optional AI environment values disable AI with a misconfigured state instead of preventing core Settings/application startup. Health probes are cached and release the DB connection before network I/O. Chat likewise releases DB transactions while waiting on the GPU. Redis failure disables admission for AI alone. Existing private GPU configuration must still be supplied before actual inference is usable.
 
-Not implemented: Operational Memory retrieval, RAG ingestion/pgvector/embeddings, multi-property AI comparisons, AI actions/confirmations, generated/scheduled AI reports and insights, retention jobs, streaming, and real-GPU/load acceptance. Their capabilities remain future; existing non-AI memory, reports, notifications, Group Admin and CRM actions continue to function normally.
+Not implemented: RAG ingestion/pgvector/embeddings, multi-property AI comparisons, AI actions/confirmations, generated/scheduled AI reports and insights, retention jobs, streaming, and real-GPU/load acceptance. Their capabilities remain future; existing non-AI memory, reports, notifications, Group Admin and CRM actions continue to function normally.
 
 ### GPU-free regression command
 
@@ -72,3 +72,15 @@ python -m pytest -q -p no:cacheprovider --tb=short
 ```
 
 AI integration tests select the test environment/provider themselves, use real PostgreSQL under a least-privilege role and provide scripted model tool calls. They create/drop only temporary test databases/roles. You do not need to set `AI_ENABLED=true` or run a GPU for this suite. CI already runs the full suite; integration skips without the test database URL are not an acceptance pass. After the web production build, `BROWSER_EXECUTABLE_PATH=/path/to/chromium npm test --prefix e2e` runs browser fixtures. These are not real-GPU or real operational-data inference tests.
+
+## Operational Memory (Phase 3)
+
+`get_operational_history` is the sixteenth read-only tool. It requires `ai.use`, the base `ai` entitlement and `memory.view`; each event family also requires the current module's view permission and entitlement. It queries existing immutable `OperationalEvent` rows under normal tenant RLS after deriving visible resource IDs through the authoritative CRM list handlers. No schema change, customer-data rewrite, or new operational event store is needed.
+
+Supported exact event/resource pairs cover tasks, maintenance, rooms, vehicles, guest requests, activities, transfers and identifiable housekeeping status events. Unknown event types, raw summaries/details, actor identities, HR, guest personal/medical information, financial values, precise coordinates and ambiguous unit-level housekeeping creation events are excluded. Fuel events and other unsupported families are excluded from historical retrieval; the existing live fuel tool is unchanged. Current record labels help identify records, but are explicitly not historical name snapshots. Only a strict terminal status enum is extracted from a recognised status-change event; the current record's status is never used as historical state.
+
+The default period is the last 30 lodge-local calendar days including today. Explicit start/end dates are inclusive, span at most 366 days, and convert to timestamp bounds using the lodge's IANA time zone. Results are newest first, up to 50 events. Optional resource type, UUID and text search narrow the already authorised current records. At most 250 current records per module are considered; reaching this bound, the event limit, or the chat context budget marks the result partial. Deleted, inaccessible, older out-of-page and unsupported records/events are excluded. A zero result is not proof that nothing happened. Logs do not establish root causes or complete recurrence counts.
+
+Historical source metadata is server-generated: selected lodge, event IDs, resource references, recorded timestamps, requested period, retrieval time and partial coverage. Raw event text is never persisted as AI tool context. The chat sources disclosure displays event references, the period and limited-coverage warnings, using normal date formatting. Each referenced record is rechecked after inference and before saved-message/retry replay; reassignment, deletion or lost module access refuses the old answer, including when the account's role fingerprint has not changed. Ordinary permission/subscription/session revalidation remains in effect. No historical answer is a database mutation.
+
+Real-model history accuracy, causation restraint and adversarial evaluation remain acceptance work for a configured vLLM/GPU; scripted provider tests verify the gateway boundaries, not model factuality. Private RAG is the next implementation phase.

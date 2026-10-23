@@ -1,5 +1,6 @@
 "use client";
 import MfaPrompt from "./MfaPrompt";
+import { navigationCopy } from "@/lib/strings/navigation";
 import LockedFeature from "./LockedFeature";
 import { LockKeyhole } from "lucide-react";
 import { Field } from "@/components/ui/field";
@@ -434,10 +435,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="topActions">
             <button
               className="searchButton"
+              aria-label={navigationCopy.search}
               onClick={() => setSearchOpen(true)}
             >
               <UiIcon name="search" />
-              <span>Search workspace</span>
+              <span>{navigationCopy.search}</span>
               <kbd>⌘ K</kbd>
             </button>
             {allowed("notifications") && <NotificationBell />}

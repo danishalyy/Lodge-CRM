@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, aiApi, getActiveLodgeId, getActiveUserId } from "@/lib/api";
 import { aiCopy as copy } from "@/lib/strings/ai";
-import { formatDateTime } from "@/lib/formatting";
+import { formatDate, formatDateTime } from "@/lib/formatting";
 import { Field } from "./ui/field";
 import { Form } from "./ui/form";
 export default function LodgeAIPage() {
@@ -219,6 +219,24 @@ export default function LodgeAIPage() {
                             <li key={i}>
                               {s.label || copy.live} ·{" "}
                               {formatDateTime(s.retrieved_at)}
+                              {s.partial && <span> · {copy.partial}</span>}
+                              {s.kind === "memory" && (
+                                <>
+                                  <p>
+                                    {copy.memory} · {copy.period}:{" "}
+                                    {formatDate(s.period?.start_date)} –{" "}
+                                    {formatDate(s.period?.end_date)}
+                                  </p>
+                                  <ul>
+                                    {s.references?.map((ref: any) => (
+                                      <li key={ref.id}>
+                                        {copy.event} {ref.id} ·{" "}
+                                        {formatDateTime(ref.recorded_at)}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </>
+                              )}
                             </li>
                           ))}
                         </ul>

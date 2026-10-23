@@ -308,10 +308,14 @@ export const operationsApi = {
         method: "POST",
         body: JSON.stringify({ role_key }),
       }),
-    assignCustomRole: (id: string, custom_role_id: string | null) =>
+    assignCustomRole: (
+      id: string,
+      custom_role_id: string | null,
+      preset_role_key?: string,
+    ) =>
       request<any>(lodgePath(`staff/${id}/custom-role`), {
         method: "PATCH",
-        body: JSON.stringify({ custom_role_id }),
+        body: JSON.stringify({ custom_role_id, preset_role_key }),
       }),
   },
   departments: tenantCollection("departments"),
@@ -405,6 +409,7 @@ export const operationsApi = {
     },
   },
   roles: {
+    catalog: () => request<any>(lodgePath("role-catalog")),
     list: () => request<any[]>(lodgePath("custom-roles")),
     permissions: () => request<any[]>(lodgePath("available-permissions")),
     create: (body: any) =>

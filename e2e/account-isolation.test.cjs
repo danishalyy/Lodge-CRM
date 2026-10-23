@@ -28,6 +28,7 @@ async function accountPage(user){
   const requests=[];
   await page.route('**/api/**',async route=>{
     const url=route.request().url();
+    if(url.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',assignable:true}],permissions:[],scopes:[],can_manage_custom_roles:false}});
     if(url.endsWith('/api/v1/auth/me'))await route.fulfill({json:user});
     else{requests.push(url);await route.fulfill({json:[]})}
   });
@@ -330,6 +331,7 @@ test('staff creation queues an invitation without choosing an owner password and
  try{
   await page.route('**/api/v1/lodges/**',async route=>{const url=new URL(route.request().url()),p=url.pathname;
    if(p.endsWith('/invitation/resend')){resends++;return route.fulfill({json:{delivery_status:'pending'}})}
+   if(p.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',assignable:true}],can_manage_custom_roles:false}});
    if(p.endsWith('/staff')){if(route.request().method()==='POST'){created=route.request().postDataJSON();return route.fulfill({json:{id:'new-staff',delivery_status:'pending'}})}return route.fulfill({json:created?[{id:'new-staff',full_name:created.full_name,email:created.email,job_title:'',phone:'',employment_status:'active',operational_status:'available',has_login:true,account_status:'pending_activation',delivery_status:'pending'}]:[]})}
    if(p.endsWith('/branding'))return route.fulfill({json:{display_name:'Acacia Lodge',logo_url:null}});
    return route.fulfill({json:[]});
@@ -618,4 +620,23 @@ test('guest profile edits show inline errors and read-only accounts cannot edit'
    else {assert.equal(await page.getByRole('button',{name:'Save profile',exact:true}).count(),0);assert.equal(await page.getByLabel('Internal notes',{exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'+ Guest',exact:true}).count(),0);assert.equal(writes,0)}
   }finally{await context.close()}
  }
+});
+
+test('role preset copy edits, staff assignment and deactivation use server metadata',async()=>{
+ const lodge='role-lodge';const user={id:'role-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:lodge,permissions:['staff.view','staff.manage','roles.custom.manage'],entitlements:['staff','custom_roles']}]};
+ const {context,page}=await accountPage(user);let roles=[],assigned=null,updates=0;
+ const catalog={default_staff_role_key:'general_staff',can_manage_custom_roles:true,presets:[{key:'general_staff',name:'General Staff',description:'Assigned tasks',permission_keys:['tasks.view'],copy_permission_keys:['tasks.view'],copy_base_role_key:'general_staff',assignable:true}],scopes:[{key:'general_staff',label:'Only their own work',description:'Assigned tasks only.'}],permissions:[{key:'tasks.view',label:'View tasks',area:'tasks',area_name:'Tasks',level:'view',can_grant:true},{key:'tasks.own.manage',label:'Update assigned tasks',area:'tasks',area_name:'Tasks',level:'edit',can_grant:true}]};
+ try {
+  await page.route('**/api/v1/lodges/role-lodge/**',async r=>{const path=new URL(r.request().url()).pathname;
+   if(path.endsWith('/role-catalog'))return r.fulfill({json:catalog});
+   if(path.includes('/custom-roles')){if(r.request().method()==='POST'){const body=r.request().postDataJSON();assert.deepEqual(body.permission_keys,['tasks.view']);roles=[{id:'role-1',...body,is_active:true,staff_count:0}];return r.fulfill({json:{id:'role-1'}})}if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();updates++;roles=[{...roles[0],...body}];if(body.is_active===false)assigned=null;return r.fulfill({json:{id:'role-1'}})}return r.fulfill({json:roles})}
+   if(path.endsWith('/custom-role')){assigned=r.request().postDataJSON().custom_role_id;roles[0].staff_count=assigned?1:0;return r.fulfill({json:{}})}
+   if(path.endsWith('/staff'))return r.fulfill({json:[{id:'staff-1',full_name:'Test Worker',phone:'',job_title:'',employment_status:'active',operational_status:'available',has_login:true,custom_role_id:assigned,custom_role_name:assigned?roles[0].name:null}]});
+   return r.fulfill({json:[]});
+  });
+  await page.goto(base+'/roles');await page.getByRole('button',{name:'Duplicate and customise',exact:true}).click();await page.getByLabel('Role name',{exact:true}).fill('Task colleague');assert.equal(await page.getByLabel('Tasks',{exact:true}).inputValue(),'view');await page.getByRole('button',{name:'Create custom role',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Role name',{exact:true}).fill('Task collaborator');await page.getByRole('button',{name:'Save role',exact:true}).click();await page.getByRole('button',{name:'Save role',exact:true}).last().click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(updates,1);
+  await page.goto(base+'/staff');await page.getByRole('button',{name:'Edit staff access',exact:true}).click();await page.getByLabel('Custom role (optional)',{exact:true}).selectOption('role-1');await page.getByRole('button',{name:'Save role',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(assigned,'role-1');
+  await page.goto(base+'/roles');await page.getByText('1 staff use this role',{exact:false}).waitFor();await page.getByRole('button',{name:'Deactivate',exact:true}).click();await page.getByText('This changes access for 1 people immediately.',{exact:false}).waitFor();await page.getByRole('button',{name:'Deactivate',exact:true}).last().click();await page.getByRole('button',{name:'Reactivate',exact:true}).waitFor();assert.equal(assigned,null);
+ }finally{await context.close()}
 });

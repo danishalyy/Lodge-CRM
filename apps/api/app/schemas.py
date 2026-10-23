@@ -60,6 +60,7 @@ class DepartmentUpdate(StrictModel):
 
 
 class StaffCreate(StrictModel):
+    custom_role_id: UUID | None = None
     invite_role_key: str | None = Field(default=None, pattern="^(department_manager|front_office|ranger|housekeeping|maintenance|driver|fb|finance|general_staff|read_only)$")
     full_name: str = Field(min_length=2, max_length=180)
     email: EmailStr | None = None
@@ -365,6 +366,7 @@ class MediaUploadRequest(StrictModel):
     sha256: str = Field(pattern="^[a-fA-F0-9]{64}$")
 
 class StaffInvite(StrictModel):
+    custom_role_id: UUID | None = None
     role_key: str = Field(pattern="^(department_manager|front_office|ranger|housekeeping|maintenance|driver|fb|finance|general_staff|read_only)$")
 
 class NotificationPreferenceUpdate(StrictModel):
@@ -441,6 +443,7 @@ class CustomRoleUpdate(StrictModel):
     permission_keys: list[str] | None = Field(default=None, max_length=300)
 
 class MembershipRoleUpdate(StrictModel):
+    preset_role_key: str | None = None
     custom_role_id: UUID | None = None
 
 class TaskChecklistCreate(StrictModel):

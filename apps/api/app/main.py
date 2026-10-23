@@ -1,3 +1,4 @@
+from .access_catalog import SENSITIVE_CUSTOM_PERMISSIONS, ROLE_FEATURES, SCOPES, ROLE_DESCRIPTIONS, permission_metadata
 from datetime import date, datetime, timedelta, timezone
 import base64
 import binascii
@@ -819,6 +820,7 @@ def staff(lodge_id: str, user: User = Depends(require_permission("staff.view")),
 
 @app.post("/api/v1/lodges/{lodge_id}/staff", dependencies=[Depends(require_csrf)])
 def create_staff(lodge_id: str, body: StaffCreate, request: Request, user: User = Depends(require_permission("staff.manage", write=True)), db: Session = Depends(get_db)):
+    if body.custom_role_id and not body.invite_role_key:raise HTTPException(422,"Invite an account before assigning a custom role")
     if body.invite_role_key and not body.email:raise HTTPException(422,"Email is required when creating a login invitation")
     ensure_fk(db, Department, body.department_id, lodge_id, "Department");ensure_fk(db,StaffProfile,body.supervisor_staff_id,lodge_id,"Supervisor")
     row=StaffProfile(lodge_id=lodge_id,full_name=body.full_name.strip(),email=str(body.email).lower() if body.email else None,phone=body.phone.strip(),job_title=body.job_title.strip(),employee_code=body.employee_code.strip() if body.employee_code else None,department_id=body.department_id,employment_status=body.employment_status,operational_status=body.operational_status,supervisor_staff_id=body.supervisor_staff_id,hire_date=body.hire_date)
@@ -826,7 +828,7 @@ def create_staff(lodge_id: str, body: StaffCreate, request: Request, user: User 
     result={"id":str(row.id),"full_name":row.full_name,"email":row.email,"phone":row.phone,"job_title":row.job_title,"employee_code":row.employee_code,"department_id":str(row.department_id) if row.department_id else None,"employment_status":row.employment_status,"operational_status":row.operational_status}
 
     if body.invite_role_key:
-        result.update(invite_staff_user(lodge_id,str(row.id),StaffInvite(role_key=body.invite_role_key),request,user,db))
+        result.update(invite_staff_user(lodge_id,str(row.id),StaffInvite(role_key=body.invite_role_key,custom_role_id=body.custom_role_id),request,user,db))
     else:commit_or_conflict(db,"Employee code already exists for this lodge")
     return result
 
@@ -857,7 +859,17 @@ def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Reques
     if not staff.email: raise HTTPException(422,"An email address is required before inviting this staff member")
     role=db.scalar(select(Role).where(Role.key==body.role_key))
     if not role: raise HTTPException(422,"Selected role is not installed")
-    role_features={"department_manager":"departments","ranger":"ranger","driver":"transfers","fb":"fb"}
+    role=_validate_staff_preset(db,user,lodge_id,body.role_key)
+    custom=None
+    if body.custom_role_id:
+        ensure_feature(db,lodge_id,"custom_roles")
+        if not user.is_super_admin and not has_permission(db,membership_for(db,user,lodge_id),"roles.custom.manage"):raise HTTPException(403,"Your role does not permit assigning custom roles")
+        custom=tenant_get(db,CustomRole,body.custom_role_id,lodge_id,"Custom role")
+        if not custom.is_active:raise HTTPException(409,"Custom role is inactive")
+        _validate_custom_permissions(list(db.scalars(select(Permission.key).join(CustomRolePermission,Permission.id==CustomRolePermission.permission_id).where(CustomRolePermission.custom_role_id==custom.id)).all()),db,user,lodge_id)
+        base=db.get(Role,custom.base_role_id)
+        if base.key=="department_manager" and not staff.department_id:raise HTTPException(422,"Assign a department first")
+    role_features=ROLE_FEATURES
     if body.role_key in role_features:ensure_feature(db,lodge_id,role_features[body.role_key])
     account=db.scalar(select(User).where(func.lower(User.email)==staff.email.lower()).with_for_update())
     if account and db.scalar(select(LodgeGroup.id).where(LodgeGroup.admin_user_id==account.id)):raise HTTPException(409,"Group administrator accounts cannot be linked to staff profiles")
@@ -876,6 +888,10 @@ def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Reques
         existing.role_id=role.id;existing.custom_role_id=None;existing.previous_role_id=None;existing.is_active=True;existing.department_id=staff.department_id
     else:
         db.add(Membership(user_id=account.id,lodge_id=lodge_id,role_id=role.id,department_id=staff.department_id,is_active=True))
+    if custom:
+        db.flush()
+        assigned=db.scalar(select(Membership).where(Membership.lodge_id==lodge_id,Membership.user_id==account.id))
+        assigned.previous_role_id=role.id;assigned.role_id=custom.base_role_id;assigned.custom_role_id=custom.id
     staff.user_id=account.id
     invitation_result={"activation_token":None,"activation_email_sent":False,"activation_email_queued":False,"delivery_status":"already_active"}
     if not account.is_active:
@@ -1854,11 +1870,48 @@ def create_staff_training(lodge_id:str,body:StaffTrainingCreate,request:Request,
     ensure_feature(db,lodge_id,"staff_hr");ctx=_ctx(db,user,lodge_id);staff=ensure_fk(db,StaffProfile,body.staff_id,lodge_id,"Staff profile");_assert_staff_scope(ctx,staff)
     row=StaffTraining(lodge_id=lodge_id,**body.model_dump());db.add(row);db.flush();audit(db,request,lodge_id,user.id,"staff_training.created","staff_training",str(row.id));db.commit();return {"id":str(row.id)}
 
-SENSITIVE_CUSTOM_ROLE_PERMISSIONS={"staff.manage","roles.custom.manage","departments.manage","notifications.delivery.view"}
+SENSITIVE_CUSTOM_ROLE_PERMISSIONS=SENSITIVE_CUSTOM_PERMISSIONS
 
-def _validate_custom_permissions(keys:list[str]):
+def _validate_custom_permissions(keys:list[str],db:Session,user:User,lodge_id:str):
     denied=sorted(set(keys)&SENSITIVE_CUSTOM_ROLE_PERMISSIONS)
     if denied:raise HTTPException(422,"Custom roles cannot delegate privileged permissions: "+", ".join(denied))
+
+    known=set(db.scalars(select(Permission.key).where(Permission.key.in_(keys))).all()) if keys else set()
+    if known!=set(keys):raise HTTPException(422,"One or more permissions are invalid")
+    membership=membership_for(db,user,lodge_id) if not user.is_super_admin else None
+    if not user.is_super_admin and any(not has_permission(db,membership,key) for key in keys):
+        raise HTTPException(403,"You cannot grant access you do not have")
+
+
+def _preset_permissions(db,role):
+    return list(db.scalars(select(Permission.key).join(RolePermission,Permission.id==RolePermission.permission_id).where(RolePermission.role_id==role.id)).all())
+
+
+def _validate_staff_preset(db,user,lodge_id,key):
+    role=db.scalar(select(Role).where(Role.key==key))
+    if not role or key not in SCOPES or key=='lodge_admin':raise HTTPException(422,"Choose an available staff preset")
+    if key in ROLE_FEATURES:ensure_feature(db,lodge_id,ROLE_FEATURES[key])
+    if not user.is_super_admin:
+        member=membership_for(db,user,lodge_id)
+        if any(not has_permission(db,member,p) for p in _preset_permissions(db,role)):raise HTTPException(403,"You cannot grant access you do not have")
+    return role
+
+
+@app.get("/api/v1/lodges/{lodge_id}/role-catalog")
+def role_catalog(lodge_id:str,user:User=Depends(require_permission("staff.manage")),db:Session=Depends(get_db)):
+    member=membership_for(db,user,lodge_id) if not user.is_super_admin else None
+    permissions=[]
+    for permission in db.scalars(select(Permission).order_by(Permission.key)).all():
+        item=permission_metadata(permission)
+        item['can_grant']=permission.key not in SENSITIVE_CUSTOM_PERMISSIONS and (user.is_super_admin or has_permission(db,member,permission.key))
+        permissions.append(item)
+    allowed={p['key'] for p in permissions if p['can_grant']}
+    presets=[]
+    for role in db.scalars(select(Role).where(Role.key.in_(SCOPES)).order_by(Role.name)).all():
+        keys=_preset_permissions(db,role)
+        available=(role.key!='lodge_admin' and (role.key not in ROLE_FEATURES or entitlement_enabled(db,lodge_id,ROLE_FEATURES[role.key])) and (user.is_super_admin or all(has_permission(db,member,k) for k in keys)))
+        presets.append({'key':role.key,'name':role.name,'description':ROLE_DESCRIPTIONS[role.key],'permission_keys':keys,'copy_permission_keys':sorted(set(keys)&allowed),'copy_base_role_key':'front_office' if role.key=='lodge_admin' else role.key,'assignable':bool(available),'scope_label':SCOPES[role.key][0],'scope_description':SCOPES[role.key][1]})
+    return {'default_staff_role_key':next((p['key'] for p in presets if p['key']=='general_staff' and p['assignable']),next((p['key'] for p in presets if p['assignable']),'')),'presets':presets,'permissions':permissions,'scopes':[{'key':k,'label':v[0],'description':v[1]} for k,v in SCOPES.items() if k!='lodge_admin'],'can_manage_custom_roles':entitlement_enabled(db,lodge_id,'custom_roles') and (user.is_super_admin or has_permission(db,member,'roles.custom.manage'))}
 
 @app.get("/api/v1/lodges/{lodge_id}/custom-roles")
 def list_custom_roles(lodge_id:str,user:User=Depends(require_permission("roles.custom.manage")),db:Session=Depends(get_db)):
@@ -1866,18 +1919,18 @@ def list_custom_roles(lodge_id:str,user:User=Depends(require_permission("roles.c
     rows=db.scalars(select(CustomRole).where(CustomRole.lodge_id==lodge_id).order_by(CustomRole.name)).all();out=[]
     for r in rows:
         base=db.get(Role,r.base_role_id);perms=list(db.scalars(select(Permission.key).join(CustomRolePermission,Permission.id==CustomRolePermission.permission_id).where(CustomRolePermission.custom_role_id==r.id)).all())
-        out.append({"id":str(r.id),"name":r.name,"description":r.description,"base_role_key":base.key if base else None,"base_role_name":base.name if base else None,"is_active":r.is_active,"permission_keys":perms})
+        out.append({"id":str(r.id),"name":r.name,"description":r.description,"base_role_key":base.key if base else None,"base_role_name":base.name if base else None,"is_active":r.is_active,"permission_keys":perms,"staff_count":db.scalar(select(func.count()).select_from(Membership).where(Membership.lodge_id==lodge_id,Membership.custom_role_id==r.id,Membership.is_active.is_(True))) or 0})
     return out
 
 @app.get("/api/v1/lodges/{lodge_id}/available-permissions")
 def available_permissions(lodge_id:str,user:User=Depends(require_permission("roles.custom.manage")),db:Session=Depends(get_db)):
-    ensure_feature(db,lodge_id,"custom_roles");return [{"key":p.key,"description":p.description} for p in db.scalars(select(Permission).order_by(Permission.key)).all()]
+    ensure_feature(db,lodge_id,"custom_roles");return role_catalog(lodge_id,user,db)["permissions"]
 
 @app.post("/api/v1/lodges/{lodge_id}/custom-roles",dependencies=[Depends(require_csrf)])
 def create_custom_role(lodge_id:str,body:CustomRoleCreate,request:Request,user:User=Depends(require_permission("roles.custom.manage",write=True)),db:Session=Depends(get_db)):
     ensure_feature(db,lodge_id,"custom_roles");base=db.scalar(select(Role).where(Role.key==body.base_role_key))
     if not base or body.base_role_key in {"lodge_admin","group_admin"}:raise HTTPException(422,"Choose an operational base role; Lodge Admin cannot be cloned")
-    _validate_custom_permissions(body.permission_keys)
+    _validate_custom_permissions(body.permission_keys,db,user,lodge_id)
     row=CustomRole(lodge_id=lodge_id,name=body.name.strip(),base_role_id=base.id,description=body.description,is_active=True);db.add(row);db.flush()
     perms=db.scalars(select(Permission).where(Permission.key.in_(body.permission_keys))).all() if body.permission_keys else []
     if len(perms)!=len(set(body.permission_keys)):raise HTTPException(422,"One or more permission keys are invalid")
@@ -1898,7 +1951,7 @@ def update_custom_role(lodge_id:str,record_id:str,body:CustomRoleUpdate,request:
                 if membership.previous_role_id: membership.role_id=membership.previous_role_id
                 membership.previous_role_id=None
     if body.permission_keys is not None:
-        _validate_custom_permissions(body.permission_keys)
+        _validate_custom_permissions(body.permission_keys,db,user,lodge_id)
         perms=db.scalars(select(Permission).where(Permission.key.in_(body.permission_keys))).all() if body.permission_keys else []
         if len(perms)!=len(set(body.permission_keys)):raise HTTPException(422,"One or more permission keys are invalid")
         db.query(CustomRolePermission).filter(CustomRolePermission.custom_role_id==row.id).delete(synchronize_session=False)
@@ -1906,14 +1959,26 @@ def update_custom_role(lodge_id:str,record_id:str,body:CustomRoleUpdate,request:
     audit(db,request,lodge_id,user.id,"custom_role.updated","custom_role",str(row.id));commit_or_conflict(db,"A custom role with this name already exists");return {"id":str(row.id)}
 
 @app.patch("/api/v1/lodges/{lodge_id}/staff/{record_id}/custom-role",dependencies=[Depends(require_csrf)])
-def assign_custom_role(lodge_id:str,record_id:str,body:MembershipRoleUpdate,request:Request,user:User=Depends(require_permission("roles.custom.manage",write=True)),db:Session=Depends(get_db)):
-    ensure_feature(db,lodge_id,"custom_roles");staff=tenant_get(db,StaffProfile,record_id,lodge_id,"Staff profile")
+def assign_custom_role(lodge_id:str,record_id:str,body:MembershipRoleUpdate,request:Request,user:User=Depends(require_permission("staff.manage",write=True)),db:Session=Depends(get_db)):
+    if body.preset_role_key and body.custom_role_id:raise HTTPException(422,"Choose a preset or a custom role, not both")
+    if body.custom_role_id:
+        ensure_feature(db,lodge_id,"custom_roles")
+        if not user.is_super_admin and not has_permission(db,membership_for(db,user,lodge_id),"roles.custom.manage"):raise HTTPException(403,"Your role does not permit assigning custom roles")
+    staff=tenant_get(db,StaffProfile,record_id,lodge_id,"Staff profile")
     if not staff.user_id:raise HTTPException(409,"Staff member must have a login account before assigning a custom role")
     membership=db.scalar(select(Membership).where(Membership.lodge_id==lodge_id,Membership.user_id==staff.user_id,Membership.is_active.is_(True)))
     if not membership:raise HTTPException(409,"Active lodge membership not found")
-    if body.custom_role_id:
+    membership.department_id=staff.department_id
+    if body.preset_role_key:
+        role=_validate_staff_preset(db,user,lodge_id,body.preset_role_key)
+        if role.key=="department_manager" and not staff.department_id:raise HTTPException(422,"Assign a department first")
+        membership.role_id=role.id;membership.custom_role_id=None;membership.previous_role_id=None
+    elif body.custom_role_id:
         role=tenant_get(db,CustomRole,body.custom_role_id,lodge_id,"Custom role")
         if not role.is_active:raise HTTPException(409,"Custom role is inactive")
+        keys=list(db.scalars(select(Permission.key).join(CustomRolePermission,Permission.id==CustomRolePermission.permission_id).where(CustomRolePermission.custom_role_id==role.id)).all())
+        _validate_custom_permissions(keys,db,user,lodge_id)
+        if db.get(Role,role.base_role_id).key=="department_manager" and not staff.department_id:raise HTTPException(422,"Assign a department first")
         if not membership.custom_role_id: membership.previous_role_id=membership.role_id
         membership.custom_role_id=role.id;membership.role_id=role.base_role_id
     else:

@@ -662,3 +662,9 @@ select:focus-visible {
 .glassDialog .drawer, .glassDrawer .drawer { overflow: visible; animation: none; transform: none; }
 .collectionToolbar .searchField input[type="search"] { border: 0; border-radius: 0; background: transparent; padding: 10px 0; margin: 0; box-shadow: none; }
 .collectionToolbar .searchField:focus-within { outline: 2px solid var(--ac); outline-offset: 3px; }
+.accessRoleGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:24px; margin:24px 0 32px; }
+.accessRoleGrid h3,.roleRow h3 { margin:8px 0; }
+.roleRow { display:flex; gap:24px; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; }
+.accessArea { padding:16px 0; border-bottom:1px solid var(--bd); }
+.roleSummary { margin-top:24px; padding:24px; background:var(--sec); border-radius:var(--radius-lg); }
+.checkRow small { display:block; color:var(--tx2); }

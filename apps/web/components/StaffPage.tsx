@@ -1,4 +1,5 @@
 "use client";
+import { accessCopy } from "@/lib/strings/access";
 import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -29,29 +30,15 @@ type Staff = {
   custom_role_id?: string;
   custom_role_name?: string;
 };
-const roles = [
-  ["department_manager", "Department Manager / Supervisor"],
-  ["front_office", "Front Office / Guest Services"],
-  ["ranger", "Ranger / Guide"],
-  ["housekeeping", "Housekeeping"],
-  ["maintenance", "Maintenance / Workshop"],
-  ["driver", "Driver / Transport"],
-  ["fb", "F&B / Kitchen"],
-  ["finance", "Finance / Accounts"],
-  ["general_staff", "General Staff"],
-  ["read_only", "Read Only / Auditor"],
-] as const;
 export default function StaffPage() {
   const access = useWorkspaceAccess();
-  const roleFeatures: Record<string, string> = {
-    department_manager: "departments",
-    ranger: "ranger",
-    driver: "transfers",
-    fb: "fb",
-  };
-  const inviteRoles = roles.filter(
-    ([key]) => !roleFeatures[key] || access.feature(roleFeatures[key]),
-  );
+  const [catalog, setCatalog] = useState<any>(null),
+    [editing, setEditing] = useState<Staff | null>(null),
+    [chosenPreset, setChosenPreset] = useState(""),
+    [chosenCustom, setChosenCustom] = useState("");
+  const inviteRoles = (catalog?.presets || [])
+    .filter((role: any) => role.assignable)
+    .map((role: any) => [role.key, role.name]);
   const [rows, setRows] = useState<Staff[]>([]),
     [deps, setDeps] = useState<Department[]>([]),
     [customRoles, setCustomRoles] = useState<any[]>([]),
@@ -70,8 +57,13 @@ export default function StaffPage() {
     try {
       const [s, d, cr, me] = await Promise.all([
         operationsApi.staff.list<Staff[]>(),
-        operationsApi.departments.list<Department[]>().catch(() => []),
-        operationsApi.roles.list().catch(() => []),
+        access.feature("departments") && access.permission("departments.view")
+          ? operationsApi.departments.list<Department[]>()
+          : Promise.resolve([]),
+        access.feature("custom_roles") &&
+        access.permission("roles.custom.manage")
+          ? operationsApi.roles.list()
+          : Promise.resolve([]),
         authApi.me(),
       ]);
       const member = me.memberships?.find(
@@ -80,6 +72,8 @@ export default function StaffPage() {
       setCanManage(
         !!me.is_super_admin || !!member?.permissions?.includes("staff.manage"),
       );
+      if (me.is_super_admin || member?.permissions?.includes("staff.manage"))
+        setCatalog(await operationsApi.roles.catalog());
       setRows(s);
       setDeps(d);
       setCustomRoles(cr);
@@ -101,6 +95,9 @@ export default function StaffPage() {
     try {
       const result = await operationsApi.staff.create<any>({
         invite_role_key: inviteOnCreate ? String(f.get("role_key")) : null,
+        custom_role_id: inviteOnCreate
+          ? String(f.get("custom_role_id") || "") || null
+          : null,
         full_name: String(f.get("full_name")),
         email: String(f.get("email") || "") || null,
         phone: String(f.get("phone") || ""),
@@ -121,7 +118,7 @@ export default function StaffPage() {
       setNotice(
         inviteOnCreate
           ? "Staff account created. The owner must use their invitation to choose a password. Email status: " +
-              result.delivery_status
+              readableLabel(result.delivery_status)
           : "Staff profile created.",
       );
       await load();
@@ -278,7 +275,19 @@ export default function StaffPage() {
                     </td>
                     <td>{r.supervisor_name || "—"}</td>
                     <td>
-                      {r.custom_role_name || "System role"}
+                      {r.custom_role_name || "Preset role"}
+                      {canManage && r.has_login && (
+                        <button
+                          className="button"
+                          onClick={() => {
+                            setEditing(r);
+                            setChosenPreset("");
+                            setChosenCustom(r.custom_role_id || "");
+                          }}
+                        >
+                          {accessCopy.editStaff}
+                        </button>
+                      )}
                       {canManage && r.has_login && customRoles.length > 0 && (
                         <select
                           className="select"
@@ -357,6 +366,89 @@ export default function StaffPage() {
           )}
         </div>
       </section>
+      {editing && (
+        <Drawer onClose={() => setEditing(null)}>
+          <div className="drawerHead">
+            <h2>{accessCopy.editStaff}</h2>
+            <button
+              className="closeButton"
+              aria-label="Close staff access"
+              onClick={() => setEditing(null)}
+            >
+              ×
+            </button>
+          </div>
+          <p>{editing.full_name}</p>
+          <Form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
+              try {
+                await operationsApi.staff.assignCustomRole(
+                  editing.id,
+                  chosenCustom || null,
+                  chosenCustom ? undefined : chosenPreset || undefined,
+                );
+                setEditing(null);
+                await load();
+              } catch (error) {
+                setError(
+                  error instanceof Error ? error.message : accessCopy.saveError,
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Field label={accessCopy.presetRole}>
+              <select
+                className="select"
+                value={chosenPreset}
+                onChange={(e) => {
+                  setChosenPreset(e.target.value);
+                  setChosenCustom("");
+                }}
+              >
+                <option value="">Keep current / restore previous preset</option>
+                {inviteRoles.map(([key, name]: string[]) => (
+                  <option key={key} value={key}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {catalog?.can_manage_custom_roles && (
+              <Field label={accessCopy.customRole}>
+                <select
+                  className="select"
+                  value={chosenCustom}
+                  onChange={(e) => setChosenCustom(e.target.value)}
+                >
+                  <option value="">{accessCopy.usePreset}</option>
+                  {customRoles
+                    .filter((role) => role.is_active)
+                    .map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            )}
+            <p>{accessCopy.roleHint}</p>
+            {error && (
+              <p role="alert" className="dangerText">
+                {error}
+              </p>
+            )}
+            <div className="drawerActions">
+              <button className="button primary" disabled={busy}>
+                {accessCopy.save}
+              </button>
+            </div>
+          </Form>
+        </Drawer>
+      )}
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
@@ -435,15 +527,30 @@ export default function StaffPage() {
                   <select
                     className="select"
                     name="role_key"
-                    defaultValue="general_staff"
+                    defaultValue={catalog?.default_staff_role_key || ""}
                   >
-                    {inviteRoles.map(([k, n]) => (
+                    {inviteRoles.map(([k, n]: string[]) => (
                       <option key={k} value={k}>
                         {n}
                       </option>
                     ))}
                   </select>
                 </Field>
+                {catalog?.can_manage_custom_roles && (
+                  <Field label={accessCopy.customRole}>
+                    <select className="select" name="custom_role_id">
+                      <option value="">{accessCopy.usePreset}</option>
+                      {customRoles
+                        .filter((role) => role.is_active)
+                        .map((role) => (
+                          <option key={role.id} value={role.id}>
+                            {role.name}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                )}
+                <p className="sub">{accessCopy.roleHint}</p>
                 <p className="sub">
                   An expiring private link is emailed to this address. You never
                   choose or see their password.
@@ -521,7 +628,7 @@ export default function StaffPage() {
               </Field>
               <Field label="Role">
                 <select className="select" name="role_key" required>
-                  {inviteRoles.map(([k, n]) => (
+                  {inviteRoles.map(([k, n]: string[]) => (
                     <option key={k} value={k}>
                       {n}
                     </option>

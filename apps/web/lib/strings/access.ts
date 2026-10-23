@@ -1,0 +1,81 @@
+export const accessCopy = {
+  title: "Roles and access",
+  intro:
+    "Start with a preset, then make a custom copy when someone needs different access.",
+  presets: "Locked presets",
+  locked: "Preset · locked",
+  custom: "Custom roles",
+  duplicate: "Duplicate and customise",
+  edit: "Edit",
+  deactivate: "Deactivate",
+  restore: "Reactivate",
+  name: "Role name",
+  description: "Description",
+  scope: "Which records can they see?",
+  scopeHint:
+    "The record scope and selected actions work together. Changing actions never removes the scope rules.",
+  advanced: "Advanced permissions",
+  no: "No access",
+  view: "Can view",
+  editAccess: "Can view and edit",
+  customAccess: "Custom access (Advanced)",
+  summary: "Access summary",
+  blocked: "Not available to delegate",
+  save: "Save role",
+  create: "Create custom role",
+  count: (n: number) => `${n} staff use this role`,
+  impact: (n: number) => `This changes access for ${n} people immediately.`,
+  deactivateHint:
+    "Staff using this role return to their previous preset. Inactive roles are retained for history.",
+  empty: "No custom roles yet. Duplicate a preset to get started.",
+  loading: "Loading access settings…",
+  retry: "Try again",
+  error: "Unable to load access settings.",
+  permissionSummary: (area: string, level: string) =>
+    level === "edit"
+      ? `Can view and edit ${area.toLowerCase()}.`
+      : level === "view"
+        ? `Can view ${area.toLowerCase()}.`
+        : level === "advanced"
+          ? `Has specific access to ${area.toLowerCase()}.`
+          : `Cannot access ${area.toLowerCase()}.`,
+  accountRole: "Account role",
+  presetRole: "Preset role",
+  customRole: "Custom role (optional)",
+  usePreset: "Use preset access",
+  editStaff: "Edit staff access",
+  roleHint:
+    "The preset applies automatically. A custom role replaces its permissions and uses its own record scope.",
+  coming: "Coming soon",
+  accessReview: "Request access review",
+  reviewSent: "Access review requested",
+  reviewPending: "An access review is already pending",
+  reason: "Reason",
+  planIncludes: "Plan includes",
+  exception: "Lodge exception",
+  finalResult: "Final result",
+  planImpact: (n: number) =>
+    `This changes ${n} lodges on this plan. Lodge exceptions still apply.`,
+  plans: "Packages",
+  compare: "Compare packages",
+  planSave: "Save plan",
+  editPlan: "Edit plan",
+  features: "Features",
+  packageDescription: "Package details",
+  previewOnly: "Coming-soon features are not included in usable access.",
+  choosePlan: "Choose a package",
+  reset: "Use plan default",
+  enable: "Enable for this lodge",
+  disable: "Disable for this lodge",
+  reasonRequired: "Explain this lodge exception",
+  defaultResult: "Plan default",
+  reviewBody:
+    "Your request will notify the SafariOS platform administrators. It does not change your lodge access.",
+  unavailable: "Feature unavailable for this lodge",
+  noPlan: "Contact your administrator to review this lodge’s enabled features.",
+  planRequired: (name: string) => `Available on ${name}`,
+  cancel: "Cancel",
+  inactive: "Inactive",
+  active: "Active",
+  saveError: "Unable to save access settings.",
+};

@@ -1,5 +1,6 @@
 "use client";
 import { readableLabel } from "@/lib/strings/content";
+import { formatMoney } from "@/lib/formatting";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { intelligenceApi } from "@/lib/api";
@@ -83,6 +84,13 @@ export default function ReportsPage() {
           value: data.maintenance?.created,
         },
         {
+          label: "Maintenance cost",
+          feature: "maintenance_workshop",
+          value: data.maintenance
+            ? formatMoney(data.maintenance.cost_cents)
+            : null,
+        },
+        {
           label: "Overlapping stays",
           feature: "stays",
           value: data.stays?.overlapping_period,
@@ -105,6 +113,11 @@ export default function ReportsPage() {
           label: "Wildlife sightings",
           feature: "wildlife",
           value: data.safari?.wildlife_sightings,
+        },
+        {
+          label: "Fuel cost",
+          feature: "fuel",
+          value: data.fleet ? formatMoney(data.fleet.fuel_cost_cents) : null,
         },
       ].filter((r) => enabled(r.feature, r.value))
     : [];

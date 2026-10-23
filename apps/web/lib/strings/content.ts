@@ -141,8 +141,10 @@ export const contentCopy = {
   timezone: "Search for a time zone",
   chooseCountry: "Select country…",
   preferences: "Lodge preferences",
-  preferencesBody: "Choose how dates appear throughout this lodge.",
+  preferencesBody:
+    "Choose how dates and monetary amounts appear throughout this lodge. Changing currency does not convert existing amounts.",
   dateFormat: "Date format",
+  currency: "Currency",
   savePreferences: "Save lodge preferences",
   browserDates: "Use viewer’s locale",
   saved: (resource: string) => `${resource} saved`,

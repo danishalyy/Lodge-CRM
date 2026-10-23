@@ -25,3 +25,9 @@ Migration 0016 changes only the currency default to PKR. Existing lodge values a
 Validation: 463 API tests, the production frontend build, all 35 browser checks and the static guard audit pass. Browser coverage includes login, activation, MFA, custom-role copy/edit/assignment/deactivation, package impact confirmation, registration errors and time-zone selection, guest creation, and responsive accessibility checks at 375, 768, 1366 and 1440 px in both themes. The combobox handles Escape before its enclosing Radix/Vaul drawer, and opens again on click after selection. Package panel spacing was reviewed in desktop dark and mobile light views.
 
 Nothing required in Part C remains undone. Optional per-lodge preset editing remains unimplemented by design. Unbuilt capabilities remain coming soon. Migrations were verified on temporary test databases; updating an installation through the existing Docker Compose migration service applies migrations 0014–0016. Existing lodge currency choices are preserved.
+
+## South Africa release default
+
+Currency settings, monetary fuel and maintenance fields, cost summaries, and the existing external-payment wording are restored. The South Africa launch uses ZAR as the ORM, database and display fallback for new lodges. Migration 0017 changes only the database default; it does not rewrite existing lodge choices. All supported currencies remain selectable. Existing payment handling stays outside SafariOS; this restoration adds no payment gateway. Accounting integrations remain explicitly coming soon.
+
+Restoration validation: 464 API tests, the production frontend build, six relevant browser checks and the static guard audit pass. Tests cover restored fuel and parts costs, report totals, ZAR database/ORM defaults, selectable currencies, and preservation of explicitly selected currencies. Responsive registration remains checked in both themes at 375, 768, 1366 and 1440 px.

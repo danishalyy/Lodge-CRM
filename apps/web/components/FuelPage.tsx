@@ -1,4 +1,5 @@
 "use client";
+import { formatMoney, formatting } from "@/lib/formatting";
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -18,6 +19,7 @@ type Fuel = {
   recorded_by?: string;
   litres: number;
   odometer_km: number;
+  cost_cents?: number;
   supplier: string;
   reference: string;
   recorded_at: string;
@@ -55,6 +57,9 @@ export default function FuelPage() {
           String(f.get("recorded_by_staff_id") || "") || null,
         litres: Number(f.get("litres")),
         odometer_km: Number(f.get("odometer_km")),
+        cost_cents: f.get("cost")
+          ? Math.round(Number(f.get("cost")) * 100)
+          : null,
         supplier: String(f.get("supplier") || ""),
         reference: String(f.get("reference") || ""),
         notes: String(f.get("notes") || ""),
@@ -74,7 +79,7 @@ export default function FuelPage() {
         <div>
           <span className="eyebrow">FLEET</span>
           <h1>Fuel</h1>
-          <p>Track refuelling and mileage across your fleet.</p>
+          <p>Track refuelling, mileage and costs across your fleet.</p>
         </div>
         <button className="button primary" onClick={() => setOpen(true)}>
           + Fuel record
@@ -89,6 +94,7 @@ export default function FuelPage() {
               <th>Vehicle</th>
               <th>Litres</th>
               <th>Odometer</th>
+              <th>Cost</th>
               <th>Recorded by</th>
             </tr>
           </thead>
@@ -99,6 +105,9 @@ export default function FuelPage() {
                 <td>{r.vehicle_name}</td>
                 <td>{r.litres.toFixed(2)} L</td>
                 <td>{r.odometer_km.toLocaleString()} km</td>
+                <td>
+                  {r.cost_cents == null ? "—" : formatMoney(r.cost_cents)}
+                </td>
                 <td>{r.recorded_by || "—"}</td>
               </tr>
             ))}
@@ -170,6 +179,17 @@ export default function FuelPage() {
               </div>
             </div>
             <div className="inlineForm">
+              <div>
+                <Field label={`Cost (${formatting().currency || "ZAR"})`}>
+                  <input
+                    className="field"
+                    name="cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                  />
+                </Field>
+              </div>
               <div>
                 <Field label="Date/time">
                   <input

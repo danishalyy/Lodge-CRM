@@ -1,4 +1,4 @@
-from .feature_catalog import BUILT, FUTURE, RETIRED_FEATURES, feature_metadata
+from .feature_catalog import BUILT, FUTURE, feature_metadata
 from .access_catalog import SENSITIVE_CUSTOM_PERMISSIONS, ROLE_FEATURES, SCOPES, ROLE_DESCRIPTIONS, permission_metadata
 from datetime import date, datetime, timedelta, timezone
 import base64
@@ -540,7 +540,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 plan_features=sorted(state & set(BUILT))
             memberships.append({
                 "lodge_id": str(lodge.id), "lodge_name": lodge.name, "branding":lodge_branding(lodge),
-                "date_format":lodge.date_format,"timezone":lodge.timezone,
+                "date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone,
                 "mfa_recommended":has_permission(db,m,"lodge.settings.manage"),
                 "role": display_role, "role_key": role.key if role else "", "custom_role_id": str(m.custom_role_id) if m.custom_role_id else None,
                 "department_id": str(m.department_id) if m.department_id else None,
@@ -614,7 +614,7 @@ def get_lodge_preferences(lodge_id:str,user:User=Depends(require_lodge_access),d
     try: lodge=db.get(Lodge,uuid.UUID(str(lodge_id)))
     except ValueError: raise HTTPException(422,"Invalid lodge identifier")
     if not lodge: raise HTTPException(404,"Lodge not found")
-    return {"date_format":lodge.date_format,"timezone":lodge.timezone}
+    return {"date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone}
 
 
 @app.patch("/api/v1/lodges/{lodge_id}/preferences",dependencies=[Depends(require_csrf)])
@@ -622,10 +622,10 @@ def update_lodge_preferences(lodge_id:str,body:LodgePreferencesUpdate,request:Re
     try: lodge=db.get(Lodge,uuid.UUID(str(lodge_id)))
     except ValueError: raise HTTPException(422,"Invalid lodge identifier")
     if not lodge: raise HTTPException(404,"Lodge not found")
-    lodge.date_format=body.date_format
+    lodge.date_format=body.date_format;lodge.currency=body.currency
     audit(db,request,lodge.id,user.id,"lodge.preferences_updated","lodge",str(lodge.id))
     db.commit()
-    return {"date_format":lodge.date_format,"timezone":lodge.timezone}
+    return {"date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone}
 
 
 def lodge_branding(lodge: Lodge):
@@ -745,12 +745,11 @@ def update_subscription(lodge_id: str, body: SubscriptionUpdate, request: Reques
 
 def _plans_payload(db):
     keys=set(db.scalars(select(PlanEntitlement.feature_key)).all()) | set(BUILT) | set(FUTURE)
-    keys-=RETIRED_FEATURES
     catalog=[feature_metadata(key) for key in sorted(keys,key=lambda key:(feature_metadata(key)['area'],feature_metadata(key)['name']))]
     output=[]
     for plan in db.scalars(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.sort_order,Plan.key)).all():
         enabled=set(db.scalars(select(PlanEntitlement.feature_key).where(PlanEntitlement.plan_key==plan.key,PlanEntitlement.enabled.is_(True))).all())
-        output.append({'key':plan.key,'name':plan.name,'description':plan.description,'revision':plan.revision,'lodge_count':db.scalar(select(func.count()).select_from(Subscription).where(Subscription.package==plan.key)) or 0,'features':sorted(enabled & set(BUILT)),'planned_features':sorted(enabled-set(BUILT)-RETIRED_FEATURES),'feature_catalog':catalog})
+        output.append({'key':plan.key,'name':plan.name,'description':plan.description,'revision':plan.revision,'lodge_count':db.scalar(select(func.count()).select_from(Subscription).where(Subscription.package==plan.key)) or 0,'features':sorted(enabled & set(BUILT)),'planned_features':sorted(enabled-set(BUILT)),'feature_catalog':catalog})
     return output
 
 
@@ -816,7 +815,7 @@ def get_lodge_entitlements(lodge_id:str,user:User=Depends(require_super_admin),d
     for ov in overrides:
         if ov.enabled:effective.add(ov.feature_key)
         else:effective.discard(ov.feature_key)
-    return {"package":sub.package,"base":sorted(base-RETIRED_FEATURES),"overrides":[{"feature_key":x.feature_key,"enabled":x.enabled,"reason":x.reason} for x in overrides if x.feature_key not in RETIRED_FEATURES],"effective":sorted(effective & set(BUILT))}
+    return {"package":sub.package,"base":sorted(base),"overrides":[{"feature_key":x.feature_key,"enabled":x.enabled,"reason":x.reason} for x in overrides],"effective":sorted(effective & set(BUILT))}
 
 
 @app.patch("/api/v1/platform/lodges/{lodge_id}/entitlements",dependencies=[Depends(require_csrf)])
@@ -1315,7 +1314,7 @@ def maintenance_list(lodge_id:str,user:User=Depends(require_permission("maintena
     out=[]
     for m in db.scalars(q.order_by(MaintenanceTicket.created_at.desc())).all():
         unit=db.get(Unit,m.unit_id) if m.unit_id else None;staff=db.get(StaffProfile,m.assigned_staff_id) if m.assigned_staff_id else None;vehicle=db.get(Vehicle,m.vehicle_id) if m.vehicle_id else None;dep=db.get(Department,m.department_id) if m.department_id else None
-        out.append({"id":str(m.id),"title":m.title,"description":m.description,"category":m.category,"priority":m.priority,"status":m.status,"department_id":str(m.department_id) if m.department_id else None,"department_name":dep.name if dep else None,"unit_id":str(m.unit_id) if m.unit_id else None,"unit_name":unit.name if unit else None,"vehicle_id":str(m.vehicle_id) if m.vehicle_id else None,"vehicle_name":(vehicle.name or vehicle.registration) if vehicle else None,"assigned_staff_id":str(m.assigned_staff_id) if m.assigned_staff_id else None,"assigned_staff_name":staff.full_name if staff else None,"asset_id":str(m.asset_id) if m.asset_id else None,"scheduled_for":m.scheduled_for.isoformat() if m.scheduled_for else None,"downtime_started_at":m.downtime_started_at.isoformat() if m.downtime_started_at else None,"downtime_ended_at":m.downtime_ended_at.isoformat() if m.downtime_ended_at else None,"recurrence_interval_days":m.recurrence_interval_days,"resolution":m.resolution,"created_at":m.created_at.isoformat()})
+        out.append({"id":str(m.id),"title":m.title,"description":m.description,"category":m.category,"priority":m.priority,"status":m.status,"department_id":str(m.department_id) if m.department_id else None,"department_name":dep.name if dep else None,"unit_id":str(m.unit_id) if m.unit_id else None,"unit_name":unit.name if unit else None,"vehicle_id":str(m.vehicle_id) if m.vehicle_id else None,"vehicle_name":(vehicle.name or vehicle.registration) if vehicle else None,"assigned_staff_id":str(m.assigned_staff_id) if m.assigned_staff_id else None,"assigned_staff_name":staff.full_name if staff else None,"cost_cents":m.cost_cents,"asset_id":str(m.asset_id) if m.asset_id else None,"scheduled_for":m.scheduled_for.isoformat() if m.scheduled_for else None,"downtime_started_at":m.downtime_started_at.isoformat() if m.downtime_started_at else None,"downtime_ended_at":m.downtime_ended_at.isoformat() if m.downtime_ended_at else None,"recurrence_interval_days":m.recurrence_interval_days,"resolution":m.resolution,"created_at":m.created_at.isoformat()})
     return out
 
 @app.post("/api/v1/lodges/{lodge_id}/maintenance",dependencies=[Depends(require_csrf)])
@@ -1367,10 +1366,10 @@ def update_maintenance(lodge_id:str,record_id:str,body:MaintenanceUpdate,request
                 follow=MaintenanceTicket(lodge_id=m.lodge_id,title=m.title,description=m.description,category=m.category,priority=m.priority,status="open",department_id=m.department_id,unit_id=m.unit_id,asset_id=m.asset_id,vehicle_id=m.vehicle_id,scheduled_for=next_when,recurrence_interval_days=m.recurrence_interval_days,created_by_user_id=user.id)
                 db.add(follow);db.flush();event(db,m.lodge_id,user.id,"maintenance.recurrence_created","maintenance",str(follow.id),f"Recurring maintenance scheduled: {m.title}")
         event(db,m.lodge_id,user.id,"maintenance.status_changed","maintenance",str(m.id),f"Maintenance '{m.title}' changed to {m.status}")
-    for f in ["priority","resolution","scheduled_for","recurrence_interval_days"]:
+    for f in ["priority","resolution","cost_cents","scheduled_for","recurrence_interval_days"]:
         v=getattr(body,f)
         if v is not None:
-            if not full and f == "priority":raise HTTPException(403,"Assigned staff cannot change maintenance priority")
+            if not full and f in {"priority","cost_cents"}:raise HTTPException(403,"Assigned staff cannot change maintenance priority or cost")
             setattr(m,f,v)
     audit(db,request,m.lodge_id,user.id,"maintenance.updated","maintenance",str(m.id));db.commit();return {"id":str(m.id),"status":m.status}
 
@@ -1489,7 +1488,7 @@ def list_fuel(lodge_id:str,user:User=Depends(require_permission("fuel.view")),db
     if ctx.role_key in {"ranger","driver"}:
         staff=_require_own_staff(ctx);q=q.where(FuelRecord.recorded_by_staff_id==staff.id)
     rows=db.scalars(q.order_by(FuelRecord.recorded_at.desc()).limit(500)).all()
-    return [{"id":str(r.id),"vehicle_id":str(r.vehicle_id),"vehicle_name":_name_vehicle(db,r.vehicle_id),"recorded_by_staff_id":str(r.recorded_by_staff_id) if r.recorded_by_staff_id else None,"recorded_by":_name_staff(db,r.recorded_by_staff_id),"litres":float(r.litres),"odometer_km":r.odometer_km,"supplier":r.supplier,"reference":r.reference,"notes":r.notes,"recorded_at":r.recorded_at.isoformat()} for r in rows]
+    return [{"id":str(r.id),"vehicle_id":str(r.vehicle_id),"vehicle_name":_name_vehicle(db,r.vehicle_id),"recorded_by_staff_id":str(r.recorded_by_staff_id) if r.recorded_by_staff_id else None,"recorded_by":_name_staff(db,r.recorded_by_staff_id),"litres":float(r.litres),"odometer_km":r.odometer_km,"cost_cents":r.cost_cents,"supplier":r.supplier,"reference":r.reference,"notes":r.notes,"recorded_at":r.recorded_at.isoformat()} for r in rows]
 
 @app.post("/api/v1/lodges/{lodge_id}/fuel",dependencies=[Depends(require_csrf)])
 def create_fuel(lodge_id:str,body:FuelCreate,request:Request,user:User=Depends(require_permission("fuel.manage",write=True)),db:Session=Depends(get_db)):
@@ -1502,7 +1501,7 @@ def create_fuel(lodge_id:str,body:FuelCreate,request:Request,user:User=Depends(r
         recorder=own
     if body.odometer_km < v.odometer_km: raise HTTPException(409,"Fuel record odometer cannot be lower than the vehicle odometer")
     if v.fuel_capacity_litres is not None and body.litres>float(v.fuel_capacity_litres):raise HTTPException(422,"Fuel litres cannot exceed the vehicle tank capacity")
-    r=FuelRecord(lodge_id=lodge_id,vehicle_id=v.id,recorded_by_staff_id=recorder.id if recorder else body.recorded_by_staff_id,litres=body.litres,odometer_km=body.odometer_km,supplier=body.supplier,reference=body.reference,notes=body.notes,recorded_at=body.recorded_at or datetime.now(timezone.utc),created_by_user_id=user.id)
+    r=FuelRecord(lodge_id=lodge_id,vehicle_id=v.id,recorded_by_staff_id=recorder.id if recorder else body.recorded_by_staff_id,litres=body.litres,odometer_km=body.odometer_km,cost_cents=body.cost_cents,supplier=body.supplier,reference=body.reference,notes=body.notes,recorded_at=body.recorded_at or datetime.now(timezone.utc),created_by_user_id=user.id)
     db.add(r);v.odometer_km=body.odometer_km;db.flush();audit(db,request,lodge_id,user.id,"fuel.recorded","fuel_record",str(r.id));event(db,lodge_id,user.id,"fuel.recorded","vehicle",str(v.id),f"{body.litres:g} L fuel recorded for {v.registration}");db.commit()
     return {"id":str(r.id),"vehicle_id":str(v.id),"odometer_km":v.odometer_km}
 
@@ -1806,7 +1805,7 @@ def reports_summary(lodge_id:str,start:date|None=None,end:date|None=None,user:Us
         "period":{"start":start.isoformat(),"end":end.isoformat()},
         "scope":{"type":"department","department_id":str(dept)} if dept else {"type":"lodge"},
         "tasks":{"created":len(task_rows),"completed":len(completed),"completion_rate":round(len(completed)/len(task_rows)*100,1) if task_rows else 0,"average_completion_hours":round(sum(durations)/len(durations),2) if durations else None},
-        "maintenance":{"created":len(maint),"completed":sum(1 for x in maint if x.status=="completed"),"critical":sum(1 for x in maint if x.priority=="critical")},
+        "maintenance":{"created":len(maint),"completed":sum(1 for x in maint if x.status=="completed"),"critical":sum(1 for x in maint if x.priority=="critical"),"cost_cents":sum(x.cost_cents or 0 for x in maint)},
         "guest_requests":{"created":len(requests),"resolved":sum(1 for x in requests if x.status=="resolved")},
     }
     if dept:
@@ -1822,7 +1821,7 @@ def reports_summary(lodge_id:str,start:date|None=None,end:date|None=None,user:Us
     unit_counts=dict(db.execute(select(Unit.status,func.count()).where(Unit.lodge_id==lodge_id).group_by(Unit.status)).all())
     base.update({
         "stays":{"overlapping_period":len(stays),"completed":sum(1 for x in stays if x.status=="completed")},
-        "fleet":{"fuel_litres":round(sum(float(x.litres) for x in fuel),2),"fuel_records":len(fuel)},
+        "fleet":{"fuel_litres":round(sum(float(x.litres) for x in fuel),2),"fuel_cost_cents":sum(x.cost_cents or 0 for x in fuel),"fuel_records":len(fuel)},
         "safari":{"activities":activities,"transfers":transfers,"wildlife_sightings":sightings},
         "rooms":{"by_status":unit_counts},
     })
@@ -2132,11 +2131,11 @@ def create_maintenance_asset(lodge_id:str,body:MaintenanceAssetCreate,request:Re
 
 @app.get("/api/v1/lodges/{lodge_id}/maintenance/{record_id}/parts")
 def list_maintenance_parts(lodge_id:str,record_id:str,user:User=Depends(require_permission("maintenance.view")),db:Session=Depends(get_db)):
-    ticket=tenant_get(db,MaintenanceTicket,record_id,lodge_id,"Maintenance ticket");rows=db.scalars(select(MaintenancePartUsage).where(MaintenancePartUsage.maintenance_ticket_id==ticket.id).order_by(MaintenancePartUsage.created_at)).all();return [{"id":str(x.id),"part_name":x.part_name,"quantity":x.quantity,"notes":x.notes} for x in rows]
+    ticket=tenant_get(db,MaintenanceTicket,record_id,lodge_id,"Maintenance ticket");rows=db.scalars(select(MaintenancePartUsage).where(MaintenancePartUsage.maintenance_ticket_id==ticket.id).order_by(MaintenancePartUsage.created_at)).all();return [{"id":str(x.id),"part_name":x.part_name,"quantity":x.quantity,"unit_cost_cents":x.unit_cost_cents,"total_cost_cents":x.quantity*x.unit_cost_cents,"notes":x.notes} for x in rows]
 
 @app.post("/api/v1/lodges/{lodge_id}/maintenance/{record_id}/parts",dependencies=[Depends(require_csrf)])
 def add_maintenance_part(lodge_id:str,record_id:str,body:MaintenancePartCreate,request:Request,user:User=Depends(require_permission("maintenance.manage",write=True)),db:Session=Depends(get_db)):
-    ensure_feature(db,lodge_id,"maintenance_workshop");ticket=tenant_get(db,MaintenanceTicket,record_id,lodge_id,"Maintenance ticket");row=MaintenancePartUsage(lodge_id=lodge_id,maintenance_ticket_id=ticket.id,**body.model_dump());db.add(row);db.flush();audit(db,request,lodge_id,user.id,"maintenance.part_added","maintenance",str(ticket.id));db.commit();return {"id":str(row.id)}
+    ensure_feature(db,lodge_id,"maintenance_workshop");ticket=tenant_get(db,MaintenanceTicket,record_id,lodge_id,"Maintenance ticket");row=MaintenancePartUsage(lodge_id=lodge_id,maintenance_ticket_id=ticket.id,**body.model_dump());db.add(row);ticket.cost_cents=(ticket.cost_cents or 0)+(body.quantity*body.unit_cost_cents);db.flush();audit(db,request,lodge_id,user.id,"maintenance.part_added","maintenance",str(ticket.id));db.commit();return {"id":str(row.id),"ticket_cost_cents":ticket.cost_cents}
 
 # --- Core operations completion 1.6 ---
 

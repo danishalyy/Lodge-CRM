@@ -1,25 +1,55 @@
 export type LodgeFormatting = {
   date_format?: string;
+  currency?: string;
   timezone?: string;
 };
+export const supportedCurrencies = [
+  "USD",
+  "ZAR",
+  "KES",
+  "TZS",
+  "UGX",
+  "NAD",
+  "BWP",
+  "ZMW",
+  "GBP",
+  "EUR",
+  "INR",
+  "AED",
+  "PKR",
+  "AUD",
+  "CAD",
+  "MZN",
+  "MWK",
+  "RWF",
+  "SCR",
+  "MUR",
+  "CHF",
+  "JPY",
+  "CNY",
+  "NZD",
+  "SGD",
+  "HKD",
+  "BRL",
+  "SAR",
+  "EGP",
+  "MAD",
+  "NGN",
+  "GHS",
+  "ETB",
+  "ZWL",
+];
 function storageKey() {
   return `lodge-format:${localStorage.getItem("active_user_id") || ""}:${localStorage.getItem("active_lodge_id") || ""}`;
 }
 export function storeFormatting(preferences: LodgeFormatting) {
   if (typeof window !== "undefined")
-    localStorage.setItem(
-      storageKey(),
-      JSON.stringify({
-        date_format: preferences.date_format,
-        timezone: preferences.timezone,
-      }),
-    );
+    localStorage.setItem(storageKey(), JSON.stringify(preferences));
 }
 export function formatting(): LodgeFormatting {
   if (typeof window === "undefined") return {};
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey()) || "{}");
-    return { date_format: stored.date_format, timezone: stored.timezone };
+    return JSON.parse(localStorage.getItem(storageKey()) || "{}");
   } catch {
     return {};
   }
@@ -70,6 +100,12 @@ export function formatTime(value: string | number | Date) {
 }
 export function formatDateTime(value: string | number | Date) {
   return `${formatDate(value)} · ${formatTime(value)}`;
+}
+export function formatMoney(cents: number) {
+  return new Intl.NumberFormat(locale(), {
+    style: "currency",
+    currency: formatting().currency || "ZAR",
+  }).format(cents / 100);
 }
 export function dateInputValue(value = new Date()) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;

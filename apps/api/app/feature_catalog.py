@@ -1,5 +1,4 @@
 """Code-defined feature capabilities and translatable presentation, not plan grants."""
-RETIRED_FEATURES={'accounting_integrations'}
 # (display name, description, area). Only implemented capabilities are usable.
 BUILT={
  'dashboard':('Lodge overview','Today’s guests, work and operational priorities.','Guests and stays'),
@@ -25,14 +24,14 @@ BUILT={
  'activities':('Activities','Schedule guest activities and guide assignments.','Safari and fleet'),
  'fleet':('Vehicles','Vehicle availability, mileage and service records.','Safari and fleet'),
  'vehicle_checklists':('Vehicle checks','Complete safety and readiness checks.','Safari and fleet'),
- 'fuel':('Fuel records','Track refuelling and mileage.','Safari and fleet'),
+ 'fuel':('Fuel records','Track refuelling, mileage and cost.','Safari and fleet'),
  'transfers':('Transfers','Coordinate guest pickups and drop-offs.','Safari and fleet'),
  'wildlife':('Wildlife sightings','Record sightings and photographs with protected-species access.','Safari and fleet'),
  'ranger':('Ranger workspace','Assigned guide work and safari operations.','Safari and fleet'),
  'offline_mobile':('Offline wildlife recording','Queue wildlife sightings on the web and sync later.','Safari and fleet'),
  'fb':('Food and drink staff access','Invite staff using the food-and-drink preset.','Food and drink'),
  'fb_operations':('Meal services','Schedule meals and view dietary requirements.','Food and drink'),
- 'reports':('Operational reports','Review permitted operational summaries.','Reports and AI'),
+ 'reports':('Operational reports','Review permitted operations and cost summaries.','Reports and AI'),
  'audit':('Audit history','Retain a history of access and operational changes.','Reports and AI'),
  'branding.basic':('Lodge branding','Lodge name and logo alongside SafariOS.','Branding'),
 }
@@ -58,6 +57,7 @@ FUTURE={
  'satellite_tracking':('Satellite tracking','Vehicle tracking over a satellite connection.','Safari and fleet'),
  'pms.optional':('Booking-system connection','Connect an external property management system.','Integrations'),
  'pms_integrations':('Booking integrations','Connect external booking and property systems.','Integrations'),
+ 'accounting_integrations':('Accounting integrations','Connect an external accounting system.','Integrations'),
  'messaging_integrations':('Messaging integrations','Connect external guest messaging services.','Integrations'),
  'api_access':('External API connections','Managed access for external applications.','Integrations'),
  'branding.enhanced':('Enhanced branding','Additional branding customisation.','Branding'),

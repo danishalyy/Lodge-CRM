@@ -39,7 +39,7 @@ class Lodge(Base):
     location: Mapped[str] = mapped_column(String(240), default="")
     timezone: Mapped[str] = mapped_column(String(80), default="Africa/Johannesburg")
     date_format: Mapped[str] = mapped_column(String(20), default="locale", server_default="locale")
-    currency: Mapped[str] = mapped_column(String(3), default="PKR", server_default="PKR")
+    currency: Mapped[str] = mapped_column(String(3), default="ZAR", server_default="ZAR")
     brand_name: Mapped[str] = mapped_column(String(180), default="")
     logo_png: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
     protected_species: Mapped[str] = mapped_column(Text, default="rhino,black rhino,white rhino")

@@ -1,4 +1,5 @@
-from pydantic import Field
+from typing import Annotated
+from pydantic import Field, TypeAdapter, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
     invitation_resend_cooldown_seconds: int = Field(60, ge=1, le=86400)
     mfa_encryption_key: str = ""
     password_reset_ttl_minutes: int = 30
+    ai_configuration_invalid: bool = False
     ai_enabled: bool = False
     ai_provider: str = "vllm"
     vllm_base_url: str = ""
@@ -43,6 +45,28 @@ class Settings(BaseSettings):
     ai_lodge_requests_per_minute: int = Field(30, ge=1, le=300)
     ai_lodge_concurrency: int = Field(2, ge=1, le=8)
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def isolate_invalid_ai_configuration(cls, data):
+        # Optional inference configuration must not prevent core CRM startup.
+        if not isinstance(data, dict):
+            return data
+        result = dict(data)
+        invalid = False
+        for name, field in cls.model_fields.items():
+            if not name.startswith(("ai_", "vllm_")) or name not in result:
+                continue
+            try:
+                annotation = Annotated[field.annotation, *field.metadata] if field.metadata else field.annotation
+                result[name] = TypeAdapter(annotation).validate_python(result[name])
+            except (ValidationError, TypeError, ValueError):
+                result[name] = field.default
+                invalid = True
+        if invalid:
+            result["ai_enabled"] = False
+            result["ai_configuration_invalid"] = True
+        return result
 
     @property
     def origins(self):

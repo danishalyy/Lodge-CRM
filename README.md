@@ -125,3 +125,7 @@ This milestone closes password-reset/MFA bypasses, protects one-time reset consu
 The browser now uses same-origin `/api` requests by default. Next.js proxies those to `API_INTERNAL_URL` at **build time**: local default `http://127.0.0.1:8000`, Docker build default `http://api:8000`. Rebuild when changing the internal destination. Avoid setting `NEXT_PUBLIC_API_URL` unless a deliberately configured cross-origin deployment is required. Production domains, HTTPS, email and object storage still need real deployment configuration.
 
 The PostgreSQL runtime test fixture and its required environment are documented in [integration tests](apps/api/tests/integration/README.md). The original source/schema tests alone are not commercial acceptance evidence. CI now runs both suites, dependency audits and the frontend production build. CI execution on GitHub remains unverified until the project is pushed.
+
+### Ask Lodge AI
+
+See [AI audit and phased implementation status](docs/AI_IMPLEMENTATION_AUDIT.md) and [local/test/vLLM setup](docs/AI_SETUP.md). The optional external vLLM gateway and read-only operational tools do not require a GPU to start the core CRM. Real inference requires an operator-configured private vLLM endpoint. Later AI capabilities remain explicitly gated until implemented and verified.

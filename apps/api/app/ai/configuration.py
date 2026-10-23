@@ -5,6 +5,8 @@ from .providers.vllm import VLLMProvider
 
 
 def configuration_state():
+    if settings.ai_configuration_invalid:
+        return "misconfigured"
     if not settings.ai_enabled:
         return "disabled"
     if settings.ai_provider == "test":

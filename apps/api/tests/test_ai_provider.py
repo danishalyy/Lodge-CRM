@@ -113,3 +113,20 @@ def test_vllm_validates_tool_json_and_does_not_execute_it():
     assert result.tool_calls[0].arguments == {
         "lodge_id": "attacker"
     }  # Registry must reject injected scope independently.
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("ai_max_context", "not a number"),
+        ("ai_request_timeout", 0),
+        ("ai_lodge_concurrency", 10000),
+        ("ai_enabled", "not a boolean"),
+    ],
+)
+def test_invalid_optional_ai_environment_cannot_break_core_configuration(field, value):
+    from app.config import Settings
+
+    config = Settings(_env_file=None, **{field: value})
+    assert not config.ai_enabled and config.ai_configuration_invalid
+    assert config.session_ttl_hours == 12

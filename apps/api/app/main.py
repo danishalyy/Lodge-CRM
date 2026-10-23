@@ -989,9 +989,9 @@ def reactivate_staff_access(lodge_id:str,record_id:str,request:Request,user:User
 
 # Units / rooms
 @app.get("/api/v1/lodges/{lodge_id}/rooms")
-def rooms(lodge_id:str,user:User=Depends(require_permission("units.view")),db:Session=Depends(get_db)):
+def rooms(lodge_id:str,user:User=Depends(require_permission("units.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
     out=[]
-    for x in db.scalars(select(Unit).where(Unit.lodge_id==lodge_id).order_by(Unit.name)).all():
+    for x in db.scalars(select(Unit).where(Unit.lodge_id==lodge_id).order_by(Unit.name).limit(limit)).all():
         active_stay=db.scalar(select(Stay).where(Stay.unit_id==x.id,Stay.status=="in_house").limit(1))
         guest=db.get(Guest,active_stay.guest_id) if active_stay else None
         out.append({"id":str(x.id),"name":x.name,"unit_type":x.unit_type,"status":x.status,"notes":x.notes,"current_guest":f"{guest.first_name} {guest.last_name}" if guest else None})
@@ -1229,7 +1229,7 @@ def update_task(lodge_id:str,record_id:str,body:TaskUpdate,request:Request,user:
 
 # Guest requests
 @app.get("/api/v1/lodges/{lodge_id}/requests")
-def requests_list(lodge_id:str,user:User=Depends(require_permission("requests.view")),db:Session=Depends(get_db)):
+def requests_list(lodge_id:str,user:User=Depends(require_permission("requests.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
     ctx=_ctx(db,user,lodge_id);q=select(GuestRequest).where(GuestRequest.lodge_id==lodge_id)
     if ctx.role_key=="department_manager":q=q.where(GuestRequest.department_id==ctx.department_id)
     elif ctx.role_key in {"housekeeping","fb"}:
@@ -1237,7 +1237,7 @@ def requests_list(lodge_id:str,user:User=Depends(require_permission("requests.vi
     elif ctx.role_key=="general_staff":
         staff=_require_own_staff(ctx);q=q.where(GuestRequest.assigned_staff_id==staff.id)
     out=[]
-    for r in db.scalars(q.order_by(GuestRequest.created_at.desc())).all():
+    for r in db.scalars(q.order_by(GuestRequest.created_at.desc()).limit(limit)).all():
         g=db.get(Guest,r.guest_id);staff=db.get(StaffProfile,r.assigned_staff_id) if r.assigned_staff_id else None;dep=db.get(Department,r.department_id) if r.department_id else None
         out.append({"id":str(r.id),"guest_id":str(r.guest_id),"guest_name":f"{g.first_name} {g.last_name}" if g else "","stay_id":str(r.stay_id) if r.stay_id else None,"department_id":str(r.department_id) if r.department_id else None,"department_name":dep.name if dep else None,"assigned_staff_id":str(r.assigned_staff_id) if r.assigned_staff_id else None,"assigned_staff_name":staff.full_name if staff else None,"task_id":str(r.task_id) if r.task_id else None,"request_type":r.request_type,"description":r.description,"priority":r.priority,"status":r.status,"resolution":r.resolution,"created_at":r.created_at.isoformat()})
     return out
@@ -1306,13 +1306,13 @@ def request_to_task(lodge_id:str,record_id:str,request:Request,user:User=Depends
 
 # Maintenance
 @app.get("/api/v1/lodges/{lodge_id}/maintenance")
-def maintenance_list(lodge_id:str,user:User=Depends(require_permission("maintenance.view")),db:Session=Depends(get_db)):
+def maintenance_list(lodge_id:str,user:User=Depends(require_permission("maintenance.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
     ctx=_ctx(db,user,lodge_id);q=select(MaintenanceTicket).where(MaintenanceTicket.lodge_id==lodge_id)
     if ctx.role_key=="department_manager":q=q.where(MaintenanceTicket.department_id==ctx.department_id)
     elif ctx.role_key in {"housekeeping","ranger","driver","general_staff"}:
         staff=ctx.staff;q=q.where(or_(MaintenanceTicket.created_by_user_id==user.id,MaintenanceTicket.assigned_staff_id==(staff.id if staff else None)))
     out=[]
-    for m in db.scalars(q.order_by(MaintenanceTicket.created_at.desc())).all():
+    for m in db.scalars(q.order_by(MaintenanceTicket.created_at.desc()).limit(limit)).all():
         unit=db.get(Unit,m.unit_id) if m.unit_id else None;staff=db.get(StaffProfile,m.assigned_staff_id) if m.assigned_staff_id else None;vehicle=db.get(Vehicle,m.vehicle_id) if m.vehicle_id else None;dep=db.get(Department,m.department_id) if m.department_id else None
         out.append({"id":str(m.id),"title":m.title,"description":m.description,"category":m.category,"priority":m.priority,"status":m.status,"department_id":str(m.department_id) if m.department_id else None,"department_name":dep.name if dep else None,"unit_id":str(m.unit_id) if m.unit_id else None,"unit_name":unit.name if unit else None,"vehicle_id":str(m.vehicle_id) if m.vehicle_id else None,"vehicle_name":(vehicle.name or vehicle.registration) if vehicle else None,"assigned_staff_id":str(m.assigned_staff_id) if m.assigned_staff_id else None,"assigned_staff_name":staff.full_name if staff else None,"cost_cents":m.cost_cents,"asset_id":str(m.asset_id) if m.asset_id else None,"scheduled_for":m.scheduled_for.isoformat() if m.scheduled_for else None,"downtime_started_at":m.downtime_started_at.isoformat() if m.downtime_started_at else None,"downtime_ended_at":m.downtime_ended_at.isoformat() if m.downtime_ended_at else None,"recurrence_interval_days":m.recurrence_interval_days,"resolution":m.resolution,"created_at":m.created_at.isoformat()})
     return out
@@ -1423,8 +1423,8 @@ def _transfer_conflicts(db:Session,lodge_id,starts,ends,driver_id=None,vehicle_i
         if vehicle_id and x.vehicle_id==vehicle_id: raise HTTPException(409,"Vehicle already has an overlapping activity")
 
 @app.get("/api/v1/lodges/{lodge_id}/vehicles")
-def list_vehicles(lodge_id:str,user:User=Depends(require_permission("vehicles.view")),db:Session=Depends(get_db)):
-    rows=db.scalars(select(Vehicle).where(Vehicle.lodge_id==lodge_id).order_by(Vehicle.registration)).all()
+def list_vehicles(lodge_id:str,user:User=Depends(require_permission("vehicles.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
+    rows=db.scalars(select(Vehicle).where(Vehicle.lodge_id==lodge_id).order_by(Vehicle.registration).limit(limit)).all()
     return [{"id":str(v.id),"registration":v.registration,"name":v.name,"make":v.make,"model":v.model,"year":v.year,"odometer_km":v.odometer_km,"fuel_capacity_litres":float(v.fuel_capacity_litres) if v.fuel_capacity_litres is not None else None,"fuel_level_percent":v.fuel_level_percent,"status":v.status,"service_due_odometer_km":v.service_due_odometer_km,"service_due_in_km":(v.service_due_odometer_km-v.odometer_km) if v.service_due_odometer_km is not None else None,"notes":v.notes} for v in rows]
 
 @app.post("/api/v1/lodges/{lodge_id}/vehicles",dependencies=[Depends(require_csrf)])
@@ -2076,11 +2076,11 @@ def add_task_comment(lodge_id:str,record_id:str,body:TaskCommentCreate,request:R
     row=TaskComment(lodge_id=lodge_id,task_id=task.id,user_id=user.id,body=body.body.strip());db.add(row);db.flush();audit(db,request,lodge_id,user.id,"task.comment_added","task",str(task.id));db.commit();return {"id":str(row.id)}
 
 @app.get("/api/v1/lodges/{lodge_id}/housekeeping-jobs")
-def list_housekeeping_jobs(lodge_id:str,user:User=Depends(require_permission("housekeeping.view")),db:Session=Depends(get_db)):
+def list_housekeeping_jobs(lodge_id:str,user:User=Depends(require_permission("housekeeping.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
     ctx=_ctx(db,user,lodge_id);q=select(HousekeepingJob).where(HousekeepingJob.lodge_id==lodge_id)
     if ctx.role_key=="housekeeping":q=q.where(HousekeepingJob.assigned_staff_id==_require_own_staff(ctx).id)
     elif ctx.role_key=="department_manager":q=q.join(StaffProfile,StaffProfile.id==HousekeepingJob.assigned_staff_id).where(StaffProfile.department_id==ctx.department_id)
-    rows=db.scalars(q.order_by(HousekeepingJob.due_at.asc().nullslast(),HousekeepingJob.created_at.desc())).all()
+    rows=db.scalars(q.order_by(HousekeepingJob.due_at.asc().nullslast(),HousekeepingJob.created_at.desc()).limit(limit)).all()
     return [{"id":str(x.id),"unit_id":str(x.unit_id),"unit_name":db.get(Unit,x.unit_id).name if db.get(Unit,x.unit_id) else "","assigned_staff_id":str(x.assigned_staff_id) if x.assigned_staff_id else None,"assigned_staff_name":_name_staff(db,x.assigned_staff_id),"inspector_staff_id":str(x.inspector_staff_id) if x.inspector_staff_id else None,"job_type":x.job_type,"status":x.status,"linen_notes":x.linen_notes,"notes":x.notes,"due_at":x.due_at.isoformat() if x.due_at else None} for x in rows]
 
 @app.post("/api/v1/lodges/{lodge_id}/housekeeping-jobs",dependencies=[Depends(require_csrf)])

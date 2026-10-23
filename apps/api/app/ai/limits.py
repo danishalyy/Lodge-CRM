@@ -46,8 +46,10 @@ def admission(user_id, lodge_id):
             ttl,
         )
     except redis.RedisError:
+        client.close()
         raise HTTPException(503, "AI admission service is unavailable") from None
     if not ok:
+        client.close()
         raise HTTPException(
             429, "AI is busy. Please try again shortly", headers={"Retry-After": "60"}
         )

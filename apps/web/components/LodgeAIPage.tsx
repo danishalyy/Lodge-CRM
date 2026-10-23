@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { aiApi, getActiveLodgeId, getActiveUserId } from "@/lib/api";
+import { ApiError, aiApi, getActiveLodgeId, getActiveUserId } from "@/lib/api";
 import { aiCopy as copy } from "@/lib/strings/ai";
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "./ui/field";
@@ -25,9 +25,18 @@ export default function LodgeAIPage() {
       if (token !== generation.current || origin !== scope()) return;
       setStatus(s);
       setConversations(c);
+      if (conversation && !c.some((row: any) => row.id === conversation)) {
+        setConversation("");
+        setMessages([]);
+      }
     } catch (e) {
-      if (token === generation.current && origin === scope())
+      if (token === generation.current && origin === scope()) {
+        if (e instanceof ApiError && [401, 403, 409].includes(e.status)) {
+          setConversation("");
+          setMessages([]);
+        }
         setError((e as Error).message);
+      }
     }
   }
   useEffect(() => {
@@ -57,8 +66,13 @@ export default function LodgeAIPage() {
         setMessages(rows);
       }
     } catch (e) {
-      if (token === generation.current && origin === scope())
+      if (token === generation.current && origin === scope()) {
+        if (e instanceof ApiError && [401, 403, 409].includes(e.status)) {
+          setConversation("");
+          setMessages([]);
+        }
         setError((e as Error).message || copy.historyFailed);
+      }
     } finally {
       if (token === generation.current && origin === scope()) setBusy(false);
     }
@@ -88,8 +102,13 @@ export default function LodgeAIPage() {
         setQuestion("");
       }
     } catch (e) {
-      if (token === generation.current && origin === scope())
+      if (token === generation.current && origin === scope()) {
+        if (e instanceof ApiError && [401, 403, 409].includes(e.status)) {
+          setConversation("");
+          setMessages([]);
+        }
         setError((e as Error).message || copy.failed);
+      }
     } finally {
       if (token === generation.current && origin === scope()) setBusy(false);
     }
@@ -173,6 +192,7 @@ export default function LodgeAIPage() {
               <div className="aiSuggestions" aria-label={copy.suggestion}>
                 {status.tools
                   .filter((t: any) => t.suggestion)
+                  .slice(0, 5)
                   .map((t: any) => (
                     <button
                       className="button secondary"
@@ -214,6 +234,7 @@ export default function LodgeAIPage() {
             <Form onSubmit={send}>
               <Field label={copy.question}>
                 <textarea
+                  className="textarea"
                   name="content"
                   required
                   maxLength={3000}

@@ -2,7 +2,7 @@ from uuid import uuid4
 from datetime import date, timedelta
 import pytest
 from sqlalchemy import select, text
-from app.ai.providers.base import Completion, ProviderUnavailable
+from app.ai.providers.base import Completion, ProviderUnavailable, ToolCall
 
 
 @pytest.fixture
@@ -31,7 +31,10 @@ def ai(account, monkeypatch):
         )
         db.commit()
     provider = TestProvider(
-        [Completion("Connection test response", input_tokens=11, output_tokens=5)]
+        [
+            Completion(tool_calls=[ToolCall("tasks-call", "get_tasks", {})]),
+            Completion("Connection test response", input_tokens=11, output_tokens=5),
+        ]
     )
     app.dependency_overrides[provider_dependency] = lambda: provider
     try:
@@ -61,7 +64,7 @@ def test_ai_persists_private_turn_and_usage_and_idempotency(ai):
     reply = c.post(path, json=body, headers=ai["csrf"])
     assert reply.status_code == 200, reply.text
     again = c.post(path, json=body, headers=ai["csrf"])
-    assert again.json() == reply.json() and len(ai["provider"].calls) == 1
+    assert again.json() == reply.json() and len(ai["provider"].calls) == 2
     history = c.get(path).json()
     assert [x["role"] for x in history] == ["user", "assistant"]
     with ai["owner"]() as db:
@@ -260,3 +263,88 @@ def test_ai_explicitly_denies_automatic_super_admin_tenant_inference(ai):
         db.commit()
     response = ai["client"].get(ai["base"] + "/status")
     assert response.status_code == 403 and "support access" in response.text
+
+
+def test_ai_history_is_private_between_users_in_the_same_lodge(ai):
+    from fastapi.testclient import TestClient
+    from sqlalchemy.exc import IntegrityError
+    from app.main import app
+    from app.models import AIMessage
+    from app.db import set_rls_context
+    from test_account_isolation import other_account
+
+    cid = create(ai)
+    other, session, raw, csrf = other_account(ai, lodge_id=ai["lodge"].id)
+    client = TestClient(app)
+    try:
+        client.cookies.set("lodge_session", raw)
+        assert (
+            client.get(ai["base"] + f"/conversations/{cid}/messages").status_code == 404
+        )
+        assert client.get(ai["base"] + "/conversations").json() == []
+    finally:
+        client.close()
+    from uuid import UUID
+
+    with ai["application"]() as db:
+        set_rls_context(db, str(ai["lodge"].id), False, str(other.id))
+        db.add(
+            AIMessage(
+                lodge_id=ai["lodge"].id,
+                user_id=other.id,
+                conversation_id=UUID(cid),
+                request_id=uuid4(),
+                role="user",
+                content="Cannot attach to somebody else’s conversation",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.flush()
+        db.rollback()
+
+
+def test_ai_redis_failure_is_closed_without_affecting_core(ai, monkeypatch):
+    import redis
+    from app.ai import limits
+
+    class FailedAdmission:
+        closed = False
+
+        def eval(self, *args):
+            raise redis.ConnectionError("private service details")
+
+        def close(self):
+            self.closed = True
+
+    failed = FailedAdmission()
+    cid = create(ai)
+    monkeypatch.setattr(limits.redis.Redis, "from_url", lambda *args, **kwargs: failed)
+    response = ai["client"].post(
+        ai["base"] + f"/conversations/{cid}/messages",
+        json={"request_id": str(uuid4()), "content": "Tasks"},
+        headers=ai["csrf"],
+    )
+    assert (
+        response.status_code == 503
+        and "private service" not in response.text
+        and failed.closed
+    )
+    assert ai["provider"].calls == []
+    assert ai["client"].get("/api/v1/auth/me").status_code == 200
+    assert (
+        ai["client"].get(f"/api/v1/lodges/{ai['lodge'].id}/guests").status_code == 200
+    )
+
+
+def test_ai_redis_concurrency_lease_releases_after_request(ai):
+    from fastapi import HTTPException
+    from app.ai.limits import admission
+
+    user, lodge = uuid4(), uuid4()
+    with admission(user, lodge):
+        with pytest.raises(HTTPException) as rejected:
+            with admission(user, lodge):
+                pass
+        assert rejected.value.status_code == 429
+    with admission(user, lodge):
+        pass

@@ -110,7 +110,11 @@ def status(
         ),
         "provider": settings.ai_provider,
         "tools": [
-            {"name": x["function"]["name"], "description": x["function"]["description"]}
+            {
+                "name": x["function"]["name"],
+                "description": x["function"]["description"],
+                "suggestion": tools.REGISTRY[x["function"]["name"]].suggestion,
+            }
             for x in tools.available(db, ctx, lodge_id)
         ],
     }
@@ -260,6 +264,7 @@ def send_message(
         input_tokens = 0
         output_tokens = 0
         tool_count = 0
+        rejected_tool = None
         try:
             for turn in range(settings.ai_max_rounds):
                 ctx = guard(db, user, lodge_id, request, write=True)
@@ -281,7 +286,7 @@ def send_message(
                 input_tokens += reply.input_tokens
                 output_tokens += reply.output_tokens
                 if not reply.tool_calls:
-                    if approved and not sources:
+                    if not sources:
                         raise ProviderUnavailable("no_operational_sources")
                     ctx = guard(db, user, lodge_id, request, write=True)
                     if fingerprint(db, ctx, lodge_id) != expected:
@@ -323,9 +328,32 @@ def send_message(
                         409, "Your access changed. Start a new conversation"
                     )
                 tool_count += 1
+                rejected_tool = (
+                    call.name[:80] if isinstance(call.name, str) else "invalid_tool"
+                )
                 result = tools.execute(
                     call.name, call.arguments, db, ctx, lodge_id, request
                 )
+                remaining = (
+                    settings.ai_max_context
+                    - settings.ai_max_output_tokens
+                    - len(json.dumps([prompt, approved], ensure_ascii=False).encode())
+                    - 1024
+                )
+                if "items" in result:
+                    while (
+                        result["items"]
+                        and len(json.dumps(result, ensure_ascii=False).encode())
+                        > remaining
+                    ):
+                        result["items"].pop()
+                        result["partial"] = True
+                    result["returned_count"] = len(result["items"])
+                if len(json.dumps(result, ensure_ascii=False).encode()) > remaining:
+                    raise HTTPException(
+                        413,
+                        "The operational result exceeds the AI context limit. Ask a narrower question",
+                    )
                 db.add(
                     AIToolExecution(
                         lodge_id=lodge_id,
@@ -337,8 +365,15 @@ def send_message(
                     )
                 )
                 db.commit()
+                rejected_tool = None
                 source = {
                     "kind": "live",
+                    "label": tools.REGISTRY[call.name].label,
+                    "lodge_id": str(lodge_id),
+                    "partial": bool(result.get("partial")),
+                    "record_ids": [
+                        r["id"] for r in result.get("items", []) if r.get("id")
+                    ],
                     "tool": call.name,
                     "retrieved_at": datetime.now(timezone.utc).isoformat(),
                 }
@@ -370,6 +405,17 @@ def send_message(
         except (ProviderUnavailable, HTTPException) as error:
             db.rollback()
             set_rls_context(db, str(lodge_id), False, str(user.id))
+            if rejected_tool:
+                db.add(
+                    AIToolExecution(
+                        lodge_id=lodge_id,
+                        user_id=user.id,
+                        conversation_id=conversation_id,
+                        request_id=body.request_id,
+                        name=rejected_tool,
+                        status="denied",
+                    )
+                )
             failed = db.get(AIUsage, usage.id)
             if failed:
                 failed.status = "failed"

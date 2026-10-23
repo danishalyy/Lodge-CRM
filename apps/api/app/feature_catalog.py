@@ -1,6 +1,8 @@
 """Code-defined feature capabilities and translatable presentation, not plan grants."""
 # (display name, description, area). Only implemented capabilities are usable.
 BUILT={
+ 'ai':('Lodge AI','Ask operational questions using permitted live data through a configured private vLLM service. Read-only tools; documents, writes and group comparisons are separate future capabilities.','Reports and AI'),
+
  'dashboard':('Lodge overview','Today’s guests, work and operational priorities.','Guests and stays'),
  'guests':('Guest profiles','Guest contact details, preferences and stay history.','Guests and stays'),
  'stays':('Stays','Arrivals, departures and room assignments.','Guests and stays'),
@@ -38,7 +40,6 @@ BUILT={
 FUTURE={
  'guest_mobile':('Guest mobile app','A dedicated guest application.','Integrations'),
  'staff_mobile':('Staff mobile app','A dedicated staff application.','Integrations'),
- 'ai':('Lodge AI','Ask questions using approved lodge information.','Reports and AI'),
  'ai_knowledge':('AI knowledge','Approved knowledge for lodge questions.','Reports and AI'),
  'document_knowledge':('Document knowledge','Use approved documents in lodge intelligence.','Reports and AI'),
  'advanced_reports':('Advanced analytics','Additional configurable analysis and reports.','Reports and AI'),

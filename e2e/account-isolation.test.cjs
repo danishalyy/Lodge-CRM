@@ -675,3 +675,20 @@ test('AI outage shows a real unavailable state while core navigation works',asyn
   await page.getByRole('link',{name:'Tasks',exact:true}).click();await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();
  }finally{await context.close()}
 });
+
+test('AI workspace sends a scoped question and displays server provenance',async()=>{
+ const {context,page}=await accountPage({id:'ai-reader',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'ai-scope',permissions:['ai.use','tasks.view'],entitlements:['ai','tasks']}]});let sent,rows=[],revoked=false;
+ try{
+  await page.route('**/api/v1/lodges/ai-scope/ai/**',async r=>{const p=new URL(r.request().url()).pathname;
+   if(p.endsWith('/status'))return r.fulfill({json:{state:'ready',provider:'vllm',scope:{lodge_id:'ai-scope',lodge_name:'River Lodge'},tools:[{name:'get_tasks',suggestion:'Which tasks are overdue?'}]}});
+   if(p.endsWith('/conversations'))return r.fulfill({json:r.request().method()==='POST'?{id:'conversation-1',created_at:'2026-10-23T08:00:00Z'}:[]});
+   if(p.endsWith('/messages')){if(r.request().method()==='POST'){if(revoked)return r.fulfill({status:403,json:{detail:'Your AI access was revoked'}});sent=r.request().postDataJSON();assert.deepEqual(Object.keys(sent).sort(),['content','request_id']);rows=[{id:'m1',role:'user',content:sent.content},{id:'m2',role:'assistant',content:'Test fixture summary of approved tasks.',sources:[{kind:'live',label:'Tasks',lodge_id:'ai-scope',tool:'get_tasks',retrieved_at:'2026-10-23T08:00:00Z'}]}];return r.fulfill({json:rows[1]});}return r.fulfill({json:rows});}
+   throw Error('Unexpected AI route');
+  });
+  await page.goto(base+'/lodge-ai');await page.getByRole('button',{name:'Which tasks are overdue?',exact:true}).click();assert.equal(await page.getByLabel('Your question',{exact:true}).inputValue(),'Which tasks are overdue?');
+  await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByText('Test fixture summary of approved tasks.',{exact:true}).waitFor();assert.equal(sent.content,'Which tasks are overdue?');
+  await page.getByText('Sources checked',{exact:true}).click();await page.locator('.aiMessage li').getByText(/Tasks/).waitFor();assert.equal(await page.getByText('Record created',{exact:true}).count(),0);
+  for(const width of [375,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-ai-${width}-${theme}.png`,fullPage:true});}
+  revoked=true;await page.getByLabel('Your question',{exact:true}).fill('Check again');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByRole('alert').filter({hasText:'Your AI access was revoked'}).waitFor();assert.equal(await page.getByText('Test fixture summary of approved tasks.',{exact:true}).count(),0);
+ }finally{await context.close()}
+});

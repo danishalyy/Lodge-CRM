@@ -50,3 +50,25 @@ RAG requires actual private upload/verification, Celery extraction, versioned em
 Group aggregation must resolve owner/group and explicit lodge memberships and recheck each lodge's subscription/AI entitlement using separate tenant contexts. Writes require actor/lodge/conversation-bound, expiring single-use server confirmation, then the existing CRM mutation logic/audit/events/notifications. Scheduled reports/insights require actor-scoped jobs and deterministic metrics/detection, not privileged global worker data sent wholesale to the model.
 
 Real vLLM acceptance remains manual until a GPU endpoint is supplied: test operational queries, malformed/unauthorised tool calls, outage isolation, simultaneous conversations, first-token/end-to-end latency, tool accuracy, VRAM/utilisation, queue depth and saturation. RAG, writes and cross-property examples are only meaningful after their corresponding phases exist. A successful deterministic test is not real inference acceptance. No production-ready claim is warranted without these results.
+
+## Implemented read-only operational tools
+
+The base `ai` capability now supports fifteen registered read tools: dashboard, tasks, rooms, current stays, arrivals, departures, requests, housekeeping, maintenance, vehicles, fuel logs, activities, transfers, private notifications and report metrics. The registry is code-defined; permissions, plan grants and lodge exceptions remain database-defined. Suggestions come from authorised registered tools, not frontend role/package lists.
+
+Adapters invoke the existing permission dependency explicitly and reuse operational handlers and their scopes. Five previously unbounded list handlers accept an optional finite limit for adapters while preserving the existing default behaviour of normal screens. Tool responses include the selected lodge, lodge time zone/current day, allowlisted fields and explicit partial-page flags. Date/search filters apply to bounded retrieved pages; when partial, answers must not claim a complete inventory or a zero result across the whole lodge. Use deterministic dashboard/report metrics for supported full-scope counts. Dashboard counts that represent stays are labelled as stays, not fabricated guest totals. Assigned-work base scopes cannot use lodge-wide dashboard/report aggregates.
+
+Guest names are limited to permitted stay/arrival records; contact, dietary/medical, staff HR/performance, financial values, precise wildlife positions, free-form notes and raw event details are not included in these initial DTOs. No registered tool reads arbitrary URLs, SQL, files, HR records, protected coordinates or writes. Source metadata comes from completed server tool execution, never model-authored citations. Each final operational answer requires at least one successful current tool result; a model answer with no tool evidence is refused. This is an evidence-presence check, not proof that a real model's prose is factually accurate: real-model grounding/tool-call quality still needs evaluation.
+
+Invalid optional AI environment values disable AI with a misconfigured state instead of preventing core Settings/application startup. Health probes are cached and release the DB connection before network I/O. Chat likewise releases DB transactions while waiting on the GPU. Redis failure disables admission for AI alone. Existing private GPU configuration must still be supplied before actual inference is usable.
+
+Not implemented: Operational Memory retrieval, RAG ingestion/pgvector/embeddings, multi-property AI comparisons, AI actions/confirmations, generated/scheduled AI reports and insights, retention jobs, streaming, and real-GPU/load acceptance. Their capabilities remain future; existing non-AI memory, reports, notifications, Group Admin and CRM actions continue to function normally.
+
+### GPU-free regression command
+
+From `apps/api`, configure a reachable **test-only** `TEST_DATABASE_ADMIN_URL` and `REDIS_URL` as documented in `tests/integration/README.md`, then run:
+
+```sh
+python -m pytest -q -p no:cacheprovider --tb=short
+```
+
+AI integration tests select the test environment/provider themselves, use real PostgreSQL under a least-privilege role and provide scripted model tool calls. They create/drop only temporary test databases/roles. You do not need to set `AI_ENABLED=true` or run a GPU for this suite. CI already runs the full suite; integration skips without the test database URL are not an acceptance pass. After the web production build, `BROWSER_EXECUTABLE_PATH=/path/to/chromium npm test --prefix e2e` runs browser fixtures. These are not real-GPU or real operational-data inference tests.

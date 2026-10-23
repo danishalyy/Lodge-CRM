@@ -24,14 +24,14 @@ def test_plan_edit_is_super_only_csrf_protected_and_immediate(account):
         db.add(LodgeEntitlementOverride(lodge_id=account['lodge'].id,feature_key='guests',enabled=False,reason='Private lodge exception'));db.commit()
     plans=c.get('/api/v1/platform/plans').json();plan=next(p for p in plans if p['key']=='Standard')
     assert plan['description'] and plan['lodge_count']>=1
-    assert next(f for f in plan['feature_catalog'] if f['key']=='ai')['status']=='coming_soon'
-    assert 'ai' not in plan['features']
+    assert next(f for f in plan['feature_catalog'] if f['key']=='telemetry')['status']=='coming_soon'
+    assert 'telemetry' not in plan['features']
     original=list(plan['features']);features=[key for key in original if key!='fuel']
     payload={'features':features,'expected_revision':plan['revision'],'expected_lodge_count':plan['lodge_count']}
     assert c.patch(path,json=payload).status_code==403
     assert c.patch(path,json={**payload,'expected_lodge_count':-1},headers=account['csrf']).status_code==422
     assert c.patch(path,json={**payload,'expected_lodge_count':plan['lodge_count']+1},headers=account['csrf']).status_code==409
-    assert c.patch(path,json={**payload,'features':features+['ai']},headers=account['csrf']).status_code==422
+    assert c.patch(path,json={**payload,'features':features+['telemetry']},headers=account['csrf']).status_code==422
     try:
         result=c.patch(path,json=payload,headers=account['csrf']);assert result.status_code==200,result.text
         updated=result.json();assert updated['revision']==plan['revision']+1 and updated['lodge_count']==plan['lodge_count']

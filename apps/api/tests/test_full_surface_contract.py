@@ -15,7 +15,7 @@ WEB=ROOT.parent/'web'
 
 def routes():
     out=[]
-    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text(), (ROOT/'app'/'group_routes.py').read_text()]:
+    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text(), (ROOT/'app'/'group_routes.py').read_text(), (ROOT/'app'/'ai'/'routes.py').read_text()]:
         for n in ast.parse(source).body:
             if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
                 for d in n.decorator_list:

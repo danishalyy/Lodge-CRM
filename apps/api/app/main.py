@@ -2314,3 +2314,7 @@ app.include_router(account_router)
 
 from .group_routes import router as group_router
 app.include_router(group_router)
+
+# The AI gateway is optional; imports perform no inference or network startup work.
+from .ai.routes import router as ai_router
+app.include_router(ai_router)

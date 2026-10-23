@@ -682,3 +682,13 @@ select:focus-visible {
 .packageComparisonPanel, .packageExceptionsPanel { margin-top: var(--space-gap); }
 .packageComparisonPanel { padding: 0; }
 .packageExceptionsPanel:has(> .tableWrap) .packageExceptionControls { padding: var(--space-card); }
+
+.aiWorkspace { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: var(--space-gap); }
+.aiWorkspace nav, .aiMessages { display: grid; gap: 16px; margin: 24px 0; }
+.aiWorkspace nav button { width: 100%; }
+.aiMessage { border-bottom: 1px solid var(--bd); padding-bottom: 24px; overflow-wrap: anywhere; }
+.aiMessage p { white-space: pre-wrap; }
+.aiSuggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.aiConversation { min-width: 0; }
+.aiWorkspace aside { align-self: start; }
+@media (max-width: 767px) { .aiWorkspace { grid-template-columns: minmax(0, 1fr); } }

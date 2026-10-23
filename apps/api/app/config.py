@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     invitation_resend_cooldown_seconds: int = Field(60, ge=1, le=86400)
     mfa_encryption_key: str = ""
     password_reset_ttl_minutes: int = 30
+    ai_enabled: bool = False
+    ai_provider: str = "vllm"
+    vllm_base_url: str = ""
+    vllm_api_key: str = ""
+    vllm_model: str = ""
+    ai_request_timeout: float = Field(30, ge=1, le=120)
+    ai_max_context: int = Field(16384, ge=2048, le=131072)
+    ai_max_output_tokens: int = Field(1024, ge=64, le=4096)
+    ai_max_rounds: int = Field(4, ge=1, le=6)
+    ai_user_requests_per_minute: int = Field(6, ge=1, le=60)
+    ai_lodge_requests_per_minute: int = Field(30, ge=1, le=300)
+    ai_lodge_concurrency: int = Field(2, ge=1, le=8)
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

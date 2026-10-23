@@ -7,7 +7,7 @@ web=root/'apps/web'
 issues=[]
 # Route-level guard audit
 routes=[]
-for source in [main,(root/'apps/api/app/account_routes.py').read_text(), (root/'apps/api/app/group_routes.py').read_text()]:
+for source in [main,(root/'apps/api/app/account_routes.py').read_text(), (root/'apps/api/app/group_routes.py').read_text(), (root/'apps/api/app/ai/routes.py').read_text()]:
     for n in ast.parse(source).body:
         if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
             src=ast.get_source_segment(source,n) or ''

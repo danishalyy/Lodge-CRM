@@ -27,7 +27,7 @@ ROLE_DESCRIPTIONS={
  'general_staff':'Basic access to assigned tasks and permitted personal work.',
  'read_only':'Views the records listed below and cannot change them with this preset.',
 }
-AREA_NAMES={'dashboard':'Overview','guests':'Guests','stays':'Stays','units':'Rooms','requests':'Guest requests','feedback':'Guest feedback','housekeeping':'Housekeeping','maintenance':'Maintenance','staff':'Staff','tasks':'Tasks','vehicles':'Fleet','vehicle_checklists':'Vehicle checks','fuel':'Fuel','activities':'Activities','transfers':'Transfers','wildlife':'Wildlife','ranger':'Ranger tools','reports':'Reports','departments':'Departments','roles':'Roles and access','notifications':'Notifications','memory':'History','audit':'Audit history','fb':'Food and drink','lodge':'Lodge settings'}
+AREA_NAMES={'ai':'Lodge AI','dashboard':'Overview','guests':'Guests','stays':'Stays','units':'Rooms','requests':'Guest requests','feedback':'Guest feedback','housekeeping':'Housekeeping','maintenance':'Maintenance','staff':'Staff','tasks':'Tasks','vehicles':'Fleet','vehicle_checklists':'Vehicle checks','fuel':'Fuel','activities':'Activities','transfers':'Transfers','wildlife':'Wildlife','ranger':'Ranger tools','reports':'Reports','departments':'Departments','roles':'Roles and access','notifications':'Notifications','memory':'History','audit':'Audit history','fb':'Food and drink','lodge':'Lodge settings'}
 
 def permission_metadata(permission):
     key=permission.key;area=key.split('.')[0]

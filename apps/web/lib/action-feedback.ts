@@ -8,6 +8,7 @@ export function actionFeedback(path: string, method: string, result: any) {
       !/^\/api\/v1\/auth\/(sessions|notifications|notification-preferences|mfa\/(enable|disable))(\/|$)/.test(
         path,
       )) ||
+    path.includes("/ai/") ||
     /\/(upload-url|download-url|preview)(\?|$)/.test(path)
   )
     return;

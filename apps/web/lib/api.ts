@@ -724,3 +724,21 @@ export const featureAccessApi = {
       body: JSON.stringify({ feature_key, reason }),
     }),
 };
+
+export const aiApi = {
+  status: () => request<any>(lodgePath("ai/status")),
+  conversations: () => request<any[]>(lodgePath("ai/conversations")),
+  create: () => request<any>(lodgePath("ai/conversations"), { method: "POST" }),
+  messages: (id: string) =>
+    request<any[]>(
+      lodgePath(`ai/conversations/${encodeURIComponent(id)}/messages`),
+    ),
+  send: (id: string, content: string) =>
+    request<any>(
+      lodgePath(`ai/conversations/${encodeURIComponent(id)}/messages`),
+      {
+        method: "POST",
+        body: JSON.stringify({ request_id: crypto.randomUUID(), content }),
+      },
+    ),
+};

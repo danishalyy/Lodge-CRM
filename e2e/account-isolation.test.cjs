@@ -666,3 +666,12 @@ test('Super Admin reviews affected lodges before editing a server-defined plan',
   await confirmation.getByRole('button',{name:'Save plan',exact:true}).click();await page.getByText('Package updated',{exact:true}).waitFor();assert.equal(writes,1);
  }finally{await context.close()}
 });
+
+test('AI outage shows a real unavailable state while core navigation works',async()=>{
+ const {context,page}=await accountPage({id:'ai-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'ai-lodge',permissions:['ai.use','tasks.view'],entitlements:['ai','tasks']}]});
+ try{
+  await page.route('**/api/v1/lodges/ai-lodge/ai/status',r=>r.fulfill({json:{state:'unavailable',provider:'vllm',scope:{lodge_id:'ai-lodge',lodge_name:'AI Lodge'},tools:[]}}));
+  await page.goto(base+'/lodge-ai');await page.getByRole('heading',{name:'Lodge AI is unavailable',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).count(),0);
+  await page.getByRole('link',{name:'Tasks',exact:true}).click();await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();
+ }finally{await context.close()}
+});

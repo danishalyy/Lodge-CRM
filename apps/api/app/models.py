@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 import uuid
-from sqlalchemy import LargeBinary, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index, Numeric
+from sqlalchemy import LargeBinary, Boolean, CheckConstraint, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint, Index, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
@@ -833,3 +833,50 @@ class LodgeGroup(Base):
     admin_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='RESTRICT'), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# Private AI history. Access additionally depends on the current conversation ACL fingerprint.
+class AIPrivate:
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('lodges.id',ondelete='CASCADE'),nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('users.id',ondelete='CASCADE'),nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow)
+
+class AIConversation(AIPrivate,Base):
+    __tablename__='ai_conversations'
+    __table_args__=(UniqueConstraint('id','lodge_id','user_id',name='uq_ai_conversation_scope'),Index('ix_ai_conversation_owner','lodge_id','user_id','created_at'))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    access_fingerprint: Mapped[str] = mapped_column(String(64))
+
+class AIMessage(AIPrivate,Base):
+    __tablename__='ai_messages'
+    __table_args__=(ForeignKeyConstraint(['conversation_id','lodge_id','user_id'],['ai_conversations.id','ai_conversations.lodge_id','ai_conversations.user_id'],ondelete='CASCADE'),UniqueConstraint('conversation_id','request_id','role',name='uq_ai_message_turn_role'),CheckConstraint("role IN ('user','assistant')",name='ck_ai_message_role'),Index('ix_ai_message_conversation','conversation_id','created_at'))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list] = mapped_column(JSONB,default=list,server_default='[]')
+
+class AIUsage(AIPrivate,Base):
+    __tablename__='ai_usage'
+    __table_args__=(ForeignKeyConstraint(['conversation_id','lodge_id','user_id'],['ai_conversations.id','ai_conversations.lodge_id','ai_conversations.user_id'],ondelete='CASCADE'),UniqueConstraint('conversation_id','request_id',name='uq_ai_usage_request'),CheckConstraint("status IN ('pending','complete','failed')",name='ck_ai_usage_status'),Index('ix_ai_usage_owner','lodge_id','user_id','created_at'))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    provider: Mapped[str] = mapped_column(String(20))
+    model: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(20),default='pending')
+    input_tokens: Mapped[int] = mapped_column(Integer,default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer,default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer,default=0)
+    tool_count: Mapped[int] = mapped_column(Integer,default=0)
+    error_code: Mapped[str] = mapped_column(String(80),default='')
+
+class AIToolExecution(AIPrivate,Base):
+    __tablename__='ai_tool_executions'
+    __table_args__=(ForeignKeyConstraint(['conversation_id','lodge_id','user_id'],['ai_conversations.id','ai_conversations.lodge_id','ai_conversations.user_id'],ondelete='CASCADE'),Index('ix_ai_tool_conversation','conversation_id','created_at'))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(20))

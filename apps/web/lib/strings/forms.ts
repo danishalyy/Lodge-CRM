@@ -1,5 +1,16 @@
 // English source catalogue. Keep validation copy here for future locale catalogues.
 export const formCopy = {
+  timezoneChoice: "Choose a time zone from the list.",
+  date: "Enter a valid date.",
+  number: "Enter a valid number.",
+  wholeNumber: "Enter a whole number.",
+  identifier: "Choose a valid record.",
+  choice: "Choose one of the available options.",
+  pattern: "Use the requested format.",
+  minimum: (n: number, strict = false) =>
+    `Enter a value ${strict ? "greater than" : "of at least"} ${n}.`,
+  maximum: (n: number, strict = false) =>
+    `Enter a value ${strict ? "less than" : "of at most"} ${n}.`,
   required: "This field is required.",
   email: "Enter a valid email address.",
   invalid: "Check this value.",

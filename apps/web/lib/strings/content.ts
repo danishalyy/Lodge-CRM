@@ -109,6 +109,8 @@ export const contentCopy = {
     platform: "Platform",
     email: "Email",
     group: "Lodge group",
+    feature: "Feature access",
+    plan: "Package",
   } as Record<string, string>,
   actions: {
     created: "created",
@@ -130,17 +132,12 @@ export const contentCopy = {
     recovery_regenerated: "recovery codes replaced",
     task_created: "task created",
     override: "access updated",
+    access_review_requested: "review requested",
   } as Record<string, string>,
   activity: "Workspace activity updated",
   eventDescription: (subject: string, action: string) =>
     `${subject} ${action}. Recorded in your workspace history.`,
-  packageSummaries: {
-    Basic: "Essential guest profiles, rooms, stays and everyday team tasks.",
-    Standard:
-      "Expanded lodge workflows, departments, staff HR, feedback and operational coordination.",
-    Premium:
-      "Expanded operations and reporting, with premium intelligence options where configured.",
-  } as Record<string, string>,
+  noTimezones: "No matching time zones. Try a city or region.",
   timezone: "Search for a time zone",
   chooseCountry: "Select country…",
   preferences: "Lodge preferences",

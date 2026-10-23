@@ -16,6 +16,7 @@ export function Form({
     const receive = (event: Event) => {
       const next = (event as CustomEvent<Record<string, string>>).detail;
       setErrors(next);
+      setSummary(formCopy.review);
       const control = Array.from(form?.elements ?? []).find(
         (el) =>
           el instanceof HTMLElement && next[el.getAttribute("name") || el.id],
@@ -64,13 +65,16 @@ export function Form({
                     ? formCopy.short((item as HTMLInputElement).minLength)
                     : v.tooLong
                       ? formCopy.long((item as HTMLInputElement).maxLength)
-                      : v.rangeOverflow || v.rangeUnderflow
-                        ? formCopy.range
-                        : formCopy.invalid;
+                      : v.customError
+                        ? item.validationMessage
+                        : v.rangeOverflow || v.rangeUnderflow
+                          ? formCopy.range
+                          : formCopy.invalid;
           }
           setErrors(next);
           setSummary("");
           if (Object.keys(next).length) {
+            setSummary(formCopy.review);
             const first = Array.from(event.currentTarget.elements).find(
               (item) => next[item.getAttribute("name") || item.id],
             );

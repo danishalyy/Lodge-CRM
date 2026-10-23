@@ -668,3 +668,17 @@ select:focus-visible {
 .accessArea { padding:16px 0; border-bottom:1px solid var(--bd); }
 .roleSummary { margin-top:24px; padding:24px; background:var(--sec); border-radius:var(--radius-lg); }
 .checkRow small { display:block; color:var(--tx2); }
+
+.timezoneCombobox { position: relative; min-width: 0; }
+.timezoneOptions { position: absolute; z-index: 60; top: calc(100% + 8px); left: 0; right: 0; max-height: 240px; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--glass-fallback); box-shadow: var(--shadow); padding: 8px; }
+.timezoneOptions [role="option"] { padding: 12px; border-radius: 8px; cursor: pointer; overflow-wrap: anywhere; }
+.timezoneOptions [role="option"][aria-selected="true"], .timezoneOptions [role="option"]:hover { background: var(--selection); color: var(--text-primary); }
+.timezoneOptions p { padding: 12px; }
+
+.timezoneCombobox > input.field { padding-right: 40px; }
+.timezoneChevron { position: absolute; top: 50%; right: 16px; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none; }
+
+.packageCards { gap: var(--space-gap); }
+.packageComparisonPanel, .packageExceptionsPanel { margin-top: var(--space-gap); }
+.packageComparisonPanel { padding: 0; }
+.packageExceptionsPanel:has(> .tableWrap) .packageExceptionControls { padding: var(--space-card); }

@@ -104,7 +104,7 @@ export function formatDateTime(value: string | number | Date) {
 export function formatMoney(cents: number) {
   return new Intl.NumberFormat(locale(), {
     style: "currency",
-    currency: formatting().currency || "ZAR",
+    currency: formatting().currency || "PKR",
   }).format(cents / 100);
 }
 export function dateInputValue(value = new Date()) {

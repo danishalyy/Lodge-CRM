@@ -3,6 +3,15 @@ import { useEffect, useState, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Drawer as Vaul } from "vaul";
+// Dismiss a focused combobox popup before closing its containing dialog.
+function keepOpenForCombobox(event: KeyboardEvent) {
+  const active = document.activeElement;
+  if (
+    active?.getAttribute("role") === "combobox" &&
+    active.getAttribute("aria-expanded") === "true"
+  )
+    event.preventDefault();
+}
 export default function Drawer({
   children,
   onClose,
@@ -43,7 +52,10 @@ export default function Drawer({
       >
         <Vaul.Portal>
           <Vaul.Overlay className="glassOverlay" />
-          <Vaul.Content className="glassDrawer">
+          <Vaul.Content
+            className="glassDrawer"
+            onEscapeKeyDown={keepOpenForCombobox}
+          >
             <div className="drawerHandle" />
             <Vaul.Title className="sr-only">Details and actions</Vaul.Title>
             <Vaul.Description className="sr-only">
@@ -63,7 +75,7 @@ export default function Drawer({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="glassOverlay" />
-        <Dialog.Content asChild>
+        <Dialog.Content onEscapeKeyDown={keepOpenForCombobox} asChild>
           <motion.div
             className="glassDialog"
             initial={reduced ? false : { opacity: 0, scale: 0.96 }}

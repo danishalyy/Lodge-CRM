@@ -122,29 +122,33 @@ export default function SuperAdminPackages() {
           </section>
         ))}
       </div>
-      <section className="panel">
-        <h2>{copy.compare}</h2>
+      <section className="panel packageComparisonPanel">
+        <div className="panelHeader">
+          <h2>{copy.compare}</h2>
+        </div>
         <PackageComparison plans={plans} />
       </section>
-      <section className="panel">
-        <h2>{copy.exception}</h2>
-        {lodges.length === 0 ? (
-          <p>{copy.noLodges}</p>
-        ) : (
-          <Field label={copy.lodge}>
-            <select
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              {lodges.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
-        {selected && !ent && <p>{copy.loading}</p>}
+      <section className="panel packageExceptionsPanel">
+        <div className="packageExceptionControls">
+          <h2>{copy.exception}</h2>
+          {lodges.length === 0 ? (
+            <p>{copy.noLodges}</p>
+          ) : (
+            <Field label={copy.lodge}>
+              <select
+                value={selected}
+                onChange={(e) => setSelected(e.target.value)}
+              >
+                {lodges.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {selected && !ent && <p>{copy.loading}</p>}
+        </div>
         {ent && (
           <div className="tableWrap">
             <table className="dataTable">

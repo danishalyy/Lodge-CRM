@@ -190,10 +190,10 @@ export default function SuperAdminLodges() {
       const result = await superApi.createLodge({
         name: String(f.get("name")),
         location: String(f.get("location")),
-        timezone: String(f.get("timezone") || "Africa/Johannesburg"),
-        package: String(f.get("pkg")),
-        start_date: String(f.get("start")),
-        expiry_date: String(f.get("expiry")),
+        timezone: String(f.get("timezone")),
+        package: String(f.get("package")),
+        start_date: String(f.get("start_date")),
+        expiry_date: String(f.get("expiry_date")),
         admin_email: String(f.get("admin_email")),
         admin_name: String(f.get("admin_name")),
       });
@@ -491,6 +491,7 @@ export default function SuperAdminLodges() {
                       id="property-timezone"
                       className="field"
                       name="timezone"
+                      required
                       defaultValue={
                         Intl.DateTimeFormat().resolvedOptions().timeZone
                       }
@@ -506,7 +507,7 @@ export default function SuperAdminLodges() {
                 <select
                   id="property-package"
                   className="field"
-                  name="pkg"
+                  name="package"
                   value={selectedPackage}
                   onChange={(e) => setSelectedPackage(e.target.value)}
                 >
@@ -533,7 +534,7 @@ export default function SuperAdminLodges() {
                     <input
                       id="property-start"
                       className="field"
-                      name="start"
+                      name="start_date"
                       defaultValue={dateInputValue()}
                       type="date"
                       required
@@ -545,7 +546,7 @@ export default function SuperAdminLodges() {
                     <input
                       id="property-expiry"
                       className="field"
-                      name="expiry"
+                      name="expiry_date"
                       defaultValue={dateInputValue(
                         new Date(
                           new Date().setFullYear(new Date().getFullYear() + 1),

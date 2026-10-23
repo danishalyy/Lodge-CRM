@@ -5,7 +5,7 @@ from sqlalchemy import select
 def test_lodge_preferences_update_and_me_are_scoped_and_audited(account):
     from app.models import AuditLog
     client=account['client'];path=f"/api/v1/lodges/{account['lodge'].id}/preferences"
-    assert client.get(path).json()['currency']=='ZAR'
+    assert client.get(path).json()['currency']=='PKR'
     body={'currency':'USD','date_format':'dd/MM/yyyy'}
     assert client.patch(path,json=body).status_code==403
     response=client.patch(path,json=body,headers=account['csrf'])
@@ -47,3 +47,16 @@ def test_registration_rejects_invalid_timezone_with_field_error(account):
     response=account['client'].post('/api/v1/platform/lodges',json={'name':'Time zone test','package':'Basic','timezone':'Not/AZone','start_date':date.today().isoformat(),'expiry_date':(date.today()+timedelta(days=365)).isoformat(),'admin_name':'Owner Name','admin_email':'owner@example.com'},headers=account['csrf'])
     assert response.status_code==422,response.text
     assert response.json()['detail'][0]['loc']==['body','timezone']
+
+
+def test_new_currency_defaults_preserve_explicit_lodge_choices(account):
+    from app.models import Lodge
+    from sqlalchemy import text
+    with account['owner']() as db:
+        explicit=Lodge(name='Existing rand choice '+uuid4().hex,currency='ZAR')
+        fresh=Lodge(name='New default '+uuid4().hex)
+        db.add_all([explicit,fresh]);db.flush()
+        # Exercise the database default independently of the ORM default.
+        direct=db.execute(text("INSERT INTO lodges (id,name,location,timezone,brand_name,protected_species,status,created_at,updated_at) VALUES (:id,:name,'','UTC','','rhino','active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING currency"),{'id':str(uuid4()),'name':'SQL default '+uuid4().hex}).scalar_one()
+        db.commit();db.refresh(explicit);db.refresh(fresh)
+        assert explicit.currency=='ZAR' and fresh.currency=='PKR' and direct=='PKR'

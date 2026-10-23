@@ -66,6 +66,7 @@ export const accessCopy = {
     `This changes ${n} lodges on this plan. Lodge exceptions still apply.`,
   plans: "Packages",
   compare: "Compare packages",
+  packageSaved: "Package updated",
   planSave: "Save plan",
   editPlan: "Edit plan",
   features: "Features",

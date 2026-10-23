@@ -86,16 +86,42 @@ export function formatApiError(status: number, payload: unknown): ApiError {
       const field = location.at(-1);
       if (!field || fields[field]) continue;
       const type = String(issue.type || "");
+      const context =
+        issue.ctx && typeof issue.ctx === "object" ? issue.ctx : {};
+      const numeric = (key: string, fallback: number) =>
+        Number.isFinite(Number(context[key])) ? Number(context[key]) : fallback;
       fields[field] =
         type === "missing"
           ? formCopy.required
           : /email/i.test(String(issue.msg)) || /email/i.test(field)
             ? formCopy.email
             : /too_short/.test(type)
-              ? formCopy.short(Number(issue.ctx?.min_length || 1))
+              ? formCopy.short(numeric("min_length", 1))
               : /too_long/.test(type)
-                ? formCopy.long(Number(issue.ctx?.max_length || 200))
-                : formCopy.invalid;
+                ? formCopy.long(numeric("max_length", 200))
+                : field === "timezone"
+                  ? formCopy.timezoneChoice
+                  : /date|time_parsing/.test(type)
+                    ? formCopy.date
+                    : /int_/.test(type)
+                      ? formCopy.wholeNumber
+                      : /float_|decimal_/.test(type)
+                        ? formCopy.number
+                        : /uuid_/.test(type)
+                          ? formCopy.identifier
+                          : type === "greater_than_equal"
+                            ? formCopy.minimum(numeric("ge", 0))
+                            : type === "greater_than"
+                              ? formCopy.minimum(numeric("gt", 0), true)
+                              : type === "less_than_equal"
+                                ? formCopy.maximum(numeric("le", 0))
+                                : type === "less_than"
+                                  ? formCopy.maximum(numeric("lt", 0), true)
+                                  : /enum|literal_error/.test(type)
+                                    ? formCopy.choice
+                                    : /pattern_mismatch/.test(type)
+                                      ? formCopy.pattern
+                                      : formCopy.invalid;
     }
     return new ApiError(formCopy.review, status, fields);
   }

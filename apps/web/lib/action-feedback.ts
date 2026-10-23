@@ -91,6 +91,6 @@ export function actionFeedback(path: string, method: string, result: any) {
     message = result?.already_pending
       ? accessCopy.reviewPending
       : accessCopy.reviewSent;
-  if (/\/platform\/plans\//.test(path)) message = "Package updated";
+  if (/\/platform\/plans\//.test(path)) message = accessCopy.packageSaved;
   toast.success(message, { id: `action:${path}` });
 }

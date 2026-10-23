@@ -473,6 +473,7 @@ test('shared error formatter hides server internals and handles malformed valida
   assert.equal(output.formatApiError(500,{detail:'psycopg SECRET'}).message,copy.formCopy.unavailable);
   assert.deepEqual(output.formatApiError(422,{detail:[null,{loc:['body','email'],msg:'email invalid'}]}).fieldErrors,{email:copy.formCopy.email});
   assert.equal(output.formatApiError(403,{detail:{private:'data'}}).message,copy.formCopy.forbidden);
+  assert.deepEqual(output.formatApiError(422,{detail:[{loc:['body','timezone'],type:'value_error',msg:'secret internal detail'},{loc:['body','capacity'],type:'greater_than_equal',ctx:{ge:1}},{loc:['body','start_date'],type:'date_from_datetime_parsing'}]}).fieldErrors,{timezone:copy.formCopy.timezoneChoice,capacity:copy.formCopy.minimum(1),start_date:copy.formCopy.date});
 });
 
 test('empty lodge shows permission-aware setup and hides single-lodge selector',async()=>{
@@ -542,12 +543,17 @@ test('lodge registration defaults dates and searchable timezone, formats errors 
    return r.fulfill({json:created?[{id:'registered-lodge',name:created.name,location:created.location,subscription_status:'Active',subscription:{package:created.package,expiry_date:created.expiry_date}}]:[]});
   });
   await page.goto(base+'/super-admin/lodges');await page.getByRole('button',{name:'+ Register lodge',exact:true}).click();
-  assert.equal(await page.getByLabel('Time zone',{exact:true}).inputValue(),await page.evaluate(()=>Intl.DateTimeFormat().resolvedOptions().timeZone));assert.ok(await page.getByLabel('Time zone',{exact:true}).getAttribute('list'));
+  assert.equal(await page.getByLabel('Time zone',{exact:true}).inputValue(),await page.evaluate(()=>Intl.DateTimeFormat().resolvedOptions().timeZone));assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('role'),'combobox');
+  await page.getByLabel('Time zone',{exact:true}).fill('Not a real zone');await page.getByRole('status').filter({hasText:'No matching time zones'}).waitFor();
+  await page.getByLabel('Time zone',{exact:true}).fill('Karachi');await page.getByRole('option',{name:'Asia/Karachi',exact:true}).click();assert.equal(await page.getByLabel('Time zone',{exact:true}).inputValue(),'Asia/Karachi');
+  await page.getByLabel('Time zone',{exact:true}).focus();await page.keyboard.press('ArrowDown');assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-expanded'),'true');await page.keyboard.press('Escape');assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-expanded'),'false');await page.getByLabel('Time zone',{exact:true}).click();assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-expanded'),'true');await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),1);
   const start=await page.getByLabel('Start date',{exact:true}).inputValue(),expiry=await page.getByLabel('Expiry date',{exact:true}).inputValue();assert.ok(start);assert.equal(Number(expiry.slice(0,4)),Number(start.slice(0,4))+1);
   await page.getByLabel('Package',{exact:true}).selectOption('Standard');await page.getByText('Expanded lodge workflows, departments, staff HR, feedback and operational coordination.',{exact:true}).waitFor();
   await page.getByLabel('Lodge name',{exact:true}).fill('Test River Lodge');await page.getByLabel('Full name',{exact:true}).fill('Lodge Owner');await page.getByLabel('Email address',{exact:true}).fill('owner@example.com');
+  await page.getByLabel('Time zone',{exact:true}).fill('Unknown/Region');await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByText('Choose a time zone from the list.',{exact:true}).waitFor();assert.equal(calls,0);assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-invalid'),'true');
+  await page.getByLabel('Time zone',{exact:true}).fill('Karachi');await page.keyboard.press('Enter');
   await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByText('Enter a valid email address.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Email address',{exact:true}).getAttribute('aria-invalid'),'true');
-  await page.getByLabel('Email address',{exact:true}).fill('newowner@example.com');await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Lodge registered',{exact:true}).waitFor();assert.equal(created.package,'Standard');assert.equal(created.start_date,start);
+  await page.getByLabel('Email address',{exact:true}).fill('newowner@example.com');await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Lodge registered',{exact:true}).waitFor();assert.equal(created.package,'Standard');assert.equal(created.start_date,start);assert.equal(created.timezone,'Asia/Karachi');
  }finally{await context.close()}
 });
 
@@ -650,6 +656,8 @@ test('Super Admin reviews affected lodges before editing a server-defined plan',
  try{
   await page.route('**/api/v1/platform/plans',r=>r.fulfill({json:[plan]}));
   await page.route('**/api/v1/platform/plans/Standard',r=>{writes++;const body=r.request().postDataJSON();assert.equal(body.expected_revision,4);assert.equal(body.expected_lodge_count,7);assert.deepEqual(body.features,[]);return r.fulfill({json:{...plan,...body,revision:5}})});
+  for(const [width,theme] of [[1440,'dark'],[375,'light']]){await page.setViewportSize({width,height:1000});await page.addInitScript(theme=>localStorage.setItem('theme',theme),theme);await page.goto(base+'/super-admin/packages');await page.getByRole('button',{name:'Edit plan: Standard',exact:true}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:`/tmp/safarios-packages-${width}-${theme}.png`,fullPage:true});}
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto(base+'/super-admin/packages');await page.getByRole('button',{name:'Edit plan: Standard',exact:true}).click();
   const editor=page.getByRole('dialog');await editor.getByText('This changes 7 lodges on this plan. Lodge exceptions still apply.',{exact:true}).waitFor();
   await editor.getByRole('checkbox',{name:'Fuel records',exact:true}).uncheck();assert.equal(await editor.getByRole('checkbox',{name:/AI assistant/}).isDisabled(),true);

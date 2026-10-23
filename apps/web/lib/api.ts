@@ -590,12 +590,22 @@ export const superApi = {
     }),
   platformNotifications: () => request<any[]>("/api/v1/platform/notifications"),
   plans: () => request<any[]>("/api/v1/platform/plans"),
+  updatePlan: (key: string, body: any) =>
+    request<any>(`/api/v1/platform/plans/${encodeURIComponent(key)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   lodgeEntitlements: (id: string) =>
     request<any>(`/api/v1/platform/lodges/${id}/entitlements`),
-  setEntitlement: (id: string, feature_key: string, enabled: boolean | null) =>
+  setEntitlement: (
+    id: string,
+    feature_key: string,
+    enabled: boolean | null,
+    reason: string,
+  ) =>
     request<any>(`/api/v1/platform/lodges/${id}/entitlements`, {
       method: "PATCH",
-      body: JSON.stringify({ feature_key, enabled }),
+      body: JSON.stringify({ feature_key, enabled, reason }),
     }),
   audit: () => request<any[]>("/api/v1/platform/audit"),
   users: () => request<any[]>("/api/v1/platform/users"),
@@ -675,4 +685,16 @@ export const lodgePreferencesApi = {
     storeFormatting(result);
     return result;
   },
+};
+
+export const featureAccessApi = {
+  info: (feature: string) =>
+    request<any>(
+      lodgePath(`feature-access?feature_key=${encodeURIComponent(feature)}`),
+    ),
+  review: (feature_key: string, reason: string) =>
+    request<any>(lodgePath("access-reviews"), {
+      method: "POST",
+      body: JSON.stringify({ feature_key, reason }),
+    }),
 };

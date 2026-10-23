@@ -8,6 +8,8 @@ import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import { API_URL, setActiveLodgeId, superApi } from "@/lib/api";
 import Drawer from "./Drawer";
+import PackageComparison from "./PackageComparison";
+import { accessCopy } from "@/lib/strings/access";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -107,7 +109,8 @@ function LogoField({
 }
 
 export default function SuperAdminLodges() {
-  const [selectedPackage, setSelectedPackage] = useState("Basic");
+  const [selectedPackage, setSelectedPackage] = useState("");
+  const [plans, setPlans] = useState<any[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<z.infer<
     typeof brandingSchema
   > | null>(null);
@@ -130,7 +133,13 @@ export default function SuperAdminLodges() {
   const load = async () => {
     setLoading(true);
     try {
-      setRows(await superApi.lodges());
+      const [lodges, packages] = await Promise.all([
+        superApi.lodges(),
+        superApi.plans(),
+      ]);
+      setRows(lodges);
+      setPlans(packages);
+      setSelectedPackage((value) => value || packages[0]?.key || "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load lodges.");
     } finally {
@@ -501,14 +510,23 @@ export default function SuperAdminLodges() {
                   value={selectedPackage}
                   onChange={(e) => setSelectedPackage(e.target.value)}
                 >
-                  <option>Basic</option>
-                  <option>Standard</option>
-                  <option>Premium</option>
+                  {plans.map((plan) => (
+                    <option key={plan.key} value={plan.key}>
+                      {plan.name} — {plan.description}
+                    </option>
+                  ))}
                 </select>
               </Field>
               <p className="fieldHint" aria-live="polite">
-                {copy.packageSummaries[selectedPackage]}
+                {
+                  plans.find((plan) => plan.key === selectedPackage)
+                    ?.description
+                }
               </p>
+              <details>
+                <summary>{accessCopy.compare}</summary>
+                <PackageComparison plans={plans} />
+              </details>
               <div className="formGrid">
                 <div>
                   <Field label="Start date">

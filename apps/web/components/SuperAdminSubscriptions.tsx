@@ -2,24 +2,27 @@
 import { useEffect, useState } from "react";
 import { superApi } from "@/lib/api";
 export default function SuperAdminSubscriptions() {
+  const [plans, setPlans] = useState<any[]>([]);
   const [rows, setRows] = useState<any[]>([]),
     [alerts, setAlerts] = useState<any[]>([]),
     [drafts, setDrafts] = useState<Record<string, any>>({}),
     [error, setError] = useState("");
   const load = async () => {
     try {
-      const [r, a] = await Promise.all([
+      const [r, a, p] = await Promise.all([
         superApi.lodges(),
         superApi.platformNotifications(),
+        superApi.plans(),
       ]);
       setRows(r);
+      setPlans(p);
       setAlerts(a.filter((x: any) => x.type === "subscription.expiry"));
       setDrafts(
         Object.fromEntries(
           r.map((x: any) => [
             x.id,
             {
-              package: x.subscription?.package || "Basic",
+              package: x.subscription?.package || p[0]?.key || "",
               start_date: x.subscription?.start_date || "",
               expiry_date: x.subscription?.expiry_date || "",
               suspended: !!x.subscription?.suspended,
@@ -98,7 +101,7 @@ export default function SuperAdminSubscriptions() {
                     <td>
                       <select
                         className="field"
-                        value={d.package || "Basic"}
+                        value={d.package || plans[0]?.key || ""}
                         onChange={(e) =>
                           setDrafts((x) => ({
                             ...x,
@@ -107,9 +110,11 @@ export default function SuperAdminSubscriptions() {
                         }
                         aria-label="Package"
                       >
-                        <option>Basic</option>
-                        <option>Standard</option>
-                        <option>Premium</option>
+                        {plans.map((plan) => (
+                          <option key={plan.key} value={plan.key}>
+                            {plan.name}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td>

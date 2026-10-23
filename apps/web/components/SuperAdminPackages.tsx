@@ -1,160 +1,334 @@
 "use client";
-import { Field } from "@/components/ui/field";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { superApi } from "@/lib/api";
+import { accessCopy as copy } from "@/lib/strings/access";
+import { Field } from "./ui/field";
+import { Form } from "./ui/form";
+import { ConfirmDialog } from "./ui/confirm-dialog";
+import Drawer from "./Drawer";
+import PackageComparison from "./PackageComparison";
 export default function SuperAdminPackages() {
   const [plans, setPlans] = useState<any[]>([]),
     [lodges, setLodges] = useState<any[]>([]),
     [selected, setSelected] = useState(""),
     [ent, setEnt] = useState<any>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [draft, setDraft] = useState<any>(null),
+    [exception, setException] = useState<any>(null),
+    [confirm, setConfirm] = useState(false),
+    [busy, setBusy] = useState(false);
+  async function load() {
+    try {
+      const [p, l] = await Promise.all([superApi.plans(), superApi.lodges()]);
+      setPlans(p);
+      setLodges(l);
+      setSelected((v) => v || l[0]?.id || "");
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   useEffect(() => {
-    Promise.all([superApi.plans(), superApi.lodges()])
-      .then(([p, l]) => {
-        setPlans(p);
-        setLodges(l);
-        if (l[0]) setSelected(l[0].id);
-      })
-      .catch((e: any) => setError(e.message));
+    void load();
   }, []);
   useEffect(() => {
-    if (selected)
+    setEnt(null);
+    if (selected) {
+      let active = true;
       superApi
         .lodgeEntitlements(selected)
-        .then(setEnt)
-        .catch((e: any) => setError(e.message));
+        .then((e) => {
+          if (active) setEnt(e);
+        })
+        .catch((e) => {
+          if (active) setError(e.message);
+        });
+      return () => {
+        active = false;
+      };
+    }
   }, [selected]);
-  const allFeatures = useMemo(
-    () => Array.from(new Set(plans.flatMap((p: any) => p.features))).sort(),
-    [plans],
-  );
-  async function toggle(feature: string) {
-    if (!selected || !ent) return;
-    const base = ent.base.includes(feature),
-      effective = ent.effective.includes(feature);
-    const next = !effective;
-    await superApi.setEntitlement(
-      selected,
-      feature,
-      next === base ? null : next,
-    );
-    setEnt(await superApi.lodgeEntitlements(selected));
+  async function savePlan() {
+    setBusy(true);
+    try {
+      await superApi.updatePlan(draft.key, {
+        features: draft.features,
+        expected_revision: draft.revision,
+        expected_lodge_count: draft.lodge_count,
+      });
+      setDraft(null);
+      await load();
+      if (selected) setEnt(await superApi.lodgeEntitlements(selected));
+    } catch (e) {
+      setError((e as Error).message);
+      await load();
+      setDraft(null);
+    } finally {
+      setBusy(false);
+    }
   }
+  async function saveException(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const result = await superApi.setEntitlement(
+        selected,
+        exception.feature.key,
+        exception.value === "default" ? null : exception.value === "yes",
+        exception.reason,
+      );
+      setEnt(result);
+      setException(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const features = plans[0]?.feature_catalog || [];
   return (
     <>
       <div className="pageHeader">
         <div>
           <span className="eyebrow">SUPER ADMIN</span>
-          <h1>Packages & entitlements</h1>
-          <p>
-            The plan definitions are server-backed. Lodge-specific overrides are
-            audited and enforced by the API.
-          </p>
+          <h1>{copy.plans}</h1>
+          <p>{copy.previewOnly}</p>
         </div>
       </div>
-      {error && <p className="dangerText">{error}</p>}
+      {error && (
+        <p role="alert" className="dangerText">
+          {error}{" "}
+          <button className="button secondary" onClick={load}>
+            {copy.retry}
+          </button>
+        </p>
+      )}
       <div className="packageCards">
-        {plans.map((p: any) => (
+        {plans.map((p) => (
           <section className="card packageCard" key={p.key}>
-            <h3>{p.name}</h3>
-            <p>{p.features.length} enabled server entitlements</p>
-            <div className="featureList">
-              {p.features.map((f: string) => (
-                <span key={f}>✓ {f}</span>
-              ))}
-            </div>
+            <h2>{p.name}</h2>
+            <p>{p.description}</p>
+            <p>{copy.planImpact(p.lodge_count)}</p>
+            <button
+              className="button"
+              disabled={busy}
+              onClick={() => {
+                setError("");
+                setDraft({ ...p, features: [...p.features] });
+              }}
+            >
+              {copy.editPlan}: {p.name}
+            </button>
           </section>
         ))}
       </div>
-      <section className="panel" style={{ marginTop: 16 }}>
-        <div className="panelHeader">
-          <div>
-            <h2>Lodge override</h2>
-            <p>
-              Enable or disable a feature for one lodge without changing its
-              plan.
-            </p>
-          </div>
-        </div>
-        <Field label="Lodge">
-          <select
-            className="field"
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            {lodges.map((l: any) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <section className="panel">
+        <h2>{copy.compare}</h2>
+        <PackageComparison plans={plans} />
+      </section>
+      <section className="panel">
+        <h2>{copy.exception}</h2>
+        {lodges.length === 0 ? (
+          <p>{copy.noLodges}</p>
+        ) : (
+          <Field label={copy.lodge}>
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+            >
+              {lodges.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {selected && !ent && <p>{copy.loading}</p>}
         {ent && (
-          <>
-            <p>
-              Package: <strong>{ent.package}</strong>
-            </p>
-            <div className="tableWrap">
-              <table className="dataTable">
-                <thead>
-                  <tr>
-                    <th>Feature</th>
-                    <th>Plan default</th>
-                    <th>Effective</th>
-                    <th>Override</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allFeatures.map((f: any) => {
-                    const base = ent.base.includes(f),
-                      effective = ent.effective.includes(f),
-                      override = ent.overrides.find(
-                        (x: any) => x.feature_key === f,
-                      );
-                    return (
-                      <tr key={f}>
-                        <td>{f}</td>
-                        <td>{base ? "Enabled" : "Disabled"}</td>
-                        <td>{effective ? "Enabled" : "Disabled"}</td>
-                        <td>
-                          <button
-                            className="button secondary"
-                            onClick={() => toggle(f)}
-                          >
-                            {override
-                              ? `${override.enabled ? "Disable" : "Enable"} / reset via next change`
-                              : effective
-                                ? "Disable"
-                                : "Enable"}
-                          </button>
-                          {override && (
-                            <button
-                              className="button secondary"
-                              style={{ marginLeft: 6 }}
-                              onClick={async () => {
-                                await superApi.setEntitlement(
-                                  selected,
-                                  f,
-                                  null,
-                                );
-                                setEnt(
-                                  await superApi.lodgeEntitlements(selected),
-                                );
-                              }}
-                            >
-                              Reset
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <div className="tableWrap">
+            <table className="dataTable">
+              <thead>
+                <tr>
+                  <th>{copy.features}</th>
+                  <th>{copy.planIncludes}</th>
+                  <th>{copy.exception}</th>
+                  <th>{copy.finalResult}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {features.map((f: any) => {
+                  const override = ent.overrides.find(
+                    (o: any) => o.feature_key === f.key,
+                  );
+                  return (
+                    <tr key={f.key}>
+                      <th scope="row">
+                        {f.name}
+                        <p className="muted">{f.description}</p>
+                      </th>
+                      <td>
+                        {!f.available
+                          ? copy.coming
+                          : ent.base.includes(f.key)
+                            ? copy.included
+                            : copy.excluded}
+                      </td>
+                      <td>
+                        <button
+                          className="button secondary"
+                          onClick={() => {
+                            setError("");
+                            setException({
+                              feature: f,
+                              value: override
+                                ? override.enabled
+                                  ? "yes"
+                                  : "no"
+                                : "default",
+                              reason: "",
+                            });
+                          }}
+                        >
+                          {override
+                            ? override.enabled
+                              ? copy.enable
+                              : copy.disable
+                            : copy.defaultResult}
+                        </button>
+                        {override?.reason && <p>{override.reason}</p>}
+                      </td>
+                      <td>
+                        {!f.available
+                          ? copy.coming
+                          : ent.effective.includes(f.key)
+                            ? copy.enabled
+                            : copy.disabled}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
+      {draft && (
+        <Drawer onClose={() => !busy && setDraft(null)}>
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setConfirm(true);
+            }}
+          >
+            <div className="drawerHead">
+              <h2>
+                {copy.editPlan}: {draft.name}
+              </h2>
+              <button
+                type="button"
+                className="closeButton"
+                aria-label={copy.close}
+                onClick={() => setDraft(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p>{copy.planImpact(draft.lodge_count)}</p>
+            {features.map((f: any) => (
+              <div className="formField" key={f.key}>
+                <label className="fieldLabel">
+                  <input
+                    type="checkbox"
+                    disabled={!f.available || busy}
+                    checked={f.available && draft.features.includes(f.key)}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        features: e.target.checked
+                          ? [...draft.features, f.key]
+                          : draft.features.filter(
+                              (key: string) => key !== f.key,
+                            ),
+                      })
+                    }
+                  />
+                  {f.name} {!f.available && ` · ${copy.coming}`}
+                </label>
+                <p className="fieldHint">{f.description}</p>
+              </div>
+            ))}
+            <div className="drawerActions">
+              <button className="button primary" disabled={busy}>
+                {copy.planSave}
+              </button>
+            </div>
+          </Form>
+        </Drawer>
+      )}
+      {exception && (
+        <Drawer onClose={() => !busy && setException(null)}>
+          <Form onSubmit={saveException}>
+            <div className="drawerHead">
+              <h2>
+                {copy.exception}: {exception.feature.name}
+              </h2>
+              <button
+                type="button"
+                className="closeButton"
+                aria-label={copy.close}
+                onClick={() => setException(null)}
+              >
+                ×
+              </button>
+            </div>
+            {error && (
+              <p className="dangerText" role="alert">
+                {error}
+              </p>
+            )}
+            <Field label={copy.exception}>
+              <select
+                value={exception.value}
+                onChange={(e) =>
+                  setException({ ...exception, value: e.target.value })
+                }
+              >
+                <option value="default">{copy.reset}</option>
+                {exception.feature.available && (
+                  <option value="yes">{copy.enable}</option>
+                )}
+                <option value="no">{copy.disable}</option>
+              </select>
+            </Field>
+            <Field label={copy.reason} helper={copy.reasonRequired}>
+              <textarea
+                name="reason"
+                required
+                minLength={5}
+                maxLength={1000}
+                value={exception.reason}
+                onChange={(e) =>
+                  setException({ ...exception, reason: e.target.value })
+                }
+              />
+            </Field>
+            <div className="drawerActions">
+              <button className="button primary" disabled={busy}>
+                {copy.saveException}
+              </button>
+            </div>
+          </Form>
+        </Drawer>
+      )}
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title={copy.planSave}
+        description={copy.planImpact(draft?.lodge_count || 0)}
+        actionLabel={copy.planSave}
+        onConfirm={savePlan}
+      />
     </>
   );
 }

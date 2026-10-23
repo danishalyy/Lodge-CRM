@@ -1,3 +1,4 @@
+from .feature_catalog import BUILT, FUTURE, feature_metadata
 from .access_catalog import SENSITIVE_CUSTOM_PERMISSIONS, ROLE_FEATURES, SCOPES, ROLE_DESCRIPTIONS, permission_metadata
 from datetime import date, datetime, timedelta, timezone
 import base64
@@ -32,7 +33,7 @@ from .models import (
     GuestFeedback, StaffShift, StaffIncident, StaffPerformanceNote, MealService, MealServiceGuest, TaskAttachment,
 )
 from .schemas import (
-    LodgePreferencesUpdate, LodgeBrandingUpdate, ActivateIn, DepartmentCreate, DepartmentUpdate, GuestCreate, GuestRequestCreate,
+    PlanUpdateIn, FeatureAccessReviewIn, LodgePreferencesUpdate, LodgeBrandingUpdate, ActivateIn, DepartmentCreate, DepartmentUpdate, GuestCreate, GuestRequestCreate,
     GuestRequestUpdate, GuestUpdate, LodgeCreate, LoginIn, MaintenanceCreate,
     MaintenanceUpdate, StaffCreate, StaffUpdate, StayCreate, StayUpdate,
     SubscriptionUpdate, TaskCreate, TaskUpdate, UnitCreate, UnitUpdate, VehicleCreate, VehicleUpdate, VehicleChecklistCreate, FuelCreate, ActivityCreate, ActivityUpdate, TransferCreate, TransferUpdate, WildlifeSightingCreate, WildlifeMediaRegister, MediaUploadRequest, StaffInvite, NotificationPreferenceUpdate, PasswordResetRequestIn, PasswordResetConfirmIn, MfaCodeIn, EntitlementOverrideIn,
@@ -45,7 +46,7 @@ from .schemas import (
 )
 from .security import (
     create_session, current_user, hash_password, new_token, require_csrf,
-    require_lodge_access, require_permission, require_super_admin, token_hash,
+    require_lodge_access, require_permission, require_super_admin, token_hash, ensure_subscription_write_allowed,
     verify_password, access_context, membership_for, has_permission, ensure_feature, entitlement_enabled,
     encrypt_mfa_secret, decrypt_mfa_secret,
 )
@@ -536,10 +537,11 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 for ov in overrides:
                     if ov.enabled: state.add(ov.feature_key)
                     else: state.discard(ov.feature_key)
-                plan_features=sorted(state)
+                plan_features=sorted(state & set(BUILT))
             memberships.append({
                 "lodge_id": str(lodge.id), "lodge_name": lodge.name, "branding":lodge_branding(lodge),
                 "date_format":lodge.date_format,"currency":lodge.currency,"timezone":lodge.timezone,
+                "mfa_recommended":has_permission(db,m,"lodge.settings.manage"),
                 "role": display_role, "role_key": role.key if role else "", "custom_role_id": str(m.custom_role_id) if m.custom_role_id else None,
                 "department_id": str(m.department_id) if m.department_id else None,
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
@@ -741,13 +743,66 @@ def update_subscription(lodge_id: str, body: SubscriptionUpdate, request: Reques
     return {"ok": True, "status": subscription_status(sub)}
 
 
+def _plans_payload(db):
+    keys=set(db.scalars(select(PlanEntitlement.feature_key)).all()) | set(BUILT) | set(FUTURE)
+    catalog=[feature_metadata(key) for key in sorted(keys,key=lambda key:(feature_metadata(key)['area'],feature_metadata(key)['name']))]
+    output=[]
+    for plan in db.scalars(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.sort_order,Plan.key)).all():
+        enabled=set(db.scalars(select(PlanEntitlement.feature_key).where(PlanEntitlement.plan_key==plan.key,PlanEntitlement.enabled.is_(True))).all())
+        output.append({'key':plan.key,'name':plan.name,'description':plan.description,'revision':plan.revision,'lodge_count':db.scalar(select(func.count()).select_from(Subscription).where(Subscription.package==plan.key)) or 0,'features':sorted(enabled & set(BUILT)),'planned_features':sorted(enabled-set(BUILT)),'feature_catalog':catalog})
+    return output
+
+
 @app.get("/api/v1/platform/plans")
 def list_plans(user:User=Depends(require_super_admin),db:Session=Depends(get_db)):
-    set_rls_context(db,None,True,str(user.id));out=[]
-    for plan in db.scalars(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.key)).all():
-        features=list(db.scalars(select(PlanEntitlement.feature_key).where(PlanEntitlement.plan_key==plan.key,PlanEntitlement.enabled.is_(True)).order_by(PlanEntitlement.feature_key)).all())
-        out.append({"key":plan.key,"name":plan.name,"features":features})
-    return out
+    set_rls_context(db,None,True,str(user.id))
+    return _plans_payload(db)
+
+
+@app.patch("/api/v1/platform/plans/{plan_key}",dependencies=[Depends(require_csrf)])
+def update_plan(plan_key:str,body:PlanUpdateIn,request:Request,user:User=Depends(require_super_admin),db:Session=Depends(get_db)):
+    set_rls_context(db,None,True,str(user.id))
+    plan=db.scalar(select(Plan).where(Plan.key==plan_key,Plan.is_active.is_(True)).with_for_update())
+    if not plan:raise HTTPException(404,"Package not found")
+    count=db.scalar(select(func.count()).select_from(Subscription).where(Subscription.package==plan.key)) or 0
+    if plan.revision!=body.expected_revision or count!=body.expected_lodge_count:raise HTTPException(409,"Package or affected lodges changed. Refresh and review the impact again")
+    if not set(body.features)<=set(BUILT):raise HTTPException(422,"Choose working features only. Coming-soon capabilities cannot be enabled")
+    rows={row.feature_key:row for row in db.scalars(select(PlanEntitlement).where(PlanEntitlement.plan_key==plan.key)).all()}
+    selected=set(body.features)
+    for key in BUILT:
+        if key in rows:rows[key].enabled=key in selected
+        else:db.add(PlanEntitlement(plan_key=plan.key,feature_key=key,enabled=key in selected))
+    plan.revision+=1
+    audit(db,request,None,user.id,"plan.updated","plan",plan.key,f"Affected lodges: {count}; enabled features: {', '.join(sorted(selected))}")
+    db.commit()
+    set_rls_context(db,None,True,str(user.id))
+    return next(plan for plan in _plans_payload(db) if plan['key']==plan_key)
+
+
+@app.get("/api/v1/lodges/{lodge_id}/feature-access")
+def feature_access_info(lodge_id:str,feature_key:str=Query(min_length=1,max_length=120),user:User=Depends(require_lodge_access),db:Session=Depends(get_db)):
+    if feature_key not in BUILT and feature_key not in FUTURE:raise HTTPException(422,"Unknown feature")
+    feature=feature_metadata(feature_key);sub=db.get(Subscription,lodge_id)
+    plans=db.scalars(select(Plan).join(PlanEntitlement,PlanEntitlement.plan_key==Plan.key).where(Plan.is_active.is_(True),PlanEntitlement.feature_key==feature_key,PlanEntitlement.enabled.is_(True)).order_by(Plan.sort_order,Plan.key)).all()
+    current_includes=bool(sub and any(plan.key==sub.package for plan in plans))
+    return {'feature':feature,'available':entitlement_enabled(db,lodge_id,feature_key),'unlocking_plans':[{'key':plan.key,'name':plan.name} for plan in plans] if feature['available'] else [],'current_plan':sub.package if sub else None,'current_plan_includes':current_includes,'status':'coming_soon' if not feature['available'] else 'lodge_exception' if current_includes else 'plan_required' if plans else 'unavailable'}
+
+
+@app.post("/api/v1/lodges/{lodge_id}/access-reviews",dependencies=[Depends(require_csrf)])
+def request_feature_access(lodge_id:str,body:FeatureAccessReviewIn,request:Request,user:User=Depends(require_lodge_access),db:Session=Depends(get_db)):
+    ensure_subscription_write_allowed(db,lodge_id)
+    if body.feature_key not in BUILT and body.feature_key not in FUTURE:raise HTTPException(422,"Unknown feature")
+    if entitlement_enabled(db,lodge_id,body.feature_key):raise HTTPException(409,"This feature is already available")
+    key=f"access-review:{user.id}:{body.feature_key}:{date.today().isoformat()}"
+    existing=db.scalar(select(Notification).where(Notification.lodge_id==lodge_id,Notification.dedupe_key==key))
+    if existing:return {'requested':True,'already_pending':True}
+    recipients=db.scalars(select(User.id).where(User.is_super_admin.is_(True),User.is_active.is_(True))).all()
+    if not recipients:raise HTTPException(409,"No platform administrator is available to receive this review")
+    feature=feature_metadata(body.feature_key);lodge=db.get(Lodge,lodge_id)
+    create_notification(db,lodge_id=lodge.id,notification_type='feature.access_review',severity='normal',title=f"Access review: {feature['name']}",body=f"{user.full_name} requests {feature['name']} for {lodge.name}. {body.reason.strip()}",resource_type='access_review',resource_id=body.feature_key,dedupe_key=key,recipient_user_ids=recipients)
+    audit(db,request,lodge.id,user.id,'feature.access_review_requested','feature',body.feature_key,body.reason.strip())
+    db.commit()
+    return {'requested':True,'already_pending':False}
 
 
 @app.get("/api/v1/platform/lodges/{lodge_id}/entitlements")
@@ -760,23 +815,25 @@ def get_lodge_entitlements(lodge_id:str,user:User=Depends(require_super_admin),d
     for ov in overrides:
         if ov.enabled:effective.add(ov.feature_key)
         else:effective.discard(ov.feature_key)
-    return {"package":sub.package,"base":sorted(base),"overrides":[{"feature_key":x.feature_key,"enabled":x.enabled} for x in overrides],"effective":sorted(effective)}
+    return {"package":sub.package,"base":sorted(base),"overrides":[{"feature_key":x.feature_key,"enabled":x.enabled,"reason":x.reason} for x in overrides],"effective":sorted(effective & set(BUILT))}
 
 
 @app.patch("/api/v1/platform/lodges/{lodge_id}/entitlements",dependencies=[Depends(require_csrf)])
 def set_lodge_entitlement(lodge_id:str,body:EntitlementOverrideIn,request:Request,user:User=Depends(require_super_admin),db:Session=Depends(get_db)):
     set_rls_context(db,None,True,str(user.id))
     if not db.get(Subscription,lodge_id):raise HTTPException(404,"Subscription not found")
-    known=db.scalar(select(PlanEntitlement.feature_key).where(PlanEntitlement.feature_key==body.feature_key).limit(1))
+    known=body.feature_key in BUILT or body.feature_key in FUTURE
+    if body.enabled and body.feature_key not in BUILT:raise HTTPException(422,"This feature is coming soon and cannot be enabled yet")
+    if len(body.reason.strip())<5:raise HTTPException(422,"Explain this lodge exception")
     if not known:raise HTTPException(422,"Unknown feature entitlement")
     row=db.get(LodgeEntitlementOverride,{"lodge_id":lodge_id,"feature_key":body.feature_key})
     if body.enabled is None:
         if row:db.delete(row)
     elif row:
-        row.enabled=body.enabled;row.updated_at=datetime.now(timezone.utc)
+        row.enabled=body.enabled;row.reason=body.reason.strip();row.updated_at=datetime.now(timezone.utc)
     else:
-        db.add(LodgeEntitlementOverride(lodge_id=lodge_id,feature_key=body.feature_key,enabled=body.enabled))
-    audit(db,request,lodge_id,user.id,"entitlement.override","subscription",lodge_id,f"{body.feature_key}={body.enabled}");db.commit()
+        db.add(LodgeEntitlementOverride(lodge_id=lodge_id,feature_key=body.feature_key,enabled=body.enabled,reason=body.reason.strip()))
+    audit(db,request,lodge_id,user.id,"entitlement.override","subscription",lodge_id,f"{body.feature_key}={body.enabled}; Reason: {body.reason.strip()}");db.commit()
     return get_lodge_entitlements(lodge_id,user,db)
 
 

@@ -1,4 +1,12 @@
 export const accessCopy = {
+  close: "Close dialog",
+  noLodges: "Register a lodge to manage its exceptions.",
+  lodge: "Lodge",
+  included: "Included",
+  excluded: "Not included",
+  enabled: "Enabled",
+  disabled: "Disabled",
+  saveException: "Save lodge exception",
   title: "Roles and access",
   intro:
     "Start with a preset, then make a custom copy when someone needs different access.",

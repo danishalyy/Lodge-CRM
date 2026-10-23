@@ -28,6 +28,7 @@ async function accountPage(user){
   const requests=[];
   await page.route('**/api/**',async route=>{
     const url=route.request().url();
+    if(url.endsWith('/platform/plans')) return route.fulfill({json:['Basic','Standard','Premium'].map((key,i)=>({key,name:key,description:key==='Standard'?'Expanded lodge workflows, departments, staff HR, feedback and operational coordination.':'Daily lodge operations.',features:[],planned_features:[],feature_catalog:[],revision:1,lodge_count:i+1}))});
     if(url.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',assignable:true}],permissions:[],scopes:[],can_manage_custom_roles:false}});
     if(url.endsWith('/api/v1/auth/me'))await route.fulfill({json:user});
     else{requests.push(url);await route.fulfill({json:[]})}
@@ -352,6 +353,7 @@ test('locked modules and hidden HR subfeatures avoid forbidden requests; saving 
  const {context,page}=await accountPage(user);let saved=false,disabledCalls=0;
  try{
   await page.route('**/api/v1/lodges/**',async route=>{const p=new URL(route.request().url()).pathname;
+   if(p.endsWith('/feature-access'))return route.fulfill({json:{feature:{name:'Fuel',description:'Fuel records'},status:'plan_required',unlocking_plans:[{key:'Standard',name:'Standard'}]}});
    if(/\/(shifts|incidents|performance|fuel)$/.test(p)){disabledCalls++;return route.fulfill({status:403,json:{detail:'Feature is not enabled for this lodge subscription'}})}
    if(p.endsWith('/staff'))return route.fulfill({json:[{id:'staff-1',full_name:'Team Member',employment_status:'active',operational_status:'available'}]});
    if(p.endsWith('/hr/leaves')){if(route.request().method()==='POST'){saved=true;return route.fulfill({json:{id:'leave-1',status:'pending'}})}return route.fulfill({json:saved?[{id:'leave-1',staff_name:'Team Member',leave_type:'annual',start_date:'2026-11-01',end_date:'2026-11-02',status:'pending'}]:[]})}
@@ -638,5 +640,21 @@ test('role preset copy edits, staff assignment and deactivation use server metad
   await page.getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Role name',{exact:true}).fill('Task collaborator');await page.getByRole('button',{name:'Save role',exact:true}).click();await page.getByRole('button',{name:'Save role',exact:true}).last().click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(updates,1);
   await page.goto(base+'/staff');await page.getByRole('button',{name:'Edit staff access',exact:true}).click();await page.getByLabel('Custom role (optional)',{exact:true}).selectOption('role-1');await page.getByRole('button',{name:'Save role',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(assigned,'role-1');
   await page.goto(base+'/roles');await page.getByText('1 staff use this role',{exact:false}).waitFor();await page.getByRole('button',{name:'Deactivate',exact:true}).click();await page.getByText('This changes access for 1 people immediately.',{exact:false}).waitFor();await page.getByRole('button',{name:'Deactivate',exact:true}).last().click();await page.getByRole('button',{name:'Reactivate',exact:true}).waitFor();assert.equal(assigned,null);
+ }finally{await context.close()}
+});
+
+
+test('Super Admin reviews affected lodges before editing a server-defined plan',async()=>{
+ const {context,page}=await accountPage({id:'plan-operator',full_name:'Operator',is_super_admin:true,mfa_enabled:true,memberships:[]});let writes=0;
+ const plan={key:'Standard',name:'Standard',description:'Server plan description',features:['fuel'],planned_features:['ai'],revision:4,lodge_count:7,feature_catalog:[{key:'fuel',name:'Fuel records',description:'Vehicle fuel logs',area:'Safari and fleet',available:true},{key:'ai',name:'AI assistant',description:'Future assistant',area:'Reports and AI',available:false}]};
+ try{
+  await page.route('**/api/v1/platform/plans',r=>r.fulfill({json:[plan]}));
+  await page.route('**/api/v1/platform/plans/Standard',r=>{writes++;const body=r.request().postDataJSON();assert.equal(body.expected_revision,4);assert.equal(body.expected_lodge_count,7);assert.deepEqual(body.features,[]);return r.fulfill({json:{...plan,...body,revision:5}})});
+  await page.goto(base+'/super-admin/packages');await page.getByRole('button',{name:'Edit plan: Standard',exact:true}).click();
+  const editor=page.getByRole('dialog');await editor.getByText('This changes 7 lodges on this plan. Lodge exceptions still apply.',{exact:true}).waitFor();
+  await editor.getByRole('checkbox',{name:'Fuel records',exact:true}).uncheck();assert.equal(await editor.getByRole('checkbox',{name:/AI assistant/}).isDisabled(),true);
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();assert.equal(writes,0);
+  const confirmation=page.getByRole('dialog').filter({has:page.getByRole('heading',{name:'Save plan',exact:true})});await confirmation.getByText('This changes 7 lodges on this plan. Lodge exceptions still apply.',{exact:true}).waitFor();
+  await confirmation.getByRole('button',{name:'Save plan',exact:true}).click();await page.getByText('Package updated',{exact:true}).waitFor();assert.equal(writes,1);
  }finally{await context.close()}
 });

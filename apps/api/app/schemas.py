@@ -398,6 +398,7 @@ class ChangePasswordIn(StrictModel):
 
 
 class EntitlementOverrideIn(StrictModel):
+    reason: str = Field(min_length=5,max_length=1000)
     feature_key: str = Field(min_length=2, max_length=120)
     enabled: bool | None = None
 
@@ -607,3 +608,13 @@ class LodgePreferencesUpdate(StrictModel):
         if value not in {'USD','ZAR','KES','TZS','UGX','NAD','BWP','ZMW','GBP','EUR','INR','AED','PKR','AUD','CAD','MZN','MWK','RWF','SCR','MUR','CHF','JPY','CNY','NZD','SGD','HKD','BRL','SAR','EGP','MAD','NGN','GHS','ETB','ZWL'}:
             raise ValueError('Choose a supported currency')
         return value
+
+
+class PlanUpdateIn(StrictModel):
+    features: list[str] = Field(max_length=200)
+    expected_revision: int = Field(ge=1)
+    expected_lodge_count: int = Field(ge=0)
+
+class FeatureAccessReviewIn(StrictModel):
+    feature_key: str = Field(min_length=1,max_length=120)
+    reason: str = Field(default='',max_length=1000)

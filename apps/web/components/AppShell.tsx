@@ -202,8 +202,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!migrated.has(key)) return false;
     if (key === "settings") return true;
     if (me.is_super_admin) return true;
-    if (key === "lodge-ai")
-      return ["lodge_admin", "group_admin"].includes(membership?.role_key);
     const p = required[key];
     return !p || membership?.permissions?.includes(p);
   };
@@ -457,7 +455,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="content">
           {!me.mfa_enabled &&
             !me.is_super_admin &&
-            membership?.role_key === "lodge_admin" &&
+            membership?.mfa_recommended &&
             path !== "/settings" && <MfaPrompt key={me.id} userId={me.id} />}
           {membership?.subscription_status === "Expired" && (
             <section className="expiryBanner">

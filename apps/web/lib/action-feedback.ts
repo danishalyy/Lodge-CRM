@@ -1,3 +1,4 @@
+import { accessCopy } from "./strings/access";
 import { contentCopy } from "./strings/content";
 import { toast } from "sonner";
 export function actionFeedback(path: string, method: string, result: any) {
@@ -86,5 +87,10 @@ export function actionFeedback(path: string, method: string, result: any) {
   if (/\/platform\/lodges$/.test(path) && method === "POST")
     message = "Lodge registered";
   if (path.endsWith("/preferences")) message = "Lodge preferences saved";
+  if (path.endsWith("/access-reviews"))
+    message = result?.already_pending
+      ? accessCopy.reviewPending
+      : accessCopy.reviewSent;
+  if (/\/platform\/plans\//.test(path)) message = "Package updated";
   toast.success(message, { id: `action:${path}` });
 }

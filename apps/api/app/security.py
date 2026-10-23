@@ -197,6 +197,8 @@ def ensure_subscription_write_allowed(db: Session, lodge_id: str):
 
 
 def entitlement_enabled(db: Session, lodge_id: str, feature_key: str) -> bool:
+    from .feature_catalog import BUILT
+    if feature_key not in BUILT:return False
     override = db.get(LodgeEntitlementOverride, {"lodge_id": lodge_id, "feature_key": feature_key})
     if override is not None:
         return bool(override.enabled)

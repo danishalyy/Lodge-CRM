@@ -457,6 +457,9 @@ class WildlifeMedia(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 class Plan(Base):
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     __tablename__ = "plans"
     key: Mapped[str] = mapped_column(String(30), primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
@@ -471,6 +474,7 @@ class PlanEntitlement(Base):
 
 
 class LodgeEntitlementOverride(Base):
+    reason: Mapped[str] = mapped_column(String(1000), default="", server_default="")
     __tablename__ = "lodge_entitlement_overrides"
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), primary_key=True)
     feature_key: Mapped[str] = mapped_column(String(120), primary_key=True)

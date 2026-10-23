@@ -129,3 +129,7 @@ The PostgreSQL runtime test fixture and its required environment are documented 
 ### Ask Lodge AI
 
 See [AI audit and phased implementation status](docs/AI_IMPLEMENTATION_AUDIT.md) and [local/test/vLLM setup](docs/AI_SETUP.md). The optional external vLLM gateway and read-only operational tools do not require a GPU to start the core CRM. Real inference requires an operator-configured private vLLM endpoint. Later AI capabilities remain explicitly gated until implemented and verified.
+
+### Private document knowledge update
+
+Optional lodge knowledge now supports private PDF/DOCX/TXT uploads, actor-scoped Celery processing, a separate real embedding endpoint and permission-filtered pgvector retrieval. It defaults off. This update requires the PostgreSQL 16 image built from `infra/postgres` **before migration 0019**; keep the existing volume and take/restore-test a database backup before updating an installation. [AI setup and acceptance](docs/AI_SETUP.md) explains configuration, sharing rules, limits and the verified test boundary. Chat and embedding GPU services remain external; live provider/full pipeline acceptance is still required before commercial launch.

@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     ai_user_requests_per_minute: int = Field(6, ge=1, le=60)
     ai_lodge_requests_per_minute: int = Field(30, ge=1, le=300)
     ai_lodge_concurrency: int = Field(2, ge=1, le=8)
+    ai_knowledge_enabled: bool = False
+    ai_embedding_base_url: str = ""
+    ai_embedding_api_key: str = ""
+    ai_embedding_model: str = ""
+    ai_embedding_version: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @model_validator(mode="before")

@@ -17,14 +17,26 @@ from ..models import (
     AuditLog,
     User,
 )
-from ..security import require_permission, require_csrf
+from ..security import (
+    require_permission,
+    require_csrf,
+    has_permission,
+    entitlement_enabled,
+)
 from .context import guard, fingerprint
 from .configuration import configuration_state, get_provider, health_ready
 from .providers.base import ProviderUnavailable
 from .limits import admission
 from .safety import SYSTEM, redact
 from . import tools
-from .memory import verify_sources
+from .memory import verify_sources as verify_memory_sources
+from .knowledge import verify_sources as verify_document_sources
+
+
+def verify_sources(sources, db, ctx, lodge_id, request):
+    verify_memory_sources(sources, db, ctx, lodge_id, request)
+    verify_document_sources(sources, db, ctx, lodge_id, request)
+
 
 router = APIRouter()
 
@@ -108,6 +120,12 @@ def status(
         },
         "state": (
             "ready" if ready else "unavailable" if state == "configured" else state
+        ),
+        "knowledge_enabled": bool(
+            settings.ai_knowledge_enabled
+            and has_permission(db, ctx.membership, "knowledge.view")
+            and entitlement_enabled(db, str(lodge_id), "ai_knowledge")
+            and entitlement_enabled(db, str(lodge_id), "document_knowledge")
         ),
         "provider": settings.ai_provider,
         "tools": [
@@ -393,6 +411,20 @@ def send_message(
                                 "resource_type",
                                 "resource_id",
                                 "recorded_at",
+                            )
+                        }
+                        for row in result.get("items", [])
+                    ]
+                if source["kind"] == "document":
+                    source["references"] = [
+                        {
+                            key: row[key]
+                            for key in (
+                                "id",
+                                "document_id",
+                                "title",
+                                "locator",
+                                "sha256",
                             )
                         }
                         for row in result.get("items", [])

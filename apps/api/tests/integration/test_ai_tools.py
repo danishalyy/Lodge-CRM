@@ -7,7 +7,10 @@ from app.ai.tools import REGISTRY
 from test_ai_foundation import ai, create
 
 
-@pytest.mark.parametrize("tool_name", list(REGISTRY))
+@pytest.mark.parametrize(
+    "tool_name",
+    [name for name, tool in REGISTRY.items() if tool.source_kind != "document"],
+)
 def test_every_read_tool_is_authorised_and_executed(ai, tool_name):
     ai["provider"].replies = [
         Completion(tool_calls=[ToolCall("read", tool_name, {})]),

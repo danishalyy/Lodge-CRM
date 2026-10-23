@@ -166,7 +166,8 @@ async function request<T>(path: string, init: RequestInit = {}) {
     !headers.has("X-Expected-User-Id")
   )
     headers.set("X-Expected-User-Id", expectedUser);
-  if (init.body) headers.set("Content-Type", "application/json");
+  if (init.body && !(init.body instanceof FormData))
+    headers.set("Content-Type", "application/json");
   if (init.method && !["GET", "HEAD"].includes(init.method.toUpperCase())) {
     const csrf = readCookie("lodge_csrf");
     if (csrf) headers.set("X-CSRF-Token", csrf);
@@ -741,4 +742,28 @@ export const aiApi = {
         body: JSON.stringify({ request_id: crypto.randomUUID(), content }),
       },
     ),
+};
+
+export const knowledgeApi = {
+  list: () => request<any>(lodgePath("ai/knowledge")),
+  upload: (body: FormData) =>
+    request<any>(lodgePath("ai/knowledge"), { method: "POST", body }),
+  process: (id: string) =>
+    request<any>(lodgePath(`ai/knowledge/${encodeURIComponent(id)}/process`), {
+      method: "POST",
+    }),
+  remove: (id: string) =>
+    request<any>(lodgePath(`ai/knowledge/${encodeURIComponent(id)}`), {
+      method: "DELETE",
+    }),
+  share: (
+    id: string,
+    body: { visibility: string; department_id: string | null },
+  ) =>
+    request<any>(lodgePath(`ai/knowledge/${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  download: (id: string) =>
+    request<any>(lodgePath(`ai/knowledge/${encodeURIComponent(id)}/download`)),
 };

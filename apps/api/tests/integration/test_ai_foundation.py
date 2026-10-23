@@ -114,7 +114,7 @@ def test_ai_denies_other_lodge_and_private_owner_rls(ai):
                 "SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE relname LIKE 'ai_%' AND relkind='r'"
             )
         ).all()
-        assert len(flags) == 4 and all(x == (True, True) for x in flags)
+        assert len(flags) == 6 and all(x == (True, True) for x in flags)
 
 
 def test_ai_rechecks_access_and_subscriptions(ai):

@@ -692,3 +692,8 @@ select:focus-visible {
 .aiConversation { min-width: 0; }
 .aiWorkspace aside { align-self: start; }
 @media (max-width: 767px) { .aiWorkspace { grid-template-columns: minmax(0, 1fr); } }
+/* Knowledge uses the existing material/spacing tokens and shared drawers. */
+.knowledgeLibrary { margin-bottom: var(--space-gap); }
+.knowledgeLibrary .actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.knowledgeLibrary select { min-width: 0; width: 100%; max-width: 100%; }
+.knowledgeLibrary article { margin-top: 24px; }

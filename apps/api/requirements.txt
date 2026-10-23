@@ -16,3 +16,5 @@ celery==5.4.0
 pyotp==2.9.0
 cryptography==50.0.2
 Pillow==13.0.0
+pypdf==6.21.2
+defusedxml==0.7.1

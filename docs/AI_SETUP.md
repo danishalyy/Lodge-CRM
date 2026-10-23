@@ -45,7 +45,7 @@ Network/Redis failures fail closed for AI. Inference POSTs are not retried autom
 
 ## Later-phase acceptance gates
 
-RAG requires actual private upload/verification, Celery extraction, versioned embeddings and pgvector retrieval with tenant/visibility filters before inference. The current PostgreSQL image has no pgvector; a compatible image/extension migration and backup/restore test are required before enabling that capability. Malicious documents must remain data and must never alter tools or permissions.
+RAG requires actual private upload/verification, Celery extraction, versioned embeddings and pgvector retrieval with tenant/visibility filters before inference. The Phase 4 PostgreSQL image adds pgvector; its migration and backup/restore requirements are documented below. Malicious documents must remain data and must never alter tools or permissions.
 
 Group aggregation must resolve owner/group and explicit lodge memberships and recheck each lodge's subscription/AI entitlement using separate tenant contexts. Writes require actor/lodge/conversation-bound, expiring single-use server confirmation, then the existing CRM mutation logic/audit/events/notifications. Scheduled reports/insights require actor-scoped jobs and deterministic metrics/detection, not privileged global worker data sent wholesale to the model.
 
@@ -61,7 +61,7 @@ Guest names are limited to permitted stay/arrival records; contact, dietary/medi
 
 Invalid optional AI environment values disable AI with a misconfigured state instead of preventing core Settings/application startup. Health probes are cached and release the DB connection before network I/O. Chat likewise releases DB transactions while waiting on the GPU. Redis failure disables admission for AI alone. Existing private GPU configuration must still be supplied before actual inference is usable.
 
-Not implemented: RAG ingestion/pgvector/embeddings, multi-property AI comparisons, AI actions/confirmations, generated/scheduled AI reports and insights, retention jobs, streaming, and real-GPU/load acceptance. Their capabilities remain future; existing non-AI memory, reports, notifications, Group Admin and CRM actions continue to function normally.
+Not implemented: multi-property AI comparisons, AI actions/confirmations, generated/scheduled AI reports and insights, retention jobs, streaming, and real-GPU/load acceptance. Their capabilities remain future; existing non-AI memory, reports, notifications, Group Admin and CRM actions continue to function normally.
 
 ### GPU-free regression command
 
@@ -83,4 +83,50 @@ The default period is the last 30 lodge-local calendar days including today. Exp
 
 Historical source metadata is server-generated: selected lodge, event IDs, resource references, recorded timestamps, requested period, retrieval time and partial coverage. Raw event text is never persisted as AI tool context. The chat sources disclosure displays event references, the period and limited-coverage warnings, using normal date formatting. Each referenced record is rechecked after inference and before saved-message/retry replay; reassignment, deletion or lost module access refuses the old answer, including when the account's role fingerprint has not changed. Ordinary permission/subscription/session revalidation remains in effect. No historical answer is a database mutation.
 
-Real-model history accuracy, causation restraint and adversarial evaluation remain acceptance work for a configured vLLM/GPU; scripted provider tests verify the gateway boundaries, not model factuality. Private RAG is the next implementation phase.
+Real-model history accuracy, causation restraint and adversarial evaluation remain acceptance work for a configured vLLM/GPU; scripted provider tests verify the gateway boundaries, not model factuality. Private RAG was the next phase; its implemented scope is documented below.
+
+## Private document knowledge (Phase 4)
+
+The optional document pipeline is implemented, with **real external embeddings** in normal operation. There is no hash/keyword/dummy embedding fallback. The two existing DB capabilities `ai_knowledge` and `document_knowledge` are implemented separately from the base AI entitlement. Both grants, `ai.use`, `knowledge.view` and an explicit `AI_KNOWLEDGE_ENABLED=true` are required. Upload/sharing/removal/processing additionally require `knowledge.manage` and an active writable subscription. Existing Lodge/Group Admin presets receive knowledge grants; custom roles can delegate them through the existing permission system. Super Admin does not inherit tenant knowledge access.
+
+Configuration for **both API and worker**:
+
+```dotenv
+AI_KNOWLEDGE_ENABLED=true
+AI_EMBEDDING_BASE_URL=https://your-private-embedding-server/v1
+AI_EMBEDDING_API_KEY=your-private-service-key
+AI_EMBEDDING_MODEL=your-embedding-model
+AI_EMBEDDING_VERSION=your-pinned-model-revision-and-normalisation-version
+```
+
+Use a real OpenAI-compatible `/embeddings` endpoint, such as a separate vLLM pooling/embedding deployment. It must produce **384 finite nonzero dimensions** per input and support the configured model. The chat model and embedding model may need separate servers/processes; configuring a chat-only vLLM server does not make embeddings available. Production requires HTTPS and a server-side API key. URL, credentials, model/version and selected lodge never come from tool arguments. Changing the embedding revision/version excludes old chunks immediately and marks documents for reprocessing; managers can safely reprocess them. Explicitly disabled/unconfigured document processing does not disable core CRM or the existing live/history AI tools.
+
+The Ask Lodge AI screen contains a permission-aware knowledge library. Upload PDF, DOCX or UTF-8 TXT (up to 10 MiB). Metadata starts unprocessed and is excluded from retrieval/download. Private originals use server-generated keys in the existing private S3/MinIO bucket; checksum verification runs before extraction. Files are never publicly listed. Visibility defaults to **Only me**; explicit department/lodge sharing requires the corresponding scope, and department sharing also requires the Departments capability. Even Lodge Admin cannot read someone else's private document. Only the creator, appropriate department manager, or lodge/group administrator for lodge-shared documents can manage a visible file.
+
+An explicit Process action queues an actor/document/lodge/token-bound Celery job. The worker rechecks current account, active employment/membership/group ownership, permissions, subscription and entitlements before processing, before each embedding batch and before publishing. It never uses a privileged/super-admin tenant context. Jobs use locking/tokens to avoid duplicate publication; status/leases allow explicit retries after queue outages or interrupted jobs. Changing visibility or removing a document affects retrieval immediately. Removal deletes chunks transactionally, invalidates pending jobs, and attempts to delete its private original. If object deletion/storage or metadata publication fails, private orphan cleanup is an operator task; no automatic blob garbage collector is implemented.
+
+Extraction runs in an isolated Linux subprocess with a 512 MiB address-space limit, 10-second CPU limit and 20-second parent deadline. It bounds PDF pages/content, DOCX archive entries/decompressed size, text length (120,000 characters), chunks (100), and embedding batches (8). Encrypted/unreadable files and textless/scanned PDFs are rejected; OCR is not implemented. DOCX macros/embedded active objects and XML entity expansion are rejected. Extractors do not execute document instructions, links, scripts or macros. Secret/email redaction is limited and is not comprehensive personal-data classification or antivirus scanning. Upload only approved material appropriate for its sharing audience. Downloaded originals are untrusted attachments, with a short (60-second) private signed URL; issued URLs remain usable until expiry. Original-file antivirus/content-disarm services are not implemented.
+
+The seventeenth tool, `search_lodge_knowledge`, accepts a bounded query and at most eight passages. PostgreSQL first materializes ready, currently authorised tenant/visibility/model/version candidates, then computes exact cosine distance with pgvector. FORCE RLS covers documents and chunks, including department/private sharing; there is no global search followed by model-side filtering or a global ANN index. Exact filtered scans are intentional for this bounded initial library; larger library/index scaling needs measured acceptance. A conservative 100-visible-record upload/list limit applies, including deleted metadata for storage-abuse checks; configurable commercial storage quotas/retention remain future work.
+
+Passages are untrusted tool data. They cannot change registered tools, grants, identity or lodge scope. Sources are created by the server with document title, immutable checksum, chunk UUID and page/document locator, and are displayed in chat. Reopening/retrying/returning a saved document answer rechecks each referenced document/chunk, current visibility and embedding version. Removing/unsharing a source refuses the old answer; old privileged context is not silently replayed. No free-form extracted text or full embedding response is stored in AI message/tool logs. Relevant excerpts are sent only to the configured private embedding/chat providers under their respective authorisation checks. Vector proximity is not proof of relevance or answer truth: real-model grounding, prompt-injection resistance and thresholds need real-provider evaluation before commercial acceptance.
+
+### PostgreSQL image and upgrade
+
+Migration **0019_private_knowledge** requires pgvector. `infra/postgres/Dockerfile` retains PostgreSQL 16, the Alpine base and existing data directory, adding checksum-pinned pgvector 0.8.2. CI uses the corresponding PostgreSQL 16 pgvector image. Build the new image **before** running migrations; the old stock image cannot execute `CREATE EXTENSION vector`. Do not delete or replace the existing database volume.
+
+Before updating a real installation, take a database backup and verify that it can be restored on the new image. For a default local Compose installation, run from the repository root:
+
+```sh
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > safarios-before-knowledge.dump
+docker compose --env-file infra/.env -f infra/docker-compose.yml build postgres api worker
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+```
+
+Do not run `down -v`. A database administrator runs Alembic and existing `db-grants` as before; the API/worker retain NOSUPERUSER/NOBYPASSRLS roles. Downgrade removes knowledge tables/data, keeps operational tables, and deliberately leaves the shared extension installed. To restore document service, restore both DB and private-object backups; embeddings alone do not back up originals. A configuration change does not move or rewrite customer volumes automatically.
+
+### Phase 4 verification boundary
+
+Automated tests use real PostgreSQL/pgvector and least-privilege RLS, actual isolated extraction, explicit in-memory storage and scripted embedding/model test doubles. A bounded HTTP transport test verifies real embedding request/response validation without claiming a GPU connection. Build, migration upgrade/downgrade/re-upgrade, custom-format vector backup/restore and preservation of an existing operational record were exercised on disposable databases in the separately built PostgreSQL image. Existing customer databases/volumes were not touched. A configured live embedding service, full running MinIO/Celery pipeline, real-model retrieval quality/injection evaluation and load acceptance remain deployment acceptance work in Phase 8.
+
+The browser fixture checks private multipart uploads, processing, sharing, destructive confirmation, precise toast feedback, document citations and both themes at 375/768/1366/1440 px. Fixture text/screenshots are not evidence of real inference. The next implementation phase is explicit cross-property Group Owner AI.

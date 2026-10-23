@@ -2318,3 +2318,9 @@ app.include_router(group_router)
 # The AI gateway is optional; imports perform no inference or network startup work.
 from .ai.routes import router as ai_router
 app.include_router(ai_router)
+
+from .ai.knowledge_routes import router as knowledge_router
+app.include_router(knowledge_router)
+
+from .ai.upload_limit import KnowledgeUploadLimit
+app.add_middleware(KnowledgeUploadLimit)

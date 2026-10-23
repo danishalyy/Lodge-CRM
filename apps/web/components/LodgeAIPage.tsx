@@ -5,6 +5,8 @@ import { aiCopy as copy } from "@/lib/strings/ai";
 import { formatDate, formatDateTime } from "@/lib/formatting";
 import { Field } from "./ui/field";
 import { Form } from "./ui/form";
+import KnowledgeLibrary from "./KnowledgeLibrary";
+import { knowledgeCopy } from "@/lib/strings/knowledge";
 export default function LodgeAIPage() {
   const [status, setStatus] = useState<any>(null),
     [conversations, setConversations] = useState<any[]>([]),
@@ -128,6 +130,7 @@ export default function LodgeAIPage() {
           )}
         </div>
       </div>
+      {status?.knowledge_enabled && <KnowledgeLibrary />}
       {error && (
         <p className="dangerText" role="alert">
           {error}{" "}
@@ -220,6 +223,17 @@ export default function LodgeAIPage() {
                               {s.label || copy.live} ·{" "}
                               {formatDateTime(s.retrieved_at)}
                               {s.partial && <span> · {copy.partial}</span>}
+                              {s.kind === "document" && (
+                                <ul>
+                                  {s.references?.map((ref: any) => (
+                                    <li key={ref.id}>
+                                      {knowledgeCopy.source}: {ref.title} ·{" "}
+                                      {ref.locator} · {knowledgeCopy.passage}{" "}
+                                      {ref.id}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                               {s.kind === "memory" && (
                                 <>
                                   <p>

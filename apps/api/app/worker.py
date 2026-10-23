@@ -129,3 +129,6 @@ def generate_hr_expiry_alerts():
                 if n:created+=1
             db.commit()
     return {"created":created}
+
+# Register actor-scoped knowledge tasks alongside existing operational jobs.
+from .ai.knowledge_jobs import ingest as ingest_knowledge

@@ -1,7 +1,9 @@
 """Code-defined feature capabilities and translatable presentation, not plan grants."""
 # (display name, description, area). Only implemented capabilities are usable.
 BUILT={
- 'ai':('Lodge AI','Ask operational questions using permitted live data through a configured private vLLM service. Read-only tools; documents, writes and group comparisons are separate future capabilities.','Reports and AI'),
+ 'ai_knowledge':('AI knowledge','Approved knowledge for lodge questions.','Reports and AI'),
+ 'document_knowledge':('Document knowledge','Use approved documents in lodge intelligence.','Reports and AI'),
+ 'ai':('Lodge AI','Ask operational questions using permitted live data through a configured private vLLM service. Read-only live and historical tools; private documents require their own feature access and embedding service. Writes and group comparisons remain future capabilities.','Reports and AI'),
 
  'dashboard':('Lodge overview','Today’s guests, work and operational priorities.','Guests and stays'),
  'guests':('Guest profiles','Guest contact details, preferences and stay history.','Guests and stays'),
@@ -40,8 +42,6 @@ BUILT={
 FUTURE={
  'guest_mobile':('Guest mobile app','A dedicated guest application.','Integrations'),
  'staff_mobile':('Staff mobile app','A dedicated staff application.','Integrations'),
- 'ai_knowledge':('AI knowledge','Approved knowledge for lodge questions.','Reports and AI'),
- 'document_knowledge':('Document knowledge','Use approved documents in lodge intelligence.','Reports and AI'),
  'advanced_reports':('Advanced analytics','Additional configurable analysis and reports.','Reports and AI'),
  'advanced_ai':('Advanced AI','Expanded lodge intelligence.','Reports and AI'),
  'ai_daily_summary':('AI daily summaries','Automatically summarise the operational day.','Reports and AI'),

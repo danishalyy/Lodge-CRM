@@ -134,7 +134,7 @@ class AuditLog(Base):
 
 class Department(Base):
     __tablename__ = "departments"
-    __table_args__ = (UniqueConstraint("lodge_id", "name", name="uq_department_lodge_name"), Index("ix_departments_lodge_active", "lodge_id", "is_active"))
+    __table_args__ = (UniqueConstraint("lodge_id", "name", name="uq_department_lodge_name"), UniqueConstraint("id", "lodge_id", name="uq_department_knowledge_scope"), Index("ix_departments_lodge_active", "lodge_id", "is_active"))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(120))
@@ -880,3 +880,44 @@ class AIToolExecution(AIPrivate,Base):
     request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     name: Mapped[str] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(20))
+
+
+# Knowledge is tenant scoped and filtered by explicit document visibility.
+from .ai.vector import Vector
+
+class AIKnowledgeDocument(Base):
+    __tablename__ = "ai_knowledge_documents"
+    __table_args__ = (UniqueConstraint("id", "lodge_id", name="uq_knowledge_scope"), ForeignKeyConstraint(["department_id", "lodge_id"], ["departments.id", "departments.lodge_id"]),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"))
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
+    department_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    title: Mapped[str] = mapped_column(String(160))
+    file_name: Mapped[str] = mapped_column(String(160))
+    source_type: Mapped[str] = mapped_column(String(8))
+    object_key: Mapped[str] = mapped_column(String(400), unique=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    visibility: Mapped[str] = mapped_column(String(20), default="private")
+    status: Mapped[str] = mapped_column(String(20), default="uploaded")
+    error_code: Mapped[str] = mapped_column(String(40), default="")
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    embedding_model: Mapped[str] = mapped_column(String(160), default="")
+    embedding_version: Mapped[str] = mapped_column(String(80), default="")
+    job_token: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    processing_actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+class AIKnowledgeChunk(Base):
+    __tablename__ = "ai_knowledge_chunks"
+    __table_args__ = (ForeignKeyConstraint(["document_id", "lodge_id"], ["ai_knowledge_documents.id", "ai_knowledge_documents.lodge_id"], ondelete="CASCADE"), UniqueConstraint("document_id", "position", name="uq_knowledge_chunk_position"),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer)
+    locator: Mapped[str] = mapped_column(String(80))
+    content: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list] = mapped_column(Vector())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

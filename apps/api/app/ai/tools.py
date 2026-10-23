@@ -24,6 +24,7 @@ from .safety import redact
 class Arguments(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     limit: int = Field(default=30, ge=1, le=50)
+    query: str | None = Field(default=None, min_length=1, max_length=500)
     status: (
         Literal[
             "open",
@@ -97,6 +98,17 @@ class Tool:
 
 
 REGISTRY = {
+    "search_lodge_knowledge": Tool(
+        "knowledge.view",
+        "ai_knowledge",
+        "knowledge_search",
+        (),
+        "Approved lodge documents",
+        "Find the lodge’s operating procedures.",
+        ("query", "limit"),
+        extra_permissions=("knowledge.view",),
+        source_kind="document",
+    ),
     "get_operational_history": Tool(
         "memory.view",
         "ai",
@@ -289,6 +301,13 @@ REGISTRY = {
 
 
 def allowed(db, ctx, tool, lodge_id):
+    if tool.source_kind == "document":
+        from .embeddings import configured
+
+        if not configured() or not entitlement_enabled(
+            db, str(lodge_id), "document_knowledge"
+        ):
+            return False
     return (
         (
             tool.handler not in {"reports_summary", "dashboard"}
@@ -323,6 +342,13 @@ def available(db, ctx, lodge_id):
         }
         if "status" in properties:
             properties["status"] = {"type": ["string", "null"], "maxLength": 32}
+        if tool.source_kind == "document":
+            properties["limit"] = {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8,
+                "default": 5,
+            }
         definitions.append(
             {
                 "type": "function",
@@ -334,6 +360,11 @@ def available(db, ctx, lodge_id):
                         "type": "object",
                         "properties": properties,
                         "additionalProperties": False,
+                        **(
+                            {"required": ["query"]}
+                            if tool.source_kind == "document"
+                            else {}
+                        ),
                     },
                 },
             }
@@ -345,13 +376,13 @@ def permission(db, ctx, key):
     return has_permission(db, ctx.membership, key)
 
 
-def clean(value):
+def clean(value, text_limit=512):
     if isinstance(value, str):
-        return redact(value[:512])
+        return redact(value[:text_limit])
     if isinstance(value, dict):
-        return {k: clean(v) for k, v in value.items()}
+        return {k: clean(v, text_limit) for k, v in value.items()}
     if isinstance(value, list):
-        return [clean(v) for v in value]
+        return [clean(v, text_limit) for v in value]
     return value
 
 
@@ -388,6 +419,8 @@ def execute(name, arguments, db, ctx, lodge_id, request):
         raise HTTPException(422, "AI tool is not registered")
     if not isinstance(arguments, dict) or set(arguments) - set(tool.filters):
         raise HTTPException(422, "AI tool arguments are invalid")
+    if name == "search_lodge_knowledge" and "limit" not in arguments:
+        arguments = {**arguments, "limit": 5}
     try:
         args = Arguments.model_validate(arguments)
     except ValidationError:
@@ -416,6 +449,15 @@ def execute(name, arguments, db, ctx, lodge_id, request):
         },
         "source": tool.label,
     }
+    if name == "search_lodge_knowledge":
+        if not args.query or args.limit > 8:
+            raise HTTPException(
+                422, "Enter a search query and request at most 8 passages"
+            )
+        from .knowledge import search
+
+        output.update(search(args, db, ctx, lodge_id, request))
+        return clean(output, 1400)
     if name == "get_operational_history":
         from .memory import read_history
 

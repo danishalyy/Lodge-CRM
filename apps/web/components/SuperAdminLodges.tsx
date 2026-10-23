@@ -558,10 +558,7 @@ export default function SuperAdminLodges() {
                   </Field>
                 </div>
               </div>
-              <p className="fieldHint">
-                Payment is collected outside SafariOS. You control subscription
-                access.
-              </p>
+              <p className="fieldHint">You control subscription access.</p>
             </section>
             <section className="formSection">
               <h2>03 / Lodge administrator</h2>

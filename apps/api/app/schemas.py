@@ -230,7 +230,6 @@ class MaintenanceUpdate(StrictModel):
     priority: str | None = Field(default=None, pattern="^(low|normal|high|critical)$")
     assigned_staff_id: UUID | None = None
     resolution: str | None = Field(default=None, max_length=8000)
-    cost_cents: int | None = Field(default=None, ge=0)
     scheduled_for: datetime | None = None
     recurrence_interval_days: int | None = Field(default=None, ge=1, le=3650)
 
@@ -273,7 +272,6 @@ class FuelCreate(StrictModel):
     recorded_by_staff_id: UUID | None = None
     litres: float = Field(gt=0, le=10000)
     odometer_km: int = Field(ge=0)
-    cost_cents: int | None = Field(default=None, ge=0)
     supplier: str = Field(default="", max_length=180)
     reference: str = Field(default="", max_length=180)
     notes: str = Field(default="", max_length=4000)
@@ -487,7 +485,6 @@ class MaintenanceAssetCreate(StrictModel):
 class MaintenancePartCreate(StrictModel):
     part_name: str = Field(min_length=1, max_length=180)
     quantity: int = Field(default=1, ge=1, le=100000)
-    unit_cost_cents: int = Field(default=0, ge=0)
     notes: str = Field(default="", max_length=4000)
 
 
@@ -600,14 +597,6 @@ class LodgeAdminInvite(StrictModel):
 
 class LodgePreferencesUpdate(StrictModel):
     date_format: Literal['locale','dd/MM/yyyy','MM/dd/yyyy','yyyy-MM-dd']
-    currency: str = Field(pattern='^[A-Z]{3}$')
-
-    @field_validator('currency')
-    @classmethod
-    def known_currency(cls,value):
-        if value not in {'USD','ZAR','KES','TZS','UGX','NAD','BWP','ZMW','GBP','EUR','INR','AED','PKR','AUD','CAD','MZN','MWK','RWF','SCR','MUR','CHF','JPY','CNY','NZD','SGD','HKD','BRL','SAR','EGP','MAD','NGN','GHS','ETB','ZWL'}:
-            raise ValueError('Choose a supported currency')
-        return value
 
 
 class PlanUpdateIn(StrictModel):

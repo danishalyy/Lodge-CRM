@@ -703,7 +703,7 @@ export const lodgePreferencesApi = {
     storeFormatting(result);
     return result;
   },
-  update: async (body: { date_format: string; currency: string }) => {
+  update: async (body: { date_format: string }) => {
     const result = await request<any>(lodgePath("preferences"), {
       method: "PATCH",
       body: JSON.stringify(body),

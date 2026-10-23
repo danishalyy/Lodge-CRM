@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { getActiveLodgeId, lodgePreferencesApi } from "@/lib/api";
-import { supportedCurrencies } from "@/lib/formatting";
 import { contentCopy as copy } from "@/lib/strings/content";
 import { Form } from "./ui/form";
 import { Field } from "./ui/field";
@@ -12,7 +11,6 @@ export default function LodgePreferences() {
     access.permission("lodge.settings.manage") && !!getActiveLodgeId();
   const [values, setValues] = useState<{
       date_format: string;
-      currency: string;
     } | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -42,7 +40,6 @@ export default function LodgePreferences() {
             try {
               setValues(
                 await lodgePreferencesApi.update({
-                  currency: values.currency,
                   date_format: values.date_format,
                 }),
               );
@@ -71,25 +68,6 @@ export default function LodgePreferences() {
                 {["dd/MM/yyyy", "MM/dd/yyyy", "yyyy-MM-dd"].map((format) => (
                   <option key={format} value={format}>
                     {format}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label={copy.currency}>
-              <select
-                className="select"
-                name="currency"
-                value={values.currency}
-                onChange={(e) =>
-                  setValues({ ...values, currency: e.target.value })
-                }
-              >
-                {supportedCurrencies.map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency} ·{" "}
-                    {new Intl.DisplayNames([navigator.language], {
-                      type: "currency",
-                    }).of(currency)}
                   </option>
                 ))}
               </select>

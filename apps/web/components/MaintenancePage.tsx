@@ -1,6 +1,5 @@
 "use client";
 import { readableLabel } from "@/lib/strings/content";
-import { formatMoney } from "@/lib/formatting";
 import { formatDateTime, formatDate } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -18,7 +17,6 @@ type Issue = {
   unit_name?: string;
   vehicle_name?: string;
   assigned_staff_name?: string;
-  cost_cents?: number;
   resolution?: string;
   asset_id?: string;
   scheduled_for?: string;
@@ -176,7 +174,6 @@ export default function MaintenancePage() {
       await operationsApi.maintenanceAssets.addPart(selected.id, {
         part_name: String(f.get("part_name")),
         quantity: Number(f.get("quantity")),
-        unit_cost_cents: Math.round(Number(f.get("unit_cost") || 0) * 100),
         notes: String(f.get("notes") || ""),
       });
       form.reset();
@@ -488,8 +485,7 @@ export default function MaintenancePage() {
             <div>
               <h1>{selected.title}</h1>
               <div className="sub">
-                Parts used are added to the ticket cost and retained in service
-                history.
+                Parts used are retained in service history.
               </div>
             </div>
             <button
@@ -507,7 +503,6 @@ export default function MaintenancePage() {
               <span>
                 {p.part_name} × {p.quantity}
               </span>
-              <strong>{formatMoney(p.total_cost_cents)}</strong>
             </div>
           ))}
           <Form onSubmit={addPart}>
@@ -522,15 +517,6 @@ export default function MaintenancePage() {
                 name="quantity"
                 defaultValue="1"
                 required
-              />
-            </Field>
-            <Field label="Unit cost">
-              <input
-                className="field"
-                type="number"
-                step="0.01"
-                min="0"
-                name="unit_cost"
               />
             </Field>
             <Field label="Notes">

@@ -51,10 +51,7 @@ export default function SuperAdminSubscriptions() {
         <div>
           <span className="eyebrow">PLATFORM</span>
           <h1>Subscriptions</h1>
-          <p>
-            Manage packages, access dates and renewals. Payments are handled
-            outside SafariOS.
-          </p>
+          <p>Manage packages, access dates and renewals.</p>
         </div>
       </div>
       {error && <p className="dangerText">{error}</p>}

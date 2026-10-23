@@ -23,7 +23,7 @@ ROLE_DESCRIPTIONS={
  'driver':'Handles assigned transport work and permitted vehicle and fuel records.',
  'ranger':'Handles guide activities, wildlife records and permitted safari operations.',
  'fb':'Handles food and drink services, assigned tasks and relevant guest requests.',
- 'finance':'Views operational and cost-related records allowed by its actual permissions; it is not a money-only record filter.',
+ 'finance':'Views operational records allowed by its actual permissions.',
  'general_staff':'Basic access to assigned tasks and permitted personal work.',
  'read_only':'Views the records listed below and cannot change them with this preset.',
 }

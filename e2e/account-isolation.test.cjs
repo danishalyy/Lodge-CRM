@@ -565,14 +565,14 @@ test('guest creation uses a country picker and a specific confirmation',async()=
  }finally{await context.close()}
 });
 
-test('lodge preferences save only allowed fields and apply date and currency formatting',async()=>{
+test('lodge preferences and fuel retain dates without financial controls',async()=>{
  const {context,page}=await accountPage({id:'format-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'format-lodge',role_key:'lodge_admin',permissions:['lodge.settings.manage','fuel.view'],entitlements:['fuel']}]});let preferences={date_format:'locale',currency:'ZAR',timezone:'Africa/Johannesburg'},saved;
  try{
   await page.route('**/api/v1/lodges/format-lodge/preferences',async r=>{if(r.request().method()==='PATCH'){saved=r.request().postDataJSON();preferences={...preferences,...saved}}return r.fulfill({json:preferences})});
-  await page.goto(base+'/settings');await page.getByLabel('Date format',{exact:true}).selectOption('dd/MM/yyyy');await page.getByLabel('Currency',{exact:true}).selectOption('USD');await page.getByRole('button',{name:'Save lodge preferences',exact:true}).click();await page.getByText('Lodge preferences saved',{exact:true}).waitFor();assert.deepEqual(saved,{currency:'USD',date_format:'dd/MM/yyyy'});
+  await page.goto(base+'/settings');await page.getByLabel('Date format',{exact:true}).selectOption('dd/MM/yyyy');assert.equal(await page.getByLabel('Currency',{exact:true}).count(),0);await page.getByRole('button',{name:'Save lodge preferences',exact:true}).click();await page.getByText('Lodge preferences saved',{exact:true}).waitFor();assert.deepEqual(saved,{date_format:'dd/MM/yyyy'});
   await page.route('**/api/v1/auth/me',r=>r.fulfill({json:{id:'format-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'format-lodge',permissions:['fuel.view'],entitlements:['fuel'],...preferences}]}}));
   await page.route('**/api/v1/lodges/format-lodge/fuel',r=>r.fulfill({json:[{id:'fuel-1',recorded_at:'2026-10-22T12:00:00Z',litres:10,odometer_km:100,cost_cents:12345,vehicle_name:'Cruiser',fuel_type:'diesel'}]}));
-  await page.goto(base+'/fuel');await page.getByText('$123.45',{exact:true}).waitFor();await page.getByText(/^22\/10\/2026 · (14:00|2:00 PM)$/).waitFor();
+  await page.goto(base+'/fuel');assert.equal(await page.getByText('$123.45',{exact:true}).count(),0);assert.equal(await page.getByRole('columnheader',{name:'Cost',exact:true}).count(),0);await page.getByText(/^22\/10\/2026 · (14:00|2:00 PM)$/).waitFor();
  }finally{await context.close()}
 });
 

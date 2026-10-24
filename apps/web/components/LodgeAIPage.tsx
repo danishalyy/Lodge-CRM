@@ -7,7 +7,12 @@ import { Field } from "./ui/field";
 import { Form } from "./ui/form";
 import KnowledgeLibrary from "./KnowledgeLibrary";
 import { knowledgeCopy } from "@/lib/strings/knowledge";
-export default function LodgeAIPage() {
+import { readableLabel } from "@/lib/strings/content";
+export default function LodgeAIPage({
+  scopeType = "lodge",
+}: {
+  scopeType?: "lodge" | "group";
+}) {
   const [status, setStatus] = useState<any>(null),
     [conversations, setConversations] = useState<any[]>([]),
     [conversation, setConversation] = useState(""),
@@ -16,14 +21,17 @@ export default function LodgeAIPage() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const generation = useRef(0);
-  const scope = () => `${getActiveUserId()}:${getActiveLodgeId()}`;
+  const scope = () => `${getActiveUserId()}:${getActiveLodgeId()}:${scopeType}`;
   async function load() {
     const token = ++generation.current,
       origin = scope();
     setStatus(null);
     setError("");
     try {
-      const [s, c] = await Promise.all([aiApi.status(), aiApi.conversations()]);
+      const [s, c] = await Promise.all([
+        aiApi.status(scopeType),
+        aiApi.conversations(scopeType),
+      ]);
       if (token !== generation.current || origin !== scope()) return;
       setStatus(s);
       setConversations(c);
@@ -36,6 +44,7 @@ export default function LodgeAIPage() {
         if (e instanceof ApiError && [401, 403, 409].includes(e.status)) {
           setConversation("");
           setMessages([]);
+          setStatus(null);
         }
         setError((e as Error).message);
       }
@@ -55,7 +64,7 @@ export default function LodgeAIPage() {
       generation.current++;
       window.removeEventListener("safarios-lodge-changed", change);
     };
-  }, []);
+  }, [scopeType]);
   async function open(id: string) {
     const origin = scope(),
       token = ++generation.current;
@@ -72,6 +81,7 @@ export default function LodgeAIPage() {
         if (e instanceof ApiError && [401, 403, 409].includes(e.status)) {
           setConversation("");
           setMessages([]);
+          setStatus(null);
         }
         setError((e as Error).message || copy.historyFailed);
       }
@@ -89,7 +99,7 @@ export default function LodgeAIPage() {
     try {
       let id = conversation;
       if (!id) {
-        const created = await aiApi.create();
+        const created = await aiApi.create(scopeType);
         if (token !== generation.current || origin !== scope()) return;
         id = created.id;
         setConversation(id);
@@ -108,6 +118,7 @@ export default function LodgeAIPage() {
         if (e instanceof ApiError && [401, 403, 409].includes(e.status)) {
           setConversation("");
           setMessages([]);
+          setStatus(null);
         }
         setError((e as Error).message || copy.failed);
       }
@@ -121,16 +132,33 @@ export default function LodgeAIPage() {
       <div className="pageHeader">
         <div>
           <span className="eyebrow">{copy.eyebrow}</span>
-          <h1>{copy.title}</h1>
-          <p>{copy.intro}</p>
-          {status?.scope && (
+          <h1>{scopeType === "group" ? copy.groupTitle : copy.title}</h1>
+          <p>{scopeType === "group" ? copy.groupIntro : copy.intro}</p>
+          {status?.scope && scopeType !== "group" && (
             <p>
               {copy.scope}: <strong>{status.scope.lodge_name}</strong>
             </p>
           )}
         </div>
       </div>
-      {status?.knowledge_enabled && <KnowledgeLibrary />}
+      {status?.scope?.type === "group" && (
+        <section className="panel groupAiCoverage">
+          <h2>
+            {copy.groupScope}: {status.scope.group_name}
+          </h2>
+          <p>
+            {copy.includedLodges}:{" "}
+            {status.scope.lodges.map((l: any) => l.lodge_name).join(", ")}
+          </p>
+          {status.scope.excluded_count > 0 && (
+            <p>{copy.excludedLodges(status.scope.excluded_count)}</p>
+          )}
+          <p>{copy.groupCoverage}</p>
+        </section>
+      )}
+      {status?.knowledge_enabled && scopeType === "lodge" && (
+        <KnowledgeLibrary />
+      )}
       {error && (
         <p className="dangerText" role="alert">
           {error}{" "}
@@ -223,6 +251,53 @@ export default function LodgeAIPage() {
                               {s.label || copy.live} ·{" "}
                               {formatDateTime(s.retrieved_at)}
                               {s.partial && <span> · {copy.partial}</span>}
+                              {s.kind === "group" && (
+                                <>
+                                  <p>
+                                    {copy.groupScope}: {s.group_name}
+                                  </p>
+                                  {s.excluded_count > 0 && (
+                                    <p>
+                                      {copy.excludedLodges(s.excluded_count)}
+                                    </p>
+                                  )}
+                                  <ul>
+                                    {s.references?.map((ref: any) => (
+                                      <li key={ref.lodge_id}>
+                                        {ref.lodge_name} · {ref.timezone}
+                                        {ref.period
+                                          ? ` · ${formatDate(ref.period.start_date)} – ${formatDate(ref.period.end_date)} (UTC)`
+                                          : ref.current_date
+                                            ? ` · ${formatDate(ref.current_date)}`
+                                            : ""}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  {s.contributors && (
+                                    <details>
+                                      <summary>{copy.metricCoverage}</summary>
+                                      <ul>
+                                        {Object.entries(s.contributors).map(
+                                          ([metric, ids]) => (
+                                            <li key={metric}>
+                                              {readableLabel(metric)}:{" "}
+                                              {(ids as string[])
+                                                .map(
+                                                  (id) =>
+                                                    s.references?.find(
+                                                      (ref: any) =>
+                                                        ref.lodge_id === id,
+                                                    )?.lodge_name || id,
+                                                )
+                                                .join(", ")}
+                                            </li>
+                                          ),
+                                        )}
+                                      </ul>
+                                    </details>
+                                  )}
+                                </>
+                              )}
                               {s.kind === "document" && (
                                 <ul>
                                   {s.references?.map((ref: any) => (

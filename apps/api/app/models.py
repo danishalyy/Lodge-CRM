@@ -843,9 +843,11 @@ class AIPrivate:
 
 class AIConversation(AIPrivate,Base):
     __tablename__='ai_conversations'
-    __table_args__=(UniqueConstraint('id','lodge_id','user_id',name='uq_ai_conversation_scope'),Index('ix_ai_conversation_owner','lodge_id','user_id','created_at'))
+    __table_args__=(UniqueConstraint('id','lodge_id','user_id',name='uq_ai_conversation_scope'),CheckConstraint("(scope_type='lodge' AND group_id IS NULL) OR (scope_type='group' AND group_id IS NOT NULL)",name='ck_ai_conversation_scope'),Index('ix_ai_conversation_owner','lodge_id','user_id','created_at'))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     access_fingerprint: Mapped[str] = mapped_column(String(64))
+    scope_type: Mapped[str] = mapped_column(String(10),default='lodge',server_default='lodge')
+    group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True),ForeignKey('lodge_groups.id',ondelete='CASCADE'),nullable=True)
 
 class AIMessage(AIPrivate,Base):
     __tablename__='ai_messages'

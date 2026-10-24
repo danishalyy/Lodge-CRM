@@ -1,5 +1,16 @@
 export const aiCopy = {
   title: "Ask Lodge AI",
+  groupTitle: "Ask Group Owner AI",
+  groupIntro:
+    "Compare authorised operational metrics across your explicitly assigned lodges.",
+  compareGroup: "Compare lodges with AI",
+  groupScope: "Group scope",
+  metricCoverage: "Metric coverage",
+  includedLodges: "Included lodges",
+  excludedLodges: (count: number) =>
+    `${count} assigned ${count === 1 ? "lodge is" : "lodges are"} excluded because AI or subscription access is unavailable.`,
+  groupCoverage:
+    "Each metric uses only lodges with the required permission and feature. Missing values are unavailable; current vehicle counts do not measure downtime duration.",
   eyebrow: "LODGE INTELLIGENCE",
   intro: "Ask about your lodge’s authorised operational information.",
   scope: "Current lodge",

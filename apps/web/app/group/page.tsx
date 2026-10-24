@@ -1,4 +1,5 @@
 "use client";
+import { aiCopy } from "@/lib/strings/ai";
 import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -110,6 +111,16 @@ export default function GroupOverview() {
       setBusy(false);
     }
   }
+  const aiAnchor = data?.lodges?.find((l: any) => {
+    const member = me?.memberships?.find((m: any) => m.lodge_id === l.id);
+    return (
+      ["Active", "Expiring Soon"].includes(l.subscription_status) &&
+      ["ai.use", "ai.group.view"].every((p) =>
+        member?.permissions?.includes(p),
+      ) &&
+      ["ai", "advanced_ai"].every((f) => member?.entitlements?.includes(f))
+    );
+  });
   if (me && !me.groups?.length)
     return (
       <main className="content">
@@ -142,6 +153,17 @@ export default function GroupOverview() {
               lodge’s subscription.
             </p>
           </div>
+          {aiAnchor && (
+            <button
+              className="button primary"
+              onClick={() => {
+                setActiveLodgeId(aiAnchor.id);
+                router.push("/lodge-ai?scope=group");
+              }}
+            >
+              {aiCopy.compareGroup}
+            </button>
+          )}
           {me?.groups?.length > 1 && (
             <label>
               Active group

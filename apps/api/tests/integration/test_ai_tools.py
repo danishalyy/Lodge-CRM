@@ -9,7 +9,11 @@ from test_ai_foundation import ai, create
 
 @pytest.mark.parametrize(
     "tool_name",
-    [name for name, tool in REGISTRY.items() if tool.source_kind != "document"],
+    [
+        name
+        for name, tool in REGISTRY.items()
+        if tool.source_kind not in {"document", "group"}
+    ],
 )
 def test_every_read_tool_is_authorised_and_executed(ai, tool_name):
     ai["provider"].replies = [

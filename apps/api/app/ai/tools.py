@@ -98,6 +98,26 @@ class Tool:
 
 
 REGISTRY = {
+    "get_group_overview": Tool(
+        "ai.group.view",
+        "advanced_ai",
+        "group_overview",
+        (),
+        "Group operational comparison",
+        "Which of my lodges has the most overdue tasks?",
+        (),
+        source_kind="group",
+    ),
+    "get_group_report_metrics": Tool(
+        "ai.group.view",
+        "advanced_ai",
+        "group_reports",
+        (),
+        "Group operational report",
+        "Compare operational reports across my lodges.",
+        ("start_date", "end_date"),
+        source_kind="group",
+    ),
     "search_lodge_knowledge": Tool(
         "knowledge.view",
         "ai_knowledge",
@@ -301,6 +321,8 @@ REGISTRY = {
 
 
 def allowed(db, ctx, tool, lodge_id):
+    if tool.source_kind == "group" and ctx.role_key != "group_admin":
+        return False
     if tool.source_kind == "document":
         from .embeddings import configured
 
@@ -330,9 +352,11 @@ def allowed(db, ctx, tool, lodge_id):
     )
 
 
-def available(db, ctx, lodge_id):
+def available(db, ctx, lodge_id, scope_type="lodge"):
     definitions = []
     for name, tool in REGISTRY.items():
+        if (tool.source_kind == "group") != (scope_type == "group"):
+            continue
         if not allowed(db, ctx, tool, lodge_id):
             continue
         properties = {
@@ -411,12 +435,14 @@ def read_rows(tool, args, db, ctx, lodge_id, bound=101):
     return getattr(main, tool.handler)(**kwargs)
 
 
-def execute(name, arguments, db, ctx, lodge_id, request):
+def execute(name, arguments, db, ctx, lodge_id, request, scope_type="lodge"):
     # Re-authenticate independently for every invocation; never trust the orchestrator's earlier decision.
     ctx = guard(db, ctx.user, lodge_id, request)
     tool = REGISTRY.get(name)
     if not tool:
         raise HTTPException(422, "AI tool is not registered")
+    if (tool.source_kind == "group") != (scope_type == "group"):
+        raise HTTPException(403, "This tool is unavailable for this conversation scope")
     if not isinstance(arguments, dict) or set(arguments) - set(tool.filters):
         raise HTTPException(422, "AI tool arguments are invalid")
     if name == "search_lodge_knowledge" and "limit" not in arguments:
@@ -431,6 +457,10 @@ def execute(name, arguments, db, ctx, lodge_id, request):
     ensure_feature(db, str(lodge_id), tool.feature)
     if not allowed(db, ctx, tool, lodge_id):
         raise HTTPException(403, "This AI tool is not available to your account")
+    if tool.source_kind == "group":
+        from .groups import execute as group_execute
+
+        return clean(group_execute(name, args, db, ctx, lodge_id, request), 1400)
     from .. import main
 
     lodge = db.get(Lodge, lodge_id)

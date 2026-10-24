@@ -133,3 +133,5 @@ See [AI audit and phased implementation status](docs/AI_IMPLEMENTATION_AUDIT.md)
 ### Private document knowledge update
 
 Optional lodge knowledge now supports private PDF/DOCX/TXT uploads, actor-scoped Celery processing, a separate real embedding endpoint and permission-filtered pgvector retrieval. It defaults off. This update requires the PostgreSQL 16 image built from `infra/postgres` **before migration 0019**; keep the existing volume and take/restore-test a database backup before updating an installation. [AI setup and acceptance](docs/AI_SETUP.md) explains configuration, sharing rules, limits and the verified test boundary. Chat and embedding GPU services remain external; live provider/full pipeline acceptance is still required before commercial launch.
+
+Group Owners can now open **Compare lodges with AI** for authorised cross-property metrics. Migration 0020 preserves individual lodge history and adds explicit private group scope; each property's membership, permissions, subscription and AI capabilities remain authoritative. See [Group Owner AI setup](docs/AI_SETUP.md#group-owner-ai-phase-5) for coverage, limits and remaining live-provider acceptance.

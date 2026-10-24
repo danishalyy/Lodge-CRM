@@ -2,7 +2,7 @@
 
 import json, time, uuid
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -29,6 +29,11 @@ from .providers.base import ProviderUnavailable
 from .limits import admission
 from .safety import SYSTEM, redact
 from . import tools
+from .groups import (
+    resolve as resolve_group,
+    conversation_fingerprint as fingerprint_for,
+    summarise as summarise_group,
+)
 from .memory import verify_sources as verify_memory_sources
 from .knowledge import verify_sources as verify_document_sources
 
@@ -39,6 +44,11 @@ def verify_sources(sources, db, ctx, lodge_id, request):
 
 
 router = APIRouter()
+
+
+class ConversationIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: Literal["lodge", "group"] = "lodge"
 
 
 class MessageIn(BaseModel):
@@ -56,7 +66,7 @@ def provider_dependency():
         ) from None
 
 
-def conversation(db, lodge_id, user, conversation_id, ctx):
+def conversation(db, lodge_id, user, conversation_id, ctx, request):
     row = db.scalar(
         select(AIConversation).where(
             AIConversation.id == conversation_id,
@@ -66,7 +76,9 @@ def conversation(db, lodge_id, user, conversation_id, ctx):
     )
     if not row:
         raise HTTPException(404, "Conversation not found")
-    if row.access_fingerprint != fingerprint(db, ctx, lodge_id):
+    if row.access_fingerprint != fingerprint_for(
+        db, ctx, lodge_id, request, row.scope_type, row.group_id
+    ):
         raise HTTPException(
             409,
             "Your access changed. Start a new conversation to use your current permissions",
@@ -105,24 +117,37 @@ def status(
     request: Request,
     user: User = Depends(require_permission("ai.use")),
     db=Depends(get_db),
+    scope: Literal["lodge", "group"] = "lodge",
 ):
     ctx = guard(db, user, lodge_id, request)
+    group = resolve_group(db, user, lodge_id, request) if scope == "group" else None
     state = configuration_state()
     ready = False
     if state == "configured":
         db.rollback()
         ready = health_ready()
         ctx = guard(db, user, lodge_id, request)
+        group = resolve_group(db, user, lodge_id, request) if scope == "group" else None
     return {
         "scope": {
             "lodge_id": str(lodge_id),
             "lodge_name": db.get(Lodge, lodge_id).name,
+            "type": scope,
+            **(
+                {
+                    key: group[key]
+                    for key in ("group_id", "group_name", "lodges", "excluded_count")
+                }
+                if group
+                else {}
+            ),
         },
         "state": (
             "ready" if ready else "unavailable" if state == "configured" else state
         ),
         "knowledge_enabled": bool(
-            settings.ai_knowledge_enabled
+            scope == "lodge"
+            and settings.ai_knowledge_enabled
             and has_permission(db, ctx.membership, "knowledge.view")
             and entitlement_enabled(db, str(lodge_id), "ai_knowledge")
             and entitlement_enabled(db, str(lodge_id), "document_knowledge")
@@ -134,7 +159,7 @@ def status(
                 "description": x["function"]["description"],
                 "suggestion": tools.REGISTRY[x["function"]["name"]].suggestion,
             }
-            for x in tools.available(db, ctx, lodge_id)
+            for x in tools.available(db, ctx, lodge_id, scope)
         ],
     }
 
@@ -145,15 +170,18 @@ def conversations(
     request: Request,
     user: User = Depends(require_permission("ai.use")),
     db=Depends(get_db),
+    scope: Literal["lodge", "group"] = "lodge",
 ):
     ctx = guard(db, user, lodge_id, request)
-    signature = fingerprint(db, ctx, lodge_id)
+    group = resolve_group(db, user, lodge_id, request) if scope == "group" else None
+    signature = group["fingerprint"] if group else fingerprint(db, ctx, lodge_id)
     rows = db.scalars(
         select(AIConversation)
         .where(
             AIConversation.lodge_id == lodge_id,
             AIConversation.user_id == user.id,
             AIConversation.access_fingerprint == signature,
+            AIConversation.scope_type == scope,
         )
         .order_by(AIConversation.created_at.desc())
         .limit(30)
@@ -171,14 +199,23 @@ def create_conversation(
     request: Request,
     user: User = Depends(require_permission("ai.use", write=True)),
     db=Depends(get_db),
+    body: ConversationIn | None = None,
 ):
     ctx = guard(db, user, lodge_id, request, write=True)
     if configuration_state() not in {"configured", "test_only"}:
         raise HTTPException(503, "Lodge AI is not configured or is unavailable")
+    scope_type = body.scope if body else "lodge"
+    group = (
+        resolve_group(db, user, lodge_id, request) if scope_type == "group" else None
+    )
     row = AIConversation(
         lodge_id=lodge_id,
         user_id=user.id,
-        access_fingerprint=fingerprint(db, ctx, lodge_id),
+        access_fingerprint=(
+            group["fingerprint"] if group else fingerprint(db, ctx, lodge_id)
+        ),
+        scope_type=scope_type,
+        group_id=uuid.UUID(group["group_id"]) if group else None,
     )
     db.add(row)
     db.flush()
@@ -196,7 +233,7 @@ def messages(
     db=Depends(get_db),
 ):
     ctx = guard(db, user, lodge_id, request)
-    conversation(db, lodge_id, user, conversation_id, ctx)
+    conversation(db, lodge_id, user, conversation_id, ctx, request)
     rows = db.scalars(
         select(AIMessage)
         .where(AIMessage.conversation_id == conversation_id)
@@ -223,8 +260,9 @@ def send_message(
     provider=Depends(provider_dependency),
 ):
     ctx = guard(db, user, lodge_id, request, write=True)
-    conv = conversation(db, lodge_id, user, conversation_id, ctx)
+    conv = conversation(db, lodge_id, user, conversation_id, ctx, request)
     expected = conv.access_fingerprint
+    scope_type, group_id = conv.scope_type, conv.group_id
     content = redact(body.content.strip())
     if not content:
         raise HTTPException(422, "Enter a question")
@@ -291,11 +329,14 @@ def send_message(
         try:
             for turn in range(settings.ai_max_rounds):
                 ctx = guard(db, user, lodge_id, request, write=True)
-                if fingerprint(db, ctx, lodge_id) != expected:
+                if (
+                    fingerprint_for(db, ctx, lodge_id, request, scope_type, group_id)
+                    != expected
+                ):
                     raise HTTPException(
                         409, "Your access changed. Start a new conversation"
                     )
-                approved = tools.available(db, ctx, lodge_id)
+                approved = tools.available(db, ctx, lodge_id, scope_type)
                 # Conservative byte budget, including schemas, reserved output and structured context.
                 if (
                     len(json.dumps([prompt, approved], ensure_ascii=False).encode())
@@ -312,7 +353,12 @@ def send_message(
                     if not sources:
                         raise ProviderUnavailable("no_operational_sources")
                     ctx = guard(db, user, lodge_id, request, write=True)
-                    if fingerprint(db, ctx, lodge_id) != expected:
+                    if (
+                        fingerprint_for(
+                            db, ctx, lodge_id, request, scope_type, group_id
+                        )
+                        != expected
+                    ):
                         raise HTTPException(
                             409, "Your access changed. Start a new conversation"
                         )
@@ -347,7 +393,10 @@ def send_message(
                     return result
                 call = reply.tool_calls[0]
                 ctx = guard(db, user, lodge_id, request, write=True)
-                if fingerprint(db, ctx, lodge_id) != expected:
+                if (
+                    fingerprint_for(db, ctx, lodge_id, request, scope_type, group_id)
+                    != expected
+                ):
                     raise HTTPException(
                         409, "Your access changed. Start a new conversation"
                     )
@@ -356,7 +405,7 @@ def send_message(
                     call.name[:80] if isinstance(call.name, str) else "invalid_tool"
                 )
                 result = tools.execute(
-                    call.name, call.arguments, db, ctx, lodge_id, request
+                    call.name, call.arguments, db, ctx, lodge_id, request, scope_type
                 )
                 remaining = (
                     settings.ai_max_context
@@ -372,6 +421,8 @@ def send_message(
                     ):
                         result["items"].pop()
                         result["partial"] = True
+                        if tools.REGISTRY[call.name].source_kind == "group":
+                            result["comparisons"] = summarise_group(result["items"])
                     result["returned_count"] = len(result["items"])
                 if len(json.dumps(result, ensure_ascii=False).encode()) > remaining:
                     raise HTTPException(
@@ -429,6 +480,32 @@ def send_message(
                         }
                         for row in result.get("items", [])
                     ]
+                if source["kind"] == "group":
+                    source["group_id"] = result["scope"]["group_id"]
+                    source["group_name"] = result["scope"]["group_name"]
+                    source["excluded_count"] = result["excluded_count"]
+                    source["references"] = [
+                        {
+                            **{
+                                key: row[key]
+                                for key in (
+                                    "lodge_id",
+                                    "lodge_name",
+                                    "timezone",
+                                    "period",
+                                    "current_date",
+                                    "retrieved_at",
+                                )
+                                if key in row
+                            },
+                            "metric_keys": list(row["metrics"]),
+                        }
+                        for row in result["items"]
+                    ]
+                    source["contributors"] = {
+                        key: value["contributor_lodge_ids"]
+                        for key, value in result["comparisons"].items()
+                    }
                 sources.append(source)
                 prompt.extend(
                     [

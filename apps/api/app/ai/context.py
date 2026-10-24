@@ -61,7 +61,7 @@ def fingerprint(db, ctx, lodge_id):
     lodge = db.get(Lodge, lodge_id)
     plan = db.execute(
         select(PlanEntitlement.feature_key, PlanEntitlement.enabled).where(
-            PlanEntitlement.plan_key == sub.package
+            PlanEntitlement.plan_key == (sub.package if sub else "")
         )
     ).all()
     overrides = db.execute(
@@ -80,8 +80,8 @@ def fingerprint(db, ctx, lodge_id):
         sorted(permissions),
         sorted((k, v) for k, v in plan),
         sorted((k, v) for k, v in overrides),
-        str(sub.start_date),
-        str(sub.expiry_date),
-        sub.suspended,
+        str(sub.start_date) if sub else "",
+        str(sub.expiry_date) if sub else "",
+        sub.suspended if sub else True,
     ]
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()

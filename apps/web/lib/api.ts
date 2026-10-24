@@ -727,9 +727,21 @@ export const featureAccessApi = {
 };
 
 export const aiApi = {
-  status: () => request<any>(lodgePath("ai/status")),
-  conversations: () => request<any[]>(lodgePath("ai/conversations")),
-  create: () => request<any>(lodgePath("ai/conversations"), { method: "POST" }),
+  status: (scope: "lodge" | "group" = "lodge") =>
+    request<any>(
+      lodgePath(scope === "group" ? "ai/status?scope=group" : "ai/status"),
+    ),
+  conversations: (scope: "lodge" | "group" = "lodge") =>
+    request<any[]>(
+      lodgePath(
+        scope === "group" ? "ai/conversations?scope=group" : "ai/conversations",
+      ),
+    ),
+  create: (scope: "lodge" | "group" = "lodge") =>
+    request<any>(lodgePath("ai/conversations"), {
+      method: "POST",
+      ...(scope === "group" ? { body: JSON.stringify({ scope }) } : {}),
+    }),
   messages: (id: string) =>
     request<any[]>(
       lodgePath(`ai/conversations/${encodeURIComponent(id)}/messages`),

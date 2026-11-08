@@ -348,3 +348,59 @@ def test_ai_redis_concurrency_lease_releases_after_request(ai):
         assert rejected.value.status_code == 429
     with admission(user, lodge):
         pass
+
+
+def test_private_conversation_titles_use_only_first_user_question(ai):
+    from app.models import AIMessage
+
+    cid = create(ai)
+    assert ai["client"].get(ai["base"] + "/conversations").json()[0]["title"] is None
+    with ai["owner"]() as db:
+        from datetime import datetime, timezone, timedelta
+
+        at = datetime.now(timezone.utc)
+        db.add(
+            AIMessage(
+                lodge_id=ai["lodge"].id,
+                user_id=ai["user"].id,
+                conversation_id=cid,
+                request_id=uuid4(),
+                role="user",
+                content="  My   lodge\nquestion owner@example.com password=private-value "
+                + ("x" * 150),
+                created_at=at,
+            )
+        )
+        db.add(
+            AIMessage(
+                lodge_id=ai["lodge"].id,
+                user_id=ai["user"].id,
+                conversation_id=cid,
+                request_id=uuid4(),
+                role="assistant",
+                content="PRIVATE ASSISTANT FACTS",
+                created_at=at + timedelta(seconds=1),
+            )
+        )
+        db.add(
+            AIMessage(
+                lodge_id=ai["lodge"].id,
+                user_id=ai["user"].id,
+                conversation_id=cid,
+                request_id=uuid4(),
+                role="user",
+                content="Later question should not replace title",
+                created_at=at + timedelta(seconds=2),
+            )
+        )
+        db.commit()
+    row = ai["client"].get(ai["base"] + "/conversations").json()[0]
+    assert row["id"] == cid and row["title"].startswith("My lodge question ")
+    assert len(row["title"]) <= 100
+    assert (
+        "owner@example.com" not in row["title"] and "private-value" not in row["title"]
+    )
+    assert (
+        "PRIVATE ASSISTANT FACTS" not in row["title"]
+        and "Later question" not in row["title"]
+    )

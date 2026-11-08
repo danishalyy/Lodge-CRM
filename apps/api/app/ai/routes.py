@@ -175,8 +175,18 @@ def conversations(
     ctx = guard(db, user, lodge_id, request)
     group = resolve_group(db, user, lodge_id, request) if scope == "group" else None
     signature = group["fingerprint"] if group else fingerprint(db, ctx, lodge_id)
-    rows = db.scalars(
-        select(AIConversation)
+    # A title is the owner's first question, never assistant-sourced CRM facts.
+    # The correlated read retains message owner/tenant RLS and current ACL filtering.
+    first_question = (
+        select(AIMessage.content)
+        .where(AIMessage.conversation_id == AIConversation.id, AIMessage.role == "user")
+        .order_by(AIMessage.created_at, AIMessage.id)
+        .limit(1)
+        .correlate(AIConversation)
+        .scalar_subquery()
+    )
+    rows = db.execute(
+        select(AIConversation, first_question.label("first_question"))
         .where(
             AIConversation.lodge_id == lodge_id,
             AIConversation.user_id == user.id,
@@ -187,7 +197,12 @@ def conversations(
         .limit(30)
     ).all()
     return [
-        {"id": str(row.id), "created_at": row.created_at.isoformat()} for row in rows
+        {
+            "id": str(row.id),
+            "created_at": row.created_at.isoformat(),
+            "title": " ".join(redact(question or "").split())[:100] or None,
+        }
+        for row, question in rows
     ]
 
 

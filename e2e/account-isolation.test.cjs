@@ -737,9 +737,65 @@ test('Group Owner AI opens explicit group scope, shows property sources and clea
    if(p.endsWith('/messages')&&m==='POST'){assert.deepEqual(Object.keys(r.request().postDataJSON()).sort(),['content','request_id']);if(revoked)return r.fulfill({status:409,json:{detail:'Group access changed. Start a new conversation'}});return r.fulfill({json:groupReply});}
    throw Error('Unexpected group AI request '+p);
   });
-  await page.goto(base+'/group');await page.getByRole('button',{name:'Compare lodges with AI',exact:true}).click();await page.getByRole('heading',{name:'Ask Group Owner AI',exact:true}).waitFor();assert.match(page.url(),/scope=group/);await page.getByText('Included lodges: Acacia Lodge, River Lodge',{exact:true}).waitFor();await page.getByText(/1 assigned lodge is excluded/).first().waitFor();
+  await page.goto(base+'/group');await page.getByRole('button',{name:'Compare lodges with AI',exact:true}).click();await page.getByRole('heading',{name:'Ask Group Owner AI',exact:true}).waitFor();assert.match(page.url(),/scope=group/);await page.locator('.aiGroupScope > summary').click();await page.getByText('Included lodges: Acacia Lodge, River Lodge',{exact:true}).waitFor();await page.getByText(/1 assigned lodge is excluded/).first().waitFor();await page.locator('.aiGroupScope > summary').click();
   await page.getByRole('button',{name:'Which of my lodges has the most overdue tasks?',exact:true}).click();await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByText('Test fixture: River Lodge has five overdue tasks; Acacia Lodge has two.',{exact:true}).waitFor();assert.ok(created);await page.getByText('Sources checked',{exact:true}).click();await page.locator('.aiMessage li').getByText(/River Lodge.*Africa\/Johannesburg/).waitFor();await page.getByText('Metric coverage',{exact:true}).click();await page.getByText(/Overdue tasks: Acacia Lodge, River Lodge/i).waitFor();
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`/tmp/safarios-group-ai-${width}-${theme}.png`,fullPage:true});}
   revoked=true;await page.getByLabel('Your question',{exact:true}).fill('Compare again');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByRole('alert').filter({hasText:/Group access changed/}).waitFor();assert.equal(await page.getByText('Test fixture: River Lodge has five overdue tasks; Acacia Lodge has two.',{exact:true}).count(),0);
  }finally{await context.close()}
+});
+
+test('conversational AI shows pending turns, formats answers safely, preserves drafts and supports mobile history',async()=>{
+ const {context,page}=await accountPage({id:'chat-user',full_name:'Maya',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'chat-lodge',permissions:['ai.use'],entitlements:['ai']}]});
+ let release,submissions=0,sent,rows=[];const gate=new Promise(resolve=>release=resolve),external=[];
+ const answer='Here is what needs attention.\n\n### Open tasks\n\n1. **Room readiness check** — due today.\n2. **Vehicle inspection** — awaiting assignment.\n\n| Task | Status |\n| --- | --- |\n| Room check | In progress |\n| Vehicle inspection | Assigned |\n\n[External reference](https://chat-external.invalid/leak)\n\n![Remote image](https://chat-external.invalid/pixel.png)\n\n<script>window.chatInjected=true</script>';
+ const history=Array.from({length:6},(_,i)=>({id:'old-'+i,title:i===2?'Vehicle notes':'Previous conversation '+i,created_at:'2026-11-08T10:00:00Z'}));
+ try{
+  page.on('request',r=>{if(r.url().includes('chat-external.invalid'))external.push(r.url());});
+  await context.grantPermissions(['clipboard-read','clipboard-write']);
+  await page.route('**/api/v1/lodges/chat-lodge/ai/**',async r=>{
+   const p=new URL(r.request().url()).pathname,m=r.request().method();
+   if(p.endsWith('/status'))return r.fulfill({json:{state:'ready',knowledge_enabled:true,scope:{type:'lodge',lodge_id:'chat-lodge',lodge_name:'Ndlovu House'},tools:[{name:'get_tasks',suggestion:'What needs attention today?'},{name:'get_room_status',suggestion:'Which rooms are ready?'},{name:'get_current_stays',suggestion:'Who is arriving today?'},{name:'get_maintenance_status',suggestion:'Any maintenance to follow up?'}]}});
+   if(p.endsWith('/conversations'))return r.fulfill({json:m==='POST'?{id:'new-chat',title:null,created_at:'2026-11-09T08:00:00Z'}:history});
+   if(p.endsWith('/messages')){
+    if(m==='POST'){submissions++;sent=r.request().postDataJSON();await gate;rows=[{id:'user-turn',role:'user',content:sent.content},{id:'assistant-turn',role:'assistant',content:answer,sources:[{kind:'live',label:'Tasks',tool:'get_tasks',retrieved_at:'2026-11-09T08:00:00Z'}]}];return r.fulfill({json:rows[1]});}
+    return r.fulfill({json:p.includes('/old-2/')?[{id:'old-answer',role:'assistant',content:'Previously checked vehicle notes.',sources:[]}]:rows});
+   }
+   throw Error('Unexpected chat route '+p);
+  });
+  await page.goto(base+'/lodge-ai');await page.getByRole('heading',{name:'What can I help you with?',exact:true}).waitFor();
+  for(const [width,theme] of [[1440,'dark'],[375,'light']]){await page.setViewportSize({width,height:900});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(200);await page.screenshot({path:`/tmp/safarios-chat-welcome-${width}-${theme}.png`,fullPage:true});}await page.setViewportSize({width:1440,height:900});await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  const input=page.getByLabel('Your question',{exact:true});await input.fill('Which tasks');await input.press('Shift+Enter');await input.pressSequentially('need attention?');assert.equal(await input.inputValue(),'Which tasks\nneed attention?');assert.equal(submissions,0);
+  const started=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/messages'));await input.press('Enter');await started;await page.locator('.aiUserMessage').getByText('Which tasks need attention?',{exact:true}).waitFor();await page.getByRole('status').filter({hasText:'Checking authorised sources'}).waitFor();assert.equal(submissions,1);
+  assert.equal(await page.getByRole('heading',{name:'What can I help you with?',exact:true}).count(),0);
+  await input.fill('A draft for my next question');await input.press('Enter');assert.equal(submissions,1);
+  release();await page.getByRole('heading',{name:'Open tasks',exact:true}).waitFor();assert.equal(await input.inputValue(),'A draft for my next question');
+  assert.equal(await page.locator('.aiMarkdown strong').getByText('Room readiness check',{exact:true}).count(),1);
+  assert.equal(await page.getByRole('table').getByRole('row').count(),3);
+  assert.equal(await page.locator('.aiMarkdown a,.aiMarkdown img,.aiMarkdown script').count(),0);assert.equal(await page.evaluate(()=>window.chatInjected),undefined);assert.deepEqual(external,[]);
+  await page.getByRole('button',{name:'Copy response',exact:true}).click();await page.getByRole('button',{name:'Copied',exact:true}).waitFor();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),answer);
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:900});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const composer=await page.locator('.aiComposer').boundingBox();assert.ok(composer.y+composer.height<=900-(width<=1023?80:0));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-chat-conversation-${width}-${theme}.png`,fullPage:true});}
+  await page.setViewportSize({width:375,height:760});await page.getByRole('button',{name:'Open conversation history',exact:true}).click();await page.getByRole('dialog').getByLabel('Search conversations',{exact:true}).fill('Vehicle');assert.equal(await page.getByRole('dialog').locator('.aiThread').count(),1);
+  await page.keyboard.press('Escape');await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Open conversation history');
+  await page.getByRole('button',{name:'Open conversation history',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:/Vehicle notes/}).click();await page.getByText('Previously checked vehicle notes.',{exact:true}).waitFor();assert.equal(await page.getByRole('dialog').count(),0);
+  await page.locator('.aiHeaderNew').click();await page.getByRole('heading',{name:'What can I help you with?',exact:true}).waitFor();assert.equal(await input.inputValue(),'');assert.equal(await page.locator('.aiMessage').count(),0);
+ }finally{release();await context.close()}
+});
+
+test('conversational AI recovers failed questions and discards late answers after a lodge switch',async()=>{
+ const {context,page}=await accountPage({id:'chat-recovery',full_name:'Maya',is_super_admin:false,mfa_enabled:true,groups:[{id:'chat-group',name:'Safari Collection'}],memberships:['recover-lodge','other-lodge'].map((lodge_id,i)=>({lodge_id,lodge_name:i?'Other lodge':'Original lodge',role_key:'group_admin',role:'Group Admin',permissions:['ai.use'],entitlements:['ai']}))});
+ let fail=true,release,posted=0;const gate=new Promise(resolve=>release=resolve);
+ try{
+  await page.route('**/api/v1/lodges/*/ai/**',async r=>{
+   const p=new URL(r.request().url()).pathname,m=r.request().method();
+   if(p.endsWith('/status'))return r.fulfill({json:{state:'ready',tools:[{name:'get_tasks',suggestion:'Check tasks'}],scope:{type:'lodge',lodge_name:p.includes('other-lodge')?'Other lodge':'Original lodge'}}});
+   if(p.endsWith('/conversations'))return r.fulfill({json:m==='POST'?{id:'recover-conversation',created_at:'2026-11-09T08:00:00Z'}:[]});
+   if(m==='POST'&&p.endsWith('/messages')){posted++;if(fail)return r.fulfill({status:503,json:{detail:'The AI connection is temporarily unavailable.'}});await gate;return r.fulfill({json:{id:'late',role:'assistant',content:'PRIVATE OLD LODGE ANSWER',sources:[]}})}
+   return r.fulfill({json:[]});
+  });
+  await page.goto(base+'/lodge-ai');const input=page.getByLabel('Your question',{exact:true});await input.fill('Check today’s tasks');await input.press('Enter');
+  await page.getByRole('alert').filter({hasText:'Something went wrong. Please try again shortly.'}).waitFor();assert.equal(await input.inputValue(),'Check today’s tasks');assert.equal(await page.locator('.aiUserMessage').count(),0);
+  fail=false;const sent=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/messages'));await input.press('Enter');await sent;await page.waitForFunction(()=>document.querySelector('.aiThinking'));await input.fill('Private draft');
+  await page.evaluate(()=>{localStorage.setItem('active_lodge_id','other-lodge');window.dispatchEvent(new Event('safarios-lodge-changed'))});await page.locator('.aiChatHeading').getByText('Other lodge',{exact:true}).waitFor();assert.equal(await input.inputValue(),'');assert.equal(await page.locator('.aiMessage').count(),0);
+  release();await page.waitForTimeout(300);assert.equal(await page.getByText('PRIVATE OLD LODGE ANSWER',{exact:true}).count(),0);assert.equal(await input.inputValue(),'');assert.equal(posted,2);
+ }finally{release();await context.close()}
 });

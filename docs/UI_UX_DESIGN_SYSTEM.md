@@ -38,3 +38,11 @@ Panels, navigation, dialogs and drawers use `backdrop-filter: blur(32px) saturat
 Respect reduced motion and retain shared Framer Motion configuration for page/dialog transitions. Preserve keyboard focus, labels, empty/loading/error states, account-change protection, MFA, permissions and tenant isolation. A visual refresh does not change access policy.
 
 Validate material changes with a production build, browser interactions, accessibility checks and desktop/mobile screenshots in both themes. Screenshots use test fixtures; they do not populate customer data or establish complete accessibility certification.
+
+## Conversational AI
+
+`LodgeAIPage` composes the shared `components/ai/ChatComposer`, `ChatMessage` and `MessageSources` components. Reuse these for future AI views and keep UI copy in `lib/strings/ai.ts`. The chat uses semantic charcoal/light materials, a narrow reading column, right-aligned question bubbles and left-aligned assistant answers. The composer stays below its independently scrolling transcript; it reserves space above mobile navigation. Desktop private history collapses; smaller screens use the shared focus-managed drawer. Knowledge management remains a separate, permission-checked view.
+
+Show the submitted question immediately and a real pending state until the API returns. Do not simulate token streaming or add unsupported stop, attachment or voice controls. Enter submits, Shift+Enter inserts a line and IME composition never submits. Preserve the next draft during a request. Recoverable failures restore the submitted question if there is no newer draft; access changes clear the conversation. All asynchronous results must still match the current user, lodge and scope.
+
+Render assistant Markdown with raw HTML disabled and model-authored links/images as text, so answers cannot execute HTML or fetch remote tracking images. Authoritative provenance stays in the server source disclosure. Tables scroll within their own container. Copy controls copy the actual answer and announce success or failure. Saved titles come from the owner's first question, redacted and bounded by the API, under the existing owner/tenant RLS and current access fingerprint.

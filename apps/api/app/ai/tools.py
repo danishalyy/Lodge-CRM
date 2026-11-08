@@ -98,6 +98,7 @@ class Tool:
 
 
 REGISTRY = {
+    "get_assignable_staff": Tool("staff.view", "staff", "staff", ("id", "full_name", "department_id", "operational_status"), "Assignable staff", "Which staff members can I assign work to?", ("limit", "search")),
     "get_group_overview": Tool(
         "ai.group.view",
         "advanced_ai",
@@ -424,6 +425,7 @@ def read_rows(tool, args, db, ctx, lodge_id, bound=101):
         kwargs.update(limit=bound, offset=0)
     elif tool.handler in {
         "rooms",
+        "staff",
         "requests_list",
         "maintenance_list",
         "list_housekeeping_jobs",
@@ -563,7 +565,7 @@ def execute(name, arguments, db, ctx, lodge_id, request, scope_type="lodge"):
         if tool.handler not in {"list_activities", "list_transfers", "list_fuel"}
         else len(rows) >= 500
     )
-    selected = rows
+    selected = [row for row in rows if row.get("employment_status")=="active"] if name=="get_assignable_staff" else rows
     if args.status:
         selected = [r for r in selected if r.get("status") == args.status]
     if args.search:

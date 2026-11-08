@@ -799,3 +799,27 @@ test('conversational AI recovers failed questions and discards late answers afte
   release();await page.waitForTimeout(300);assert.equal(await page.getByText('PRIVATE OLD LODGE ANSWER',{exact:true}).count(),0);assert.equal(await input.inputValue(),'');assert.equal(posted,2);
  }finally{release();await context.close()}
 });
+
+test('AI actions require an explicit review and confirmation and cannot submit twice',async()=>{
+ const {context,page}=await accountPage({id:'ai-actions-user',full_name:'Maya',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'ai-actions-lodge',permissions:['ai.use','ai.actions'],entitlements:['ai','ai_actions']}]});
+ let confirmed=0,reviewed=0,discarded=0,release;const gate=new Promise(resolve=>release=resolve);
+ let proposal={id:'action-1',action:'create_task',status:'pending',expires_at:new Date(Date.now()+600000).toISOString(),preview:{fields:[{key:'title',value:'Inspect water pump'},{key:'priority',value:'high'},{key:'proof_required',value:true}]}};
+ const message=()=>({id:'action-answer',role:'assistant',content:'Review the proposed change below. Nothing has been changed yet.',sources:[],actions:[proposal]});
+ try{
+  await page.route('**/api/v1/lodges/ai-actions-lodge/ai/**',async r=>{
+   const p=new URL(r.request().url()).pathname,m=r.request().method();
+   if(p.endsWith('/status'))return r.fulfill({json:{state:'ready',tools:[{name:'get_tasks',suggestion:'Prepare a task'}]}});
+   if(p.endsWith('/conversations'))return r.fulfill({json:m==='POST'?{id:'action-chat',created_at:new Date().toISOString()}:[]});
+   if(p.endsWith('/messages'))return r.fulfill({json:m==='POST'?message():[message()]});
+   if(p.endsWith('/review')){reviewed++;return r.fulfill({json:{...proposal,token:'opaque-review-token-for-this-proposal-only'}})}
+   if(p.endsWith('/confirm')){assert.deepEqual(r.request().postDataJSON(),{token:'opaque-review-token-for-this-proposal-only'});confirmed++;await gate;proposal={...proposal,status:'confirmed',result:{id:'task-made',status:'created'}};return r.fulfill({json:proposal})}
+   if(p.endsWith('/cancel')){discarded++;proposal={...proposal,status:'cancelled'};return r.fulfill({json:proposal})}
+   throw Error('Unexpected action URL '+p);
+  });
+  await page.goto(base+'/lodge-ai');await page.getByLabel('Your question',{exact:true}).fill('Prepare a task for the pump');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByRole('button',{name:'Review change',exact:true}).waitFor();assert.equal(confirmed,0);
+  await page.getByRole('button',{name:'Review change',exact:true}).click();await page.getByRole('dialog').getByText('Inspect water pump',{exact:true}).waitFor();assert.equal(reviewed,1);assert.equal(confirmed,0);
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:900});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const applyBox=await page.getByRole('dialog').getByRole('button',{name:'Confirm and apply',exact:true}).boundingBox();assert.ok(applyBox&&applyBox.y>=0&&applyBox.y+applyBox.height<=901);const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-action-${width}-${theme}.png`,fullPage:true});}
+  await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(confirmed,0);await page.waitForFunction(()=>document.activeElement?.textContent==='Review change');
+  await page.getByRole('button',{name:'Review change',exact:true}).click();const apply=page.getByRole('dialog').getByRole('button',{name:'Confirm and apply',exact:true});await apply.click();await page.getByRole('button',{name:'Applying change…',exact:true}).waitFor();assert.equal(confirmed,1);await page.getByRole('button',{name:'Applying change…',exact:true}).dispatchEvent('click');assert.equal(confirmed,1);release();await page.getByText('Task created',{exact:true}).waitFor();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Change applied',{exact:true}).waitFor();assert.equal(discarded,0);assert.equal(await page.getByRole('button',{name:'Review change',exact:true}).count(),0);
+ }finally{release();await context.close()}
+});

@@ -870,3 +870,23 @@ select:focus-visible {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .aiChatFrame { background: var(--glass-fallback); }
 }
+
+/* Confirmed AI actions reuse the shared drawer and sticky action footer. */
+.aiActionProposal { margin: 20px 0 0 40px; border: 1px solid var(--bd); border-radius: 16px; padding: 20px; background: var(--sec); }
+.aiActionHeading { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+.aiActionHeading strong { font-weight: 500; font-size: 14px; }
+.aiActionProposal p { font-size: 12px; line-height: 1.6; margin: 8px 0; overflow-wrap: anywhere; }
+.aiActionProposal p > span:first-child { color: var(--tx2); margin-right: 8px; }
+.aiActionState { display: flex; gap: 8px; align-items: center; color: var(--tx2); }
+.aiActionProposal .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.aiActionDetails { margin: 24px 0; }
+.aiActionDetails > div { padding: 14px 0; border-bottom: 1px solid var(--bd); }
+.aiActionDetails dt { color: var(--tx2); font-size: 12px; margin-bottom: 6px; }
+.aiActionDetails dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.aiActionDetails small { display: block; color: var(--tx2); margin-top: 6px; }
+@media (max-width:640px) { .aiActionProposal { margin-left: 0; padding: 16px; } }
+
+.aiActionReviewHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.aiActionReviewHeader h2 { margin: 0; }
+.aiActionReviewHeader .iconButton { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; flex-shrink: 0; }
+.aiActionReviewHeader .iconButton svg { width: 18px; height: 18px; }

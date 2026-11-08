@@ -923,3 +923,27 @@ class AIKnowledgeChunk(Base):
     content: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list] = mapped_column(Vector())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AIAction(AIPrivate, Base):
+    __tablename__ = "ai_actions"
+    __table_args__ = (
+        ForeignKeyConstraint(["conversation_id", "lodge_id", "user_id"], ["ai_conversations.id", "ai_conversations.lodge_id", "ai_conversations.user_id"], ondelete="CASCADE"),
+        UniqueConstraint("conversation_id", "request_id", name="uq_ai_action_request"),
+        CheckConstraint("status IN ('pending','confirmed','cancelled')", name="ck_ai_action_status"),
+        CheckConstraint("action IN ('create_task','update_task','create_maintenance','create_housekeeping')", name="ck_ai_action_kind"),
+        Index("ix_ai_action_owner", "lodge_id", "user_id", "created_at"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    action: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    preview: Mapped[dict] = mapped_column(JSONB)
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    access_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    result: Mapped[dict] = mapped_column(JSONB, default=dict, server_default='{}')
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

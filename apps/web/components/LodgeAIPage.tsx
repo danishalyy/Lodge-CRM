@@ -490,7 +490,15 @@ export default function LodgeAIPage({
                         aria-relevant="additions text"
                       >
                         {messages.map((message) => (
-                          <ChatMessage key={message.id} message={message} />
+                          <ChatMessage
+                            key={message.id}
+                            message={message}
+                            conversationId={conversation}
+                            onDenied={(reason) => {
+                              clearAccess();
+                              setError(reason);
+                            }}
+                          />
                         ))}
                       </div>
                     )}

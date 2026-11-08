@@ -16,13 +16,13 @@ from ..models import (
     Lodge,
     User,
 )
-from ..security import current_user, require_permission, access_context, ensure_feature
+from ..security import _current_user, require_permission, access_context, ensure_feature
 
 
 def guard(db, user, lodge_id, request, write=False):
     db.expire_all()
     # Recheck the session, account and employment at every boundary, including after inference.
-    user = current_user(
+    user = _current_user(
         lodge_session=request.cookies.get("lodge_session"),
         db=db,
         x_expected_user_id=str(user.id),

@@ -727,6 +727,18 @@ export const featureAccessApi = {
 };
 
 export const aiApi = {
+  action: (
+    conversationId: string,
+    actionId: string,
+    kind: "review" | "confirm" | "cancel",
+    token?: string,
+  ) =>
+    request<any>(
+      lodgePath(
+        `ai/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/${kind}`,
+      ),
+      { method: "POST", ...(token ? { body: JSON.stringify({ token }) } : {}) },
+    ),
   status: (scope: "lodge" | "group" = "lodge") =>
     request<any>(
       lodgePath(scope === "group" ? "ai/status?scope=group" : "ai/status"),

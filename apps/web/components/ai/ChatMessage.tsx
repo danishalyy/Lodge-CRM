@@ -6,6 +6,7 @@ import { Check, Compass, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { aiCopy as copy } from "@/lib/strings/ai";
 import MessageSources from "./MessageSources";
+import ActionProposal, { Proposal } from "./ActionProposal";
 
 export type Message = {
   id: string;
@@ -13,8 +14,17 @@ export type Message = {
   content: string;
   sources?: any[];
   pending?: boolean;
+  actions?: Proposal[];
 };
-export default function ChatMessage({ message }: { message: Message }) {
+export default function ChatMessage({
+  message,
+  conversationId,
+  onDenied,
+}: {
+  message: Message;
+  conversationId: string;
+  onDenied: (message: string) => void;
+}) {
   const [copied, setCopied] = useState(false),
     [copyError, setCopyError] = useState(false);
   useEffect(() => {
@@ -77,6 +87,15 @@ export default function ChatMessage({ message }: { message: Message }) {
           <p>{message.content}</p>
         </div>
       )}
+      {assistant &&
+        message.actions?.map((action) => (
+          <ActionProposal
+            key={action.id}
+            proposal={action}
+            conversationId={conversationId}
+            onDenied={onDenied}
+          />
+        ))}
       {assistant && (
         <div className="aiMessageActions">
           <MessageSources sources={message.sources} />

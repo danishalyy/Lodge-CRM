@@ -14,6 +14,7 @@ from ..models import (
     AIMessage,
     AIUsage,
     AIToolExecution,
+    AIAction,
     AuditLog,
     User,
 )
@@ -28,7 +29,7 @@ from .configuration import configuration_state, get_provider, health_ready
 from .providers.base import ProviderUnavailable
 from .limits import admission
 from .safety import SYSTEM, redact
-from . import tools
+from . import tools, actions
 from .groups import (
     resolve as resolve_group,
     conversation_fingerprint as fingerprint_for,
@@ -86,8 +87,8 @@ def conversation(db, lodge_id, user, conversation_id, ctx, request):
     return row
 
 
-def message_payload(row):
-    return {
+def message_payload(row, db=None):
+    value = {
         "id": str(row.id),
         "request_id": str(row.request_id),
         "role": row.role,
@@ -95,6 +96,20 @@ def message_payload(row):
         "sources": row.sources,
         "created_at": row.created_at.isoformat(),
     }
+    if db is not None:
+        proposals = (
+            db.scalars(
+                select(AIAction).where(
+                    AIAction.conversation_id == row.conversation_id,
+                    AIAction.request_id == row.request_id,
+                )
+            ).all()
+            if row.role == "assistant"
+            else []
+        )
+        if proposals:
+            value["actions"] = [actions.payload(p) for p in proposals]
+    return value
 
 
 def audit(db, user, lodge_id, action, request_id, request):
@@ -160,6 +175,14 @@ def status(
                 "suggestion": tools.REGISTRY[x["function"]["name"]].suggestion,
             }
             for x in tools.available(db, ctx, lodge_id, scope)
+        ]
+        + [
+            {
+                "name": x["function"]["name"],
+                "description": x["function"]["description"],
+                "suggestion": None,
+            }
+            for x in actions.available(db, ctx, lodge_id, scope)
         ],
     }
 
@@ -258,7 +281,7 @@ def messages(
     verify_sources(
         [source for row in rows for source in row.sources], db, ctx, lodge_id, request
     )
-    return [message_payload(row) for row in reversed(rows)]
+    return [message_payload(row, db) for row in reversed(rows)]
 
 
 @router.post(
@@ -298,7 +321,7 @@ def send_message(
                     )
                 )
                 verify_sources(answer.sources, db, ctx, lodge_id, request)
-                return message_payload(answer)
+                return message_payload(answer, db)
             raise HTTPException(
                 409,
                 "This AI request was already submitted. Start a new request to try again",
@@ -351,10 +374,18 @@ def send_message(
                     raise HTTPException(
                         409, "Your access changed. Start a new conversation"
                     )
-                approved = tools.available(db, ctx, lodge_id, scope_type)
+                approved = tools.available(
+                    db, ctx, lodge_id, scope_type
+                ) + actions.available(db, ctx, lodge_id, scope_type)
                 # Conservative byte budget, including schemas, reserved output and structured context.
                 if (
-                    len(json.dumps([prompt, approved], ensure_ascii=False).encode())
+                    len(
+                        json.dumps(
+                            [prompt, approved],
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ).encode()
+                    )
                     > settings.ai_max_context - settings.ai_max_output_tokens
                 ):
                     raise HTTPException(
@@ -365,8 +396,16 @@ def send_message(
                 input_tokens += reply.input_tokens
                 output_tokens += reply.output_tokens
                 if not reply.tool_calls:
+                    answer_text = reply.content
                     if not sources:
-                        raise ProviderUnavailable("no_operational_sources")
+                        if any(
+                            t["function"]["name"] in actions.KINDS for t in approved
+                        ):
+                            # Never publish an ungrounded model answer, including a claimed write.
+                            # A fixed clarification lets action conversations collect missing details.
+                            answer_text = actions.CLARIFICATION
+                        else:
+                            raise ProviderUnavailable("no_operational_sources")
                     ctx = guard(db, user, lodge_id, request, write=True)
                     if (
                         fingerprint_for(
@@ -384,7 +423,7 @@ def send_message(
                         conversation_id=conversation_id,
                         request_id=body.request_id,
                         role="assistant",
-                        content=redact(reply.content),
+                        content=redact(answer_text),
                         sources=sources,
                     )
                     db.add(answer)
@@ -419,13 +458,69 @@ def send_message(
                 rejected_tool = (
                     call.name[:80] if isinstance(call.name, str) else "invalid_tool"
                 )
+                if call.name in actions.KINDS:
+                    # The model creates only a proposal; it never receives a confirmation token.
+                    proposal = actions.prepare(
+                        db,
+                        ctx,
+                        lodge_id,
+                        conv,
+                        body.request_id,
+                        call.name,
+                        call.arguments,
+                        request,
+                    )
+                    answer = AIMessage(
+                        lodge_id=lodge_id,
+                        user_id=user.id,
+                        conversation_id=conversation_id,
+                        request_id=body.request_id,
+                        role="assistant",
+                        content="Review the proposed change below. Nothing has been changed yet.",
+                        sources=sources,
+                    )
+                    db.add(answer)
+                    db.add(
+                        AIToolExecution(
+                            lodge_id=lodge_id,
+                            user_id=user.id,
+                            conversation_id=conversation_id,
+                            request_id=body.request_id,
+                            name=call.name,
+                            status="proposed",
+                        )
+                    )
+                    usage = db.get(AIUsage, usage.id)
+                    usage.status = "complete"
+                    usage.input_tokens = input_tokens
+                    usage.output_tokens = output_tokens
+                    usage.tool_count = tool_count
+                    usage.latency_ms = int((time.monotonic() - started) * 1000)
+                    audit(
+                        db,
+                        user,
+                        lodge_id,
+                        "ai.request.completed",
+                        body.request_id,
+                        request,
+                    )
+                    db.flush()
+                    result = message_payload(answer, db)
+                    db.commit()
+                    return result
                 result = tools.execute(
                     call.name, call.arguments, db, ctx, lodge_id, request, scope_type
                 )
                 remaining = (
                     settings.ai_max_context
                     - settings.ai_max_output_tokens
-                    - len(json.dumps([prompt, approved], ensure_ascii=False).encode())
+                    - len(
+                        json.dumps(
+                            [prompt, approved],
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ).encode()
+                    )
                     - 1024
                 )
                 if "items" in result:

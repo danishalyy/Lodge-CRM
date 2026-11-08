@@ -864,10 +864,10 @@ def update_department(lodge_id: str, record_id: str, body: DepartmentUpdate, req
 
 # Staff
 @app.get("/api/v1/lodges/{lodge_id}/staff")
-def staff(lodge_id: str, user: User = Depends(require_permission("staff.view")), db: Session = Depends(get_db)):
+def staff(lodge_id: str, user: User = Depends(require_permission("staff.view")), db: Session = Depends(get_db), limit: int | None = Query(None,ge=1,le=250)):
     ctx=_ctx(db,user,lodge_id);can_contact=_may(db,ctx,"staff.contact.view");out=[];q=select(StaffProfile).where(StaffProfile.lodge_id==lodge_id)
     if ctx.role_key=="department_manager":q=q.where(StaffProfile.department_id==ctx.department_id)
-    for x in db.scalars(q.order_by(StaffProfile.full_name)).all():
+    for x in db.scalars(q.order_by(StaffProfile.full_name).limit(limit)).all():
         dep=db.get(Department,x.department_id) if x.department_id else None
         membership=db.scalar(select(Membership).where(Membership.lodge_id==lodge_id,Membership.user_id==x.user_id,Membership.is_active.is_(True))) if x.user_id else None
         custom=db.get(CustomRole,membership.custom_role_id) if membership and membership.custom_role_id else None
@@ -1161,6 +1161,11 @@ def tasks(lodge_id:str,status:str|None=None,assignee_id:uuid.UUID|None=None,limi
 
 @app.post("/api/v1/lodges/{lodge_id}/tasks",dependencies=[Depends(require_csrf)])
 def create_task(lodge_id:str,body:TaskCreate,request:Request,user:User=Depends(require_permission("tasks.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_task_record(lodge_id, body, request, user, db)
+    db.commit()
+    return result
+
+def _create_task_record(lodge_id, body, request, user, db):
     if body.recurrence_interval_days or body.recurrence_end_date: ensure_feature(db,lodge_id,"advanced_tasks")
     if body.recurrence_interval_days and body.due_at is None: raise HTTPException(422,"Recurring tasks require a due date")
     ctx=_ctx(db,user,lodge_id);dep=ensure_fk(db,Department,body.department_id,lodge_id,"Department");staff=ensure_fk(db,StaffProfile,body.assigned_staff_id,lodge_id,"Staff profile");ensure_fk(db,Guest,body.guest_id,lodge_id,"Guest");ensure_fk(db,Unit,body.unit_id,lodge_id,"Unit")
@@ -1172,12 +1177,17 @@ def create_task(lodge_id:str,body:TaskCreate,request:Request,user:User=Depends(r
     if t.assigned_staff_id:
         recipient=staff_user_id(db,lodge_id,t.assigned_staff_id)
         create_notification(db,lodge_id=lodge_id,notification_type="task.assigned",severity="high" if t.priority in {"high","critical"} else "normal",title="Task assigned",body=t.title,resource_type="task",resource_id=t.id,dedupe_key=f"task-assigned:{t.id}:{t.assigned_staff_id}",recipient_user_ids=[recipient] if recipient else [])
-    audit(db,request,t.lodge_id,user.id,"task.created","task",str(t.id));event(db,t.lodge_id,user.id,"task.created","task",str(t.id),f"Task created: {t.title}");db.commit();return {"id":str(t.id),"status":t.status}
+    audit(db,request,t.lodge_id,user.id,"task.created","task",str(t.id));event(db,t.lodge_id,user.id,"task.created","task",str(t.id),f"Task created: {t.title}");return {"id":str(t.id),"status":t.status}
 
 TASK_TRANSITIONS={"created":{"assigned","cancelled"},"assigned":{"accepted","cancelled"},"accepted":{"started","cancelled"},"started":{"completed","cancelled"},"completed":set(),"cancelled":set()}
 
 @app.patch("/api/v1/lodges/{lodge_id}/tasks/{record_id}",dependencies=[Depends(require_csrf)])
 def update_task(lodge_id:str,record_id:str,body:TaskUpdate,request:Request,user:User=Depends(require_permission("tasks.view",write=True)),db:Session=Depends(get_db)):
+    result=_update_task_record(lodge_id, record_id, body, request, user, db)
+    db.commit()
+    return result
+
+def _update_task_record(lodge_id, record_id, body, request, user, db):
     ctx=_ctx(db,user,lodge_id);t=tenant_get(db,Task,record_id,lodge_id,"Task");_ensure_department_scope(ctx,t.department_id,"task")
     full=_may(db,ctx,"tasks.manage");own=_may(db,ctx,"tasks.own.manage") and ctx.staff and t.assigned_staff_id==ctx.staff.id
     if not full and not own:raise HTTPException(403,"You may only update tasks assigned to you")
@@ -1224,7 +1234,7 @@ def update_task(lodge_id:str,record_id:str,body:TaskUpdate,request:Request,user:
         v=getattr(body,f)
         if v is not None:setattr(t,f,v)
     if t.recurrence_interval_days and not t.due_at: raise HTTPException(422,"Recurring tasks require a due date")
-    audit(db,request,t.lodge_id,user.id,"task.updated","task",str(t.id));db.commit();return {"id":str(t.id),"status":t.status}
+    audit(db,request,t.lodge_id,user.id,"task.updated","task",str(t.id));return {"id":str(t.id),"status":t.status}
 
 
 # Guest requests
@@ -1319,6 +1329,11 @@ def maintenance_list(lodge_id:str,user:User=Depends(require_permission("maintena
 
 @app.post("/api/v1/lodges/{lodge_id}/maintenance",dependencies=[Depends(require_csrf)])
 def create_maintenance(lodge_id:str,body:MaintenanceCreate,request:Request,user:User=Depends(require_permission("maintenance.view",write=True)),db:Session=Depends(get_db)):
+    result=_create_maintenance_record(lodge_id, body, request, user, db)
+    db.commit()
+    return result
+
+def _create_maintenance_record(lodge_id, body, request, user, db):
     if body.asset_id or body.scheduled_for or body.recurrence_interval_days: ensure_feature(db,lodge_id,"maintenance_workshop")
     ctx=_ctx(db,user,lodge_id);full=_may(db,ctx,"maintenance.manage");report=_may(db,ctx,"maintenance.report")
     if not full and not report:raise HTTPException(403,"Your role cannot report maintenance issues")
@@ -1329,7 +1344,7 @@ def create_maintenance(lodge_id:str,body:MaintenanceCreate,request:Request,user:
     m=MaintenanceTicket(lodge_id=lodge_id,title=body.title.strip(),description=body.description,category=body.category.strip(),priority=body.priority,status=status,department_id=department_id,unit_id=body.unit_id,asset_id=body.asset_id,vehicle_id=body.vehicle_id,assigned_staff_id=body.assigned_staff_id,scheduled_for=body.scheduled_for,recurrence_interval_days=body.recurrence_interval_days,created_by_user_id=user.id)
     db.add(m);db.flush();audit(db,request,m.lodge_id,user.id,"maintenance.created","maintenance",str(m.id));event(db,m.lodge_id,user.id,"maintenance.created","maintenance",str(m.id),f"Maintenance ticket created: {m.title}")
     maintenance_opened(db,unit,vehicle,body.priority=="critical")
-    db.commit();return {"id":str(m.id),"status":m.status}
+    return {"id":str(m.id),"status":m.status}
 
 MAINT_TRANSITIONS={"open":{"assigned","in_progress","cancelled"},"assigned":{"in_progress","waiting","cancelled"},"in_progress":{"waiting","completed","cancelled"},"waiting":{"in_progress","completed","cancelled"},"completed":set(),"cancelled":set()}
 
@@ -2085,6 +2100,11 @@ def list_housekeeping_jobs(lodge_id:str,user:User=Depends(require_permission("ho
 
 @app.post("/api/v1/lodges/{lodge_id}/housekeeping-jobs",dependencies=[Depends(require_csrf)])
 def create_housekeeping_job(lodge_id:str,body:HousekeepingCreate,request:Request,user:User=Depends(require_permission("housekeeping.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_housekeeping_job_record(lodge_id, body, request, user, db)
+    db.commit()
+    return result
+
+def _create_housekeeping_job_record(lodge_id, body, request, user, db):
     full_workflow=entitlement_enabled(db,lodge_id,"housekeeping_full")
     if not full_workflow and (body.job_type not in {"cleaning","guest_request"} or body.inspector_staff_id or body.linen_notes):
         raise HTTPException(403,"Turndown, inspections and linen workflows require Standard or Premium")
@@ -2093,7 +2113,7 @@ def create_housekeeping_job(lodge_id:str,body:HousekeepingCreate,request:Request
         if staff and staff.department_id!=ctx.department_id:raise HTTPException(403,"Department Manager can only assign housekeeping within their department")
         if inspector and inspector.department_id!=ctx.department_id:raise HTTPException(403,"Department Manager can only select inspectors within their department")
     housekeeping_job_created(db,unit,body.job_type)
-    row=HousekeepingJob(lodge_id=lodge_id,unit_id=unit.id,assigned_staff_id=staff.id if staff else None,inspector_staff_id=inspector.id if inspector else None,job_type=body.job_type,status="assigned",linen_notes=body.linen_notes,notes=body.notes,due_at=body.due_at,created_by_user_id=user.id);db.add(row);db.flush();audit(db,request,lodge_id,user.id,"housekeeping.created","housekeeping",str(row.id));event(db,lodge_id,user.id,"housekeeping.created","unit",str(unit.id),f"{body.job_type} assigned for {unit.name}");db.commit();return {"id":str(row.id),"status":row.status}
+    row=HousekeepingJob(lodge_id=lodge_id,unit_id=unit.id,assigned_staff_id=staff.id if staff else None,inspector_staff_id=inspector.id if inspector else None,job_type=body.job_type,status="assigned",linen_notes=body.linen_notes,notes=body.notes,due_at=body.due_at,created_by_user_id=user.id);db.add(row);db.flush();audit(db,request,lodge_id,user.id,"housekeeping.created","housekeeping",str(row.id));event(db,lodge_id,user.id,"housekeeping.created","unit",str(unit.id),f"{body.job_type} assigned for {unit.name}");return {"id":str(row.id),"status":row.status}
 
 HK_TRANSITIONS={"assigned":{"accepted","in_progress","cancelled"},"accepted":{"in_progress","cancelled"},"in_progress":{"awaiting_inspection","completed","cancelled"},"awaiting_inspection":{"completed","in_progress","cancelled"},"completed":set(),"cancelled":set()}
 @app.patch("/api/v1/lodges/{lodge_id}/housekeeping-jobs/{record_id}",dependencies=[Depends(require_csrf)])
@@ -2324,3 +2344,6 @@ app.include_router(knowledge_router)
 
 from .ai.upload_limit import KnowledgeUploadLimit
 app.add_middleware(KnowledgeUploadLimit)
+
+from .ai.action_routes import router as ai_action_router
+app.include_router(ai_action_router)

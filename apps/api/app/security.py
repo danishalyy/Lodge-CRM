@@ -67,6 +67,10 @@ def create_session(db: Session, user: User, response: Response):
 
 
 def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None), x_lodge_context: str | None = Header(None)) -> User:
+    return _current_user(lodge_session,db,x_expected_user_id,x_lodge_context,persist_activity=True)
+
+
+def _current_user(lodge_session,db,x_expected_user_id=None,x_lodge_context=None,*,persist_activity=False):
     if not lodge_session:
         raise HTTPException(401, "Authentication required")
     now = datetime.now(timezone.utc)
@@ -83,7 +87,10 @@ def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends
     # Persist session activity first, then establish transaction-local RLS context.
     # Non-platform users must retain an active lodge membership and active employment.
     s.last_seen_at = now
-    db.commit()
+    if persist_activity:
+        db.commit()
+    else:
+        db.flush()  # AI callers own their transaction and any record locks.
     set_rls_context(db, None, user.is_super_admin, str(user.id))
     if not user.is_super_admin:
         memberships = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()

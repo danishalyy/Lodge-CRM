@@ -3106,7 +3106,7 @@ textarea:focus-visible {
   --space-card: 24px;
   --space-section: 32px;
   --space-gap: 24px;
-  --surface-card-radius: 24px;
+  --surface-card-radius: 20px;
   --surface-input-radius: 12px;
   --surface-modal-radius: 28px;
   --glass-blur: 32px;
@@ -3132,12 +3132,12 @@ textarea:focus-visible {
   --space-card: 24px;
   --space-section: 32px;
   --space-gap: 24px;
-  --surface-card-radius: 24px;
+  --surface-card-radius: 20px;
   --surface-input-radius: 12px;
   --surface-modal-radius: 28px;
   --control-border: #8e8a82;
-  --material-shadow: 0 8px 24px rgba(0,0,0,.12);
-  --material-shadow-small: 0 2px 8px rgba(0,0,0,.08);
+  --material-shadow: none;
+  --material-shadow-small: none;
   --glass-highlight: inset 0 1px 0 rgba(255,255,255,.055);
   --duration-fast: 160ms;
   --duration-base: 240ms;

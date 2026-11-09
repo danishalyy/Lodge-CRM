@@ -1,4 +1,6 @@
 "use client";
+import { uiCopy as c } from "@/lib/strings/redesign";
+import { CodeInput } from "@/components/ui/code-input";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { securityCopy as security } from "@/lib/strings/security";
@@ -52,37 +54,31 @@ export default function Login() {
         <div className="authStoryInner">
           <SafariBrand />
           <div className="authStatement">
-            <span className="eyebrow">THOUGHTFULLY CONNECTED</span>
-            <h1>Exceptional stays. Effortless operations.</h1>
-            <p>
-              One considered workspace for your people, your property, and every
-              detail of the guest experience.
-            </p>
+            <span className="eyebrow">{c.loginLabel}</span>
+            <h1>
+              {c.loginHeadline} <em>{c.loginAccent}</em>
+            </h1>
+            <p>{c.loginSupport}</p>
           </div>
-          <div className="authSignals">
-            <div>
-              <i className="statusDot" />
-              <span>Operational command centre</span>
-            </div>
-            <div>
-              <i className="statusDot" />
-              <span>Role-aware access</span>
-            </div>
-            <div>
-              <i className="statusDot" />
-              <span>Connected lodge workflows</span>
-            </div>
-          </div>
-          <small className="authFoot">
-            SafariOS · Built around the rhythm of your lodge.
-          </small>
+          <svg
+            className="authHorizon"
+            viewBox="0 0 600 100"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M0 75Q250 38 600 75M0 90Q250 58 600 90M400 22Q438-8 475 22M438 15V50"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+          </svg>
         </div>
       </section>
       <section className="authFormSide">
         <Form className="panel authCard" onSubmit={submit}>
           <span className="eyebrow">SECURE ACCESS</span>
-          <h1>Your lodge. Connected.</h1>
-          <p>Welcome back. Sign in to your SafariOS workspace.</p>
+          <h1>{c.loginTitle}</h1>
+          <p>{c.loginIntro}</p>
           <Field label="Email">
             <input
               id="login-email"
@@ -125,17 +121,11 @@ export default function Login() {
                 </Field>
               ) : (
                 <Field label="Authenticator code">
-                  <input
+                  <CodeInput
                     id="login-code"
-                    className="field otpField"
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    required
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    autoComplete="one-time-code"
-                    placeholder="000000"
+                    required
                   />
                 </Field>
               )}

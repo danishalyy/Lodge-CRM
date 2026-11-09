@@ -105,6 +105,7 @@ export function RingChart({
 export type CalendarEvent = {
   date: string;
   label: string;
+  onSelect?: () => void;
   kind?: "arrival" | "departure" | "activity" | "transfer" | "other";
 };
 const key = (d: Date) => {
@@ -152,7 +153,13 @@ export function OperationsCalendar({
           dayEvents.map((e, i) => (
             <div className="calendarAgendaItem" key={i}>
               <span>{e.date}</span>
-              <strong>{e.label}</strong>
+              {e.onSelect ? (
+                <button className="linkButton" onClick={e.onSelect}>
+                  {e.label}
+                </button>
+              ) : (
+                <strong>{e.label}</strong>
+              )}
             </div>
           ))
         ) : (

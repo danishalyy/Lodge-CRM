@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -10,6 +11,7 @@ import { authApi, operationsApi } from "@/lib/api";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
 export default function FeedbackPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const [rows, setRows] = useState<any[]>([]),
     [guests, setGuests] = useState<any[]>([]),
@@ -20,6 +22,7 @@ export default function FeedbackPage() {
     [canManage, setCanManage] = useState(false);
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
       const me = await authApi.me();
       const active = localStorage.getItem("active_lodge_id");
@@ -56,6 +59,8 @@ export default function FeedbackPage() {
       }
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -100,43 +105,54 @@ export default function FeedbackPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Guest</th>
-              <th>Type</th>
-              <th>Category</th>
-              <th>Rating</th>
-              <th>Assigned</th>
-              <th>Status</th>
-              <th>Follow-up</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <strong>{r.guest_name}</strong>
-                  <br />
-                  <small>{r.comments || "—"}</small>
-                </td>
-                <td>{r.feedback_type}</td>
-                <td>{r.category}</td>
-                <td>{r.rating || "—"}</td>
-                <td>{r.assigned_staff_name || "—"}</td>
-                <td>
-                  <StatusPill value={r.status} />
-                </td>
-                <td>{r.follow_up_required ? "Required" : "No"}</td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="FeedbackPage"
+        defaultView="list"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Rating</th>
+                <th>Assigned</th>
+                <th>Status</th>
+                <th>Follow-up</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No guest feedback has been recorded.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>{r.guest_name}</strong>
+                    <br />
+                    <small>{r.comments || "—"}</small>
+                  </td>
+                  <td>{r.feedback_type}</td>
+                  <td>{r.category}</td>
+                  <td>{r.rating || "—"}</td>
+                  <td>{r.assigned_staff_name || "—"}</td>
+                  <td>
+                    <StatusPill value={r.status} />
+                  </td>
+                  <td>{r.follow_up_required ? "Required" : "No"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No guest feedback has been recorded.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && access.permission("feedback.manage") && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

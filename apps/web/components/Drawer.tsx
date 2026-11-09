@@ -78,9 +78,9 @@ export default function Drawer({
         <Dialog.Content onEscapeKeyDown={keepOpenForCombobox} asChild>
           <motion.div
             className="glassDialog"
-            initial={reduced ? false : { opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            style={{ x: "-50%", y: "-50%" }}
+            initial={reduced ? false : { opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: reduced ? 0 : 0.25 }}
           >
             <Dialog.Title className="sr-only">Details and actions</Dialog.Title>
             <Dialog.Description className="sr-only">

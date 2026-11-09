@@ -336,48 +336,97 @@ export default function MaintenancePage() {
           )}
           <section className="panel">
             <h2>Maintenance queue</h2>
-            {issues.map((i) => (
-              <div className="taskRow" key={i.id}>
-                <div className="taskMain">
-                  <button
-                    className="linkButton"
-                    onClick={() => openIssue(i)}
-                    disabled={!workshop}
-                  >
-                    <strong>{i.title}</strong>
-                  </button>
-                  <small>
-                    {i.unit_name || i.vehicle_name || i.category} ·{" "}
-                    {i.assigned_staff_name || "Unassigned"}
-                    {i.scheduled_for
-                      ? ` · ${formatDateTime(i.scheduled_for)}`
-                      : ""}
-                  </small>
-                </div>
-                <div className="taskMeta">
-                  <StatusPill value={i.priority} />{" "}
-                  <StatusPill value={i.status} />
-                  <div style={{ marginTop: 6 }}>
-                    {next[i.status] && (
-                      <button
-                        className="button secondary"
-                        onClick={() => update(i.id, { status: next[i.status] })}
-                      >
-                        {readableLabel(next[i.status]!)}
-                      </button>
-                    )}{" "}
-                    {!["completed", "cancelled"].includes(i.status) && (
-                      <button
-                        className="button secondary"
-                        onClick={() => complete(i)}
-                      >
-                        Complete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+            <div
+              className="collectionBoard"
+              tabIndex={0}
+              role="region"
+              aria-label="Workflow board"
+            >
+              {[
+                { label: "New", states: ["new", "open", "reported"] },
+                { label: "Assigned", states: ["assigned", "scheduled"] },
+                {
+                  label: "In repair",
+                  states: ["in_progress", "waiting_parts"],
+                },
+                { label: "Review", states: ["resolved", "awaiting_review"] },
+                { label: "Done", states: ["completed", "closed", "cancelled"] },
+              ].map((column) => {
+                const known = [
+                  { label: "New", states: ["new", "open", "reported"] },
+                  { label: "Assigned", states: ["assigned", "scheduled"] },
+                  {
+                    label: "In repair",
+                    states: ["in_progress", "waiting_parts"],
+                  },
+                  { label: "Review", states: ["resolved", "awaiting_review"] },
+                  {
+                    label: "Done",
+                    states: ["completed", "closed", "cancelled"],
+                  },
+                ].flatMap((g) => g.states);
+                const items = issues.filter(
+                  (item) =>
+                    column.states.includes(item.status) ||
+                    (column.label === "New" && !known.includes(item.status)),
+                );
+                return (
+                  <section className="boardColumn" key={column.label}>
+                    <h2>
+                      {column.label}
+                      <span>{items.length}</span>
+                    </h2>
+                    {items.map((i) => (
+                      <div className="taskRow" key={i.id}>
+                        <div className="taskMain">
+                          <button
+                            className="linkButton"
+                            onClick={() => openIssue(i)}
+                            disabled={!workshop}
+                          >
+                            <strong>{i.title}</strong>
+                          </button>
+                          <small>
+                            {i.unit_name || i.vehicle_name || i.category} ·{" "}
+                            {i.assigned_staff_name || "Unassigned"}
+                            {i.scheduled_for
+                              ? ` · ${formatDateTime(i.scheduled_for)}`
+                              : ""}
+                          </small>
+                        </div>
+                        <div className="taskMeta">
+                          <StatusPill value={i.priority} />{" "}
+                          <StatusPill value={i.status} />
+                          <div style={{ marginTop: 6 }}>
+                            {canManage && next[i.status] && (
+                              <button
+                                className="button secondary"
+                                onClick={() =>
+                                  update(i.id, { status: next[i.status] })
+                                }
+                              >
+                                {readableLabel(next[i.status]!)}
+                              </button>
+                            )}{" "}
+                            {canManage &&
+                              !["completed", "cancelled"].includes(
+                                i.status,
+                              ) && (
+                                <button
+                                  className="button secondary"
+                                  onClick={() => complete(i)}
+                                >
+                                  Complete
+                                </button>
+                              )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
             {!issues.length && (
               <div className="empty">
                 No maintenance tickets have been created.

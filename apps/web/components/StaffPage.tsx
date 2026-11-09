@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { accessCopy } from "@/lib/strings/access";
@@ -228,143 +229,154 @@ export default function StaffPage() {
       )}
       {error && <div className="panel dangerText">{error}</div>}
       <section className="panel">
-        <TableScroll className="tableWrap">
-          {loading ? (
-            <div className="empty">Loading…</div>
-          ) : (
-            <table className="dataTable">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Department</th>
-                  <th>Job title</th>
-                  <th>Employment</th>
-                  <th>Operational status</th>
-                  <th>Supervisor</th>
-                  <th>Role</th>
-                  <th>Login</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <strong>{r.full_name}</strong>
-                      <br />
-                      <small>{r.email || r.phone || "—"}</small>
-                    </td>
-                    <td>{r.department_name || "—"}</td>
-                    <td>{r.job_title || "—"}</td>
-                    <td>
-                      <StatusPill value={r.employment_status} />
-                    </td>
-                    <td>
-                      <select
-                        className="select"
-                        disabled={!canManage}
-                        value={r.operational_status}
-                        onChange={(e) => status(r.id, e.target.value)}
-                        aria-label="Status"
-                      >
-                        <option value="available">Available</option>
-                        <option value="on_shift">On shift</option>
-                        <option value="on_drive">On drive</option>
-                        <option value="off_duty">Off duty</option>
-                        <option value="leave">Leave</option>
-                      </select>
-                    </td>
-                    <td>{r.supervisor_name || "—"}</td>
-                    <td>
-                      {r.custom_role_name || "Preset role"}
-                      {canManage && r.has_login && (
-                        <button
-                          className="button"
-                          onClick={() => {
-                            setEditing(r);
-                            setChosenPreset("");
-                            setChosenCustom(r.custom_role_id || "");
-                          }}
-                        >
-                          {accessCopy.editStaff}
-                        </button>
-                      )}
-                      {canManage && r.has_login && customRoles.length > 0 && (
+        <CollectionView
+          loading={loading}
+          error={Boolean(error)}
+          onRetry={() => {
+            setError("");
+            void load();
+          }}
+          name="StaffPage"
+          defaultView="cards"
+        >
+          <TableScroll className="tableWrap">
+            {loading ? (
+              <div className="empty">Loading…</div>
+            ) : (
+              <table className="dataTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Job title</th>
+                    <th>Employment</th>
+                    <th>Operational status</th>
+                    <th>Supervisor</th>
+                    <th>Role</th>
+                    <th>Login</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <strong>{r.full_name}</strong>
+                        <br />
+                        <small>{r.email || r.phone || "—"}</small>
+                      </td>
+                      <td>{r.department_name || "—"}</td>
+                      <td>{r.job_title || "—"}</td>
+                      <td>
+                        <StatusPill value={r.employment_status} />
+                      </td>
+                      <td>
                         <select
                           className="select"
-                          value={r.custom_role_id || ""}
-                          onChange={async (e) => {
-                            try {
-                              await operationsApi.staff.assignCustomRole(
-                                r.id,
-                                e.target.value || null,
-                              );
-                              await load();
-                            } catch (e: any) {
-                              setError(e.message);
-                            }
-                          }}
-                          aria-label="Custom role"
+                          disabled={!canManage}
+                          value={r.operational_status}
+                          onChange={(e) => status(r.id, e.target.value)}
+                          aria-label="Status"
                         >
-                          <option value="">System role</option>
-                          {customRoles
-                            .filter((x: any) => x.is_active)
-                            .map((x: any) => (
-                              <option key={x.id} value={x.id}>
-                                {x.name}
-                              </option>
-                            ))}
+                          <option value="available">Available</option>
+                          <option value="on_shift">On shift</option>
+                          <option value="on_drive">On drive</option>
+                          <option value="off_duty">Off duty</option>
+                          <option value="leave">Leave</option>
                         </select>
-                      )}
-                    </td>
-                    <td>
-                      {r.has_login ? (
-                        <>
-                          <StatusPill value={r.account_status || "active"} />
-                          {r.delivery_status && (
-                            <small className="textSecondary">
-                              Email: {readableLabel(r.delivery_status)}
-                            </small>
-                          )}
-                          {canManage && r.account_status !== "active" && (
-                            <button
-                              className="button secondary"
-                              disabled={
-                                busy || r.employment_status !== "active"
+                      </td>
+                      <td>{r.supervisor_name || "—"}</td>
+                      <td>
+                        {r.custom_role_name || "Preset role"}
+                        {canManage && r.has_login && (
+                          <button
+                            className="button"
+                            onClick={() => {
+                              setEditing(r);
+                              setChosenPreset("");
+                              setChosenCustom(r.custom_role_id || "");
+                            }}
+                          >
+                            {accessCopy.editStaff}
+                          </button>
+                        )}
+                        {canManage && r.has_login && customRoles.length > 0 && (
+                          <select
+                            className="select"
+                            value={r.custom_role_id || ""}
+                            onChange={async (e) => {
+                              try {
+                                await operationsApi.staff.assignCustomRole(
+                                  r.id,
+                                  e.target.value || null,
+                                );
+                                await load();
+                              } catch (e: any) {
+                                setError(e.message);
                               }
-                              onClick={() => resend(r)}
-                            >
-                              Resend invitation
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <button
-                          className="button secondary"
-                          onClick={() => {
-                            setInviteStaff(r);
-                            setDevLink("");
-                          }}
-                          disabled={
-                            !canManage ||
-                            !r.email ||
-                            r.employment_status !== "active"
-                          }
-                        >
-                          Invite
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}{" "}
-          {!loading && !rows.length && (
-            <div className="empty">
-              No staff profiles have been created yet.
-            </div>
-          )}
-        </TableScroll>
+                            }}
+                            aria-label="Custom role"
+                          >
+                            <option value="">System role</option>
+                            {customRoles
+                              .filter((x: any) => x.is_active)
+                              .map((x: any) => (
+                                <option key={x.id} value={x.id}>
+                                  {x.name}
+                                </option>
+                              ))}
+                          </select>
+                        )}
+                      </td>
+                      <td>
+                        {r.has_login ? (
+                          <>
+                            <StatusPill value={r.account_status || "active"} />
+                            {r.delivery_status && (
+                              <small className="textSecondary">
+                                Email: {readableLabel(r.delivery_status)}
+                              </small>
+                            )}
+                            {canManage && r.account_status !== "active" && (
+                              <button
+                                className="button secondary"
+                                disabled={
+                                  busy || r.employment_status !== "active"
+                                }
+                                onClick={() => resend(r)}
+                              >
+                                Resend invitation
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            className="button secondary"
+                            onClick={() => {
+                              setInviteStaff(r);
+                              setDevLink("");
+                            }}
+                            disabled={
+                              !canManage ||
+                              !r.email ||
+                              r.employment_status !== "active"
+                            }
+                          >
+                            Invite
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}{" "}
+            {!loading && !rows.length && (
+              <div className="empty">
+                No staff profiles have been created yet.
+              </div>
+            )}
+          </TableScroll>
+        </CollectionView>
       </section>
       {editing && (
         <Drawer onClose={() => setEditing(null)}>

@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { useEffect, useState } from "react";
@@ -10,6 +11,7 @@ import { ConfirmDialog } from "./ui/confirm-dialog";
 import Drawer from "./Drawer";
 import PackageComparison from "./PackageComparison";
 export default function SuperAdminPackages() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const [plans, setPlans] = useState<any[]>([]),
     [lodges, setLodges] = useState<any[]>([]),
     [selected, setSelected] = useState(""),
@@ -20,6 +22,7 @@ export default function SuperAdminPackages() {
     [confirm, setConfirm] = useState(false),
     [busy, setBusy] = useState(false);
   async function load() {
+    setCollectionLoading(true);
     try {
       const [p, l] = await Promise.all([superApi.plans(), superApi.lodges()]);
       setPlans(p);
@@ -28,6 +31,8 @@ export default function SuperAdminPackages() {
       setError("");
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setCollectionLoading(false);
     }
   }
   useEffect(() => {
@@ -152,71 +157,82 @@ export default function SuperAdminPackages() {
           {selected && !ent && <p>{copy.loading}</p>}
         </div>
         {ent && (
-          <TableScroll className="tableWrap">
-            <table className="dataTable">
-              <thead>
-                <tr>
-                  <th>{copy.features}</th>
-                  <th>{copy.planIncludes}</th>
-                  <th>{copy.exception}</th>
-                  <th>{copy.finalResult}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {features.map((f: any) => {
-                  const override = ent.overrides.find(
-                    (o: any) => o.feature_key === f.key,
-                  );
-                  return (
-                    <tr key={f.key}>
-                      <th scope="row">
-                        {f.name}
-                        <p className="muted">{f.description}</p>
-                      </th>
-                      <td>
-                        {!f.available
-                          ? copy.coming
-                          : ent.base.includes(f.key)
-                            ? copy.included
-                            : copy.excluded}
-                      </td>
-                      <td>
-                        <button
-                          className="button secondary"
-                          onClick={() => {
-                            setError("");
-                            setException({
-                              feature: f,
-                              value: override
-                                ? override.enabled
-                                  ? "yes"
-                                  : "no"
-                                : "default",
-                              reason: "",
-                            });
-                          }}
-                        >
-                          {override
-                            ? override.enabled
-                              ? copy.enable
-                              : copy.disable
-                            : copy.defaultResult}
-                        </button>
-                        {override?.reason && <p>{override.reason}</p>}
-                      </td>
-                      <td>
-                        {!f.available
-                          ? copy.coming
-                          : ent.effective.includes(f.key)
-                            ? copy.enabled
-                            : copy.disabled}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </TableScroll>
+          <CollectionView
+            loading={collectionLoading}
+            error={Boolean(error)}
+            onRetry={() => {
+              setError("");
+              void load();
+            }}
+            name="SuperAdminPackages"
+            defaultView="list"
+          >
+            <TableScroll className="tableWrap">
+              <table className="dataTable">
+                <thead>
+                  <tr>
+                    <th>{copy.features}</th>
+                    <th>{copy.planIncludes}</th>
+                    <th>{copy.exception}</th>
+                    <th>{copy.finalResult}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {features.map((f: any) => {
+                    const override = ent.overrides.find(
+                      (o: any) => o.feature_key === f.key,
+                    );
+                    return (
+                      <tr key={f.key}>
+                        <th scope="row">
+                          {f.name}
+                          <p className="muted">{f.description}</p>
+                        </th>
+                        <td>
+                          {!f.available
+                            ? copy.coming
+                            : ent.base.includes(f.key)
+                              ? copy.included
+                              : copy.excluded}
+                        </td>
+                        <td>
+                          <button
+                            className="button secondary"
+                            onClick={() => {
+                              setError("");
+                              setException({
+                                feature: f,
+                                value: override
+                                  ? override.enabled
+                                    ? "yes"
+                                    : "no"
+                                  : "default",
+                                reason: "",
+                              });
+                            }}
+                          >
+                            {override
+                              ? override.enabled
+                                ? copy.enable
+                                : copy.disable
+                              : copy.defaultResult}
+                          </button>
+                          {override?.reason && <p>{override.reason}</p>}
+                        </td>
+                        <td>
+                          {!f.available
+                            ? copy.coming
+                            : ent.effective.includes(f.key)
+                              ? copy.enabled
+                              : copy.disabled}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableScroll>
+          </CollectionView>
         )}
       </section>
       {draft && (

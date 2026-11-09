@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -11,6 +12,7 @@ import { authApi, lodgeApi, operationsApi } from "@/lib/api";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
 export default function FoodBeveragePage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const [rows, setRows] = useState<any[]>([]),
     [guests, setGuests] = useState<any[]>([]),
@@ -19,6 +21,7 @@ export default function FoodBeveragePage() {
     [canManage, setCanManage] = useState(false);
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
       const me = await authApi.me(),
         active = localStorage.getItem("active_lodge_id"),
@@ -41,6 +44,8 @@ export default function FoodBeveragePage() {
       }
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -81,52 +86,65 @@ export default function FoodBeveragePage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Service</th>
-              <th>When</th>
-              <th>Location</th>
-              <th>Guests</th>
-              <th>Dietary alerts</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <strong>{r.name}</strong>
-                  <br />
-                  <small>{readableLabel(r.meal_type)}</small>
-                </td>
-                <td>{formatDateTime(r.scheduled_at)}</td>
-                <td>{r.location || "—"}</td>
-                <td>{r.expected_guest_count}</td>
-                <td>
-                  {r.guests
-                    ?.filter((g: any) => g.dietary_requirements || g.allergies)
-                    .map((g: any) => (
-                      <div key={g.guest_id}>
-                        <strong>{g.guest_name}</strong>:{" "}
-                        {[g.dietary_requirements, g.allergies]
-                          .filter(Boolean)
-                          .join(" • ")}
-                      </div>
-                    )) || "—"}
-                </td>
-                <td>
-                  <StatusPill value={r.status} />
-                </td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="FoodBeveragePage"
+        defaultView="cards"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>When</th>
+                <th>Location</th>
+                <th>Guests</th>
+                <th>Dietary alerts</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No meal services scheduled.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>{r.name}</strong>
+                    <br />
+                    <small>{readableLabel(r.meal_type)}</small>
+                  </td>
+                  <td>{formatDateTime(r.scheduled_at)}</td>
+                  <td>{r.location || "—"}</td>
+                  <td>{r.expected_guest_count}</td>
+                  <td>
+                    {r.guests
+                      ?.filter(
+                        (g: any) => g.dietary_requirements || g.allergies,
+                      )
+                      .map((g: any) => (
+                        <div key={g.guest_id}>
+                          <strong>{g.guest_name}</strong>:{" "}
+                          {[g.dietary_requirements, g.allergies]
+                            .filter(Boolean)
+                            .join(" • ")}
+                        </div>
+                      )) || "—"}
+                  </td>
+                  <td>
+                    <StatusPill value={r.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No meal services scheduled.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && access.permission("fb.manage") && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

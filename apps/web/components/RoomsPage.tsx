@@ -28,6 +28,7 @@ export default function RoomsPage() {
   const access = useWorkspaceAccess();
   const canManage = access.permission("units.manage");
   const [rows, setRows] = useState<Room[]>([]),
+    [selected, setSelected] = useState<Room | null>(null),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
@@ -78,39 +79,84 @@ export default function RoomsPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <div className="roomGrid">
-        {rows.map((r) => (
-          <article className="roomCard" key={r.id}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <b>{r.name}</b>
-              <StatusPill value={r.status} />
-            </div>
-            <p>
-              {r.unit_type}
-              {r.current_guest ? ` · ${r.current_guest}` : ""}
-            </p>
-            <select
-              className="select"
-              value={r.status}
-              onChange={(e) => update(r.id, e.target.value)}
-              disabled={!canManage}
-              aria-label="Status"
-            >
-              {statuses.map((s) => (
-                <option value={s} key={s}>
-                  {readableLabel(s)}
-                </option>
+      <div className="roomStatusBoard">
+        {[
+          "available",
+          "occupied",
+          "cleaning",
+          "awaiting_inspection",
+          "maintenance",
+          "out_of_service",
+        ].map((state) => {
+          const units = rows.filter((r) =>
+            state === "available"
+              ? ["available", "ready"].includes(r.status)
+              : r.status === state,
+          );
+          return (
+            <section className="roomStatusColumn" key={state}>
+              <h2>
+                {readableLabel(state)}
+                <span>{units.length}</span>
+              </h2>
+              {units.map((r) => (
+                <article className="roomCard" key={r.id}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <button
+                      className="linkButton"
+                      onClick={() => setSelected(r)}
+                    >
+                      <b>{r.name}</b>
+                    </button>
+                    <StatusPill value={r.status} />
+                  </div>
+                  <p>
+                    {r.unit_type}
+                    {r.current_guest ? ` · ${r.current_guest}` : ""}
+                  </p>
+                  <select
+                    className="select"
+                    value={r.status}
+                    onChange={(e) => update(r.id, e.target.value)}
+                    disabled={!canManage}
+                    aria-label="Status"
+                  >
+                    {statuses.map((s) => (
+                      <option value={s} key={s}>
+                        {readableLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                </article>
               ))}
-            </select>
-          </article>
-        ))}
+            </section>
+          );
+        })}
       </div>
+      {selected && (
+        <Drawer onClose={() => setSelected(null)}>
+          <div className="drawerHead">
+            <h2>{selected.name}</h2>
+            <button
+              className="closeButton"
+              aria-label="Close dialog"
+              onClick={() => setSelected(null)}
+            >
+              ×
+            </button>
+          </div>
+          <StatusPill value={selected.status} />
+          <p>{selected.unit_type}</p>
+          {selected.current_guest && <p>{selected.current_guest}</p>}
+          <p>{selected.notes}</p>
+        </Drawer>
+      )}
       {!rows.length && (
         <div className="panel empty">
           No rooms or units have been configured yet.

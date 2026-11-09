@@ -1,4 +1,6 @@
 "use client";
+import { PermissionMatrix } from "./ui/permission-matrix";
+import { modules } from "@/lib/modules";
 import { useEffect, useState } from "react";
 import { operationsApi } from "@/lib/api";
 import { accessCopy as copy } from "@/lib/strings/access";
@@ -284,9 +286,17 @@ export default function RolesPage() {
               />
               {copy.advanced}
             </label>
-            {groups.map((group) => (
-              <section className="accessArea" key={group.key}>
-                {advanced ? (
+            {!advanced && (
+              <PermissionMatrix
+                groups={groups}
+                level={level}
+                onChange={setLevel}
+              />
+            )}
+            {advanced &&
+              groups.map((group) => (
+                <section className="accessArea" key={group.key}>
+                  {" "}
                   <>
                     <h3>{group.name}</h3>
                     {group.permissions.map((permission: any) => (
@@ -318,42 +328,40 @@ export default function RolesPage() {
                       </label>
                     ))}
                   </>
-                ) : (
-                  <Field label={group.name}>
-                    <select
-                      className="select"
-                      value={level(group)}
-                      onChange={(e) => setLevel(group, e.target.value)}
-                    >
-                      <option value="none">{copy.no}</option>
-                      <option
-                        value="view"
-                        disabled={
-                          !group.permissions.some(
-                            (p: any) => p.can_grant && p.level === "view",
-                          )
-                        }
-                      >
-                        {copy.view}
-                      </option>
-                      <option
-                        value="edit"
-                        disabled={
-                          !group.permissions.some(
-                            (p: any) => p.can_grant && p.level === "edit",
-                          )
-                        }
-                      >
-                        {copy.editAccess}
-                      </option>
-                      {level(group) === "advanced" && (
-                        <option value="advanced">{copy.customAccess}</option>
-                      )}
-                    </select>
-                  </Field>
-                )}
-              </section>
-            ))}
+                </section>
+              ))}
+            <aside className="panel rolePreview">
+              <span className="eyebrow">Role preview</span>
+              <h3>{draft.name || copy.custom}</h3>
+              <p>
+                {
+                  catalog.scopes.find((s: any) => s.key === draft.base_role_key)
+                    ?.label
+                }
+              </p>
+              <div>
+                {modules
+                  .filter(([key]) => {
+                    const permission =
+                      (
+                        {
+                          hr: "staff.hr.view",
+                          "food-beverage": "fb.view",
+                          roles: "roles.custom.manage",
+                          rooms: "units.view",
+                          requests: "requests.view",
+                          feedback: "feedback.view",
+                          fleet: "vehicles.view",
+                          "lodge-ai": "ai.use",
+                        } as Record<string, string>
+                      )[key] || key + ".view";
+                    return draft.permission_keys.includes(permission);
+                  })
+                  .map(([key, label]) => (
+                    <span key={key}>{label}</span>
+                  ))}
+              </div>
+            </aside>
             <section className="roleSummary" aria-live="polite">
               <h3>{copy.summary}</h3>
               {groups.map((group) => (

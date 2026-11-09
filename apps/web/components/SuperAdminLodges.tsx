@@ -1,10 +1,13 @@
 "use client";
+import { CollectionView } from "./ui/collection-view";
+import { TableScroll } from "./ui/table-scroll";
 import { contentCopy as copy, readableLabel } from "@/lib/strings/content";
 import { TimezonePicker } from "@/components/ui/timezone-picker";
 import { dateInputValue, formatDate } from "@/lib/formatting";
 
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
+import { uiCopy as ui } from "@/lib/strings/redesign";
 import { FormEvent, useEffect, useState } from "react";
 import { API_URL, superApi } from "@/lib/api";
 import Drawer from "./Drawer";
@@ -109,6 +112,48 @@ function LogoField({
 }
 
 export default function SuperAdminLodges() {
+  const [lodgeView, setLodgeView] = useState<"cards" | "list">("cards");
+  const [registrationStep, setRegistrationStep] = useState(0);
+  useEffect(() => {
+    const receive = (event: Event) => {
+      const errors = (event as CustomEvent<Record<string, string>>).detail;
+      if (!errors) return;
+      const fields = Object.keys(errors);
+      if (fields.some((f) => ["name", "location", "timezone"].includes(f)))
+        setRegistrationStep(0);
+      else if (
+        fields.some((f) => ["package", "start_date", "expiry_date"].includes(f))
+      )
+        setRegistrationStep(1);
+    };
+    document.addEventListener("safarios-field-errors", receive, true);
+    return () =>
+      document.removeEventListener("safarios-field-errors", receive, true);
+  }, []);
+  function continueRegistration(form: HTMLFormElement) {
+    const section =
+      form.querySelectorAll<HTMLElement>(".formSection")[registrationStep];
+    const errors: Record<string, string> = {};
+    section
+      ?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input,select")
+      .forEach((input) => {
+        if (!input.checkValidity())
+          errors[input.name] = input.validity.customError
+            ? input.validationMessage
+            : input.validity.valueMissing
+              ? "Complete this field."
+              : "Enter a valid value.";
+      });
+    if (Object.keys(errors).length) {
+      form.dispatchEvent(
+        new CustomEvent("safarios-field-errors", { detail: errors }),
+      );
+      section?.querySelector<HTMLElement>("[required]:invalid")?.focus();
+      return;
+    }
+    setRegistrationStep((value) => Math.min(2, value + 1));
+  }
+
   const [selectedPackage, setSelectedPackage] = useState("");
   const [plans, setPlans] = useState<any[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<z.infer<
@@ -265,6 +310,7 @@ export default function SuperAdminLodges() {
         <button
           className="button primary"
           onClick={() => {
+            setRegistrationStep(0);
             setOpen(true);
             setError("");
             setFile(null);
@@ -272,6 +318,24 @@ export default function SuperAdminLodges() {
         >
           + Register lodge
         </button>
+      </div>
+      <div className="filterBar">
+        <div className="viewSwitcher">
+          <button
+            type="button"
+            aria-pressed={lodgeView === "cards"}
+            onClick={() => setLodgeView("cards")}
+          >
+            {ui.cards}
+          </button>
+          <button
+            type="button"
+            aria-pressed={lodgeView === "list"}
+            onClick={() => setLodgeView("list")}
+          >
+            {ui.list}
+          </button>
+        </div>
       </div>
       {notice && (
         <p className="notice" role="status">
@@ -359,7 +423,7 @@ export default function SuperAdminLodges() {
             </button>
           )}
         </section>
-      ) : (
+      ) : lodgeView === "cards" ? (
         <div className="propertyGrid">
           {visible.map((lodge) => (
             <article className="propertyCard" key={lodge.id}>
@@ -429,11 +493,51 @@ export default function SuperAdminLodges() {
                 >
                   Manage branding
                 </button>
-
               </div>
             </article>
           ))}
         </div>
+      ) : (
+        <CollectionView name="platform-lodges">
+          <TableScroll className="tableWrap">
+            <table className="dataTable">
+              <thead>
+                <tr>
+                  <th>Lodge</th>
+                  <th>Package</th>
+                  <th>Status</th>
+                  <th>Expiry</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((lodge) => (
+                  <tr key={lodge.id}>
+                    <td>{lodge.branding?.display_name || lodge.name}</td>
+                    <td>{lodge.subscription?.package || "—"}</td>
+                    <td>
+                      <StatusPill value={lodge.subscription_status} />
+                    </td>
+                    <td>
+                      {lodge.subscription?.expiry_date
+                        ? formatDate(lodge.subscription.expiry_date)
+                        : "—"}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => edit(lodge)}
+                      >
+                        Manage branding
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+        </CollectionView>
       )}
       {open && (
         <Drawer onClose={close}>
@@ -452,8 +556,41 @@ export default function SuperAdminLodges() {
               <UiIcon name="close" />
             </button>
           </div>
-          <Form onSubmit={add}>
-            <section className="formSection">
+          <ol className="registrationSteps" aria-label="Registration steps">
+            {[ui.property, ui.subscriptionStep, ui.administrator].map(
+              (title, index) => (
+                <li
+                  key={title}
+                  aria-current={registrationStep === index ? "step" : undefined}
+                >
+                  <button
+                    type="button"
+                    disabled={index > registrationStep}
+                    onClick={() => setRegistrationStep(index)}
+                  >
+                    <span>{index + 1}</span>
+                    {title}
+                  </button>
+                </li>
+              ),
+            )}
+          </ol>
+          <Form
+            onSubmit={add}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                registrationStep < 2 &&
+                (event.target as HTMLElement).tagName !== "TEXTAREA" &&
+                (event.target as HTMLElement).getAttribute("role") !==
+                  "combobox"
+              ) {
+                event.preventDefault();
+                continueRegistration(event.currentTarget);
+              }
+            }}
+          >
+            <section className="formSection" hidden={registrationStep !== 0}>
               <h2>01 / Property identity</h2>
               <Field label="Lodge name">
                 <input
@@ -492,7 +629,7 @@ export default function SuperAdminLodges() {
               </div>
               <LogoField preview={preview} onChange={choose} />
             </section>
-            <section className="formSection">
+            <section className="formSection" hidden={registrationStep !== 1}>
               <h2>02 / Subscription</h2>
               <Field label="Package">
                 <select
@@ -554,7 +691,7 @@ export default function SuperAdminLodges() {
                 access.
               </p>
             </section>
-            <section className="formSection">
+            <section className="formSection" hidden={registrationStep !== 2}>
               <h2>03 / Lodge administrator</h2>
               <Field label="Full name">
                 <input
@@ -591,9 +728,32 @@ export default function SuperAdminLodges() {
               >
                 Cancel
               </button>
-              <button className="button primary" disabled={busy}>
-                {busy ? "Registering…" : "Register lodge"}
-              </button>
+              {registrationStep > 0 && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => setRegistrationStep((value) => value - 1)}
+                >
+                  {ui.previous}
+                </button>
+              )}
+              {registrationStep < 2 ? (
+                <button
+                  type="button"
+                  className="button primary"
+                  onClick={(event) => {
+                    const form = event.currentTarget.closest("form");
+                    if (form) continueRegistration(form);
+                  }}
+                >
+                  {ui.continue}
+                </button>
+              ) : (
+                <button className="button primary" disabled={busy}>
+                  {busy ? "Registering…" : "Register lodge"}
+                </button>
+              )}
             </div>
           </Form>
         </Drawer>

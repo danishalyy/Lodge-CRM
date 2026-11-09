@@ -6,15 +6,16 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Inter", "-apple-system", "sans-serif"],
-        heading: ["Inter", "-apple-system", "sans-serif"],
+        heading: ["Outfit", "Inter", "-apple-system", "sans-serif"],
         label: ["Inter", "sans-serif"],
-        display: ["Inter", "-apple-system", "sans-serif"],
+        display: ["Outfit", "Inter", "-apple-system", "sans-serif"],
       },
       colors: {
         charcoal: "var(--color-charcoal)",
         olive: "var(--color-olive)",
         gold: "var(--color-gold)",
-        surface: "var(--surface-glass)",
+        surface: "var(--surface)",
+        canvas: "var(--bg)", navigation: "var(--bg-nav)", "surface-2": "var(--surface-2)", line: "var(--line)", ink: "var(--text)", "ink-secondary": "var(--text-2)", "gold-text": "var(--gold-text)", "gold-wash": "var(--gold-wash)", "on-gold": "var(--on-gold)",
         beige: "var(--color-beige)",
         gray: "var(--color-gray)",
         brown: "var(--color-brown)",

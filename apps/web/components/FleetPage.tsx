@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -22,6 +23,7 @@ type Vehicle = {
   notes: string;
 };
 export default function FleetPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("vehicles.manage");
 
@@ -30,12 +32,15 @@ export default function FleetPage() {
     [error, setError] = useState("");
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
       const nextRows = await operationsApi.vehicles.list<Vehicle[]>();
       if (!access.isCurrent()) return;
       setRows(nextRows);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -95,65 +100,77 @@ export default function FleetPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Vehicle</th>
-              <th>Registration</th>
-              <th>Odometer</th>
-              <th>Service</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((v) => (
-              <tr key={v.id}>
-                <td>
-                  <strong>
-                    {v.name || `${v.make} ${v.model}`.trim() || "Vehicle"}
-                  </strong>
-                  <br />
-                  <small>
-                    {[v.make, v.model, v.year].filter(Boolean).join(" ") || "—"}
-                  </small>
-                </td>
-                <td>{v.registration}</td>
-                <td>{v.odometer_km.toLocaleString()} km</td>
-                <td>
-                  {v.service_due_in_km == null ? (
-                    "—"
-                  ) : v.service_due_in_km <= 0 ? (
-                    <span className="dangerText">Due now</span>
-                  ) : (
-                    `${v.service_due_in_km.toLocaleString()} km`
-                  )}
-                </td>
-                <td>
-                  {canManage ? (
-                    <select
-                      className="select"
-                      value={v.status}
-                      onChange={(e) => upd(v.id, { status: e.target.value })}
-                      aria-label="Status"
-                    >
-                      <option value="ready">Ready</option>
-                      <option value="assigned">Assigned</option>
-                      <option value="maintenance">Maintenance</option>
-                      <option value="out_of_service">Out of service</option>
-                    </select>
-                  ) : (
-                    <StatusPill value={v.status} />
-                  )}
-                </td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="FleetPage"
+        defaultView="cards"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Registration</th>
+                <th>Odometer</th>
+                <th>Service</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No vehicles have been added.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((v) => (
+                <tr key={v.id}>
+                  <td>
+                    <strong>
+                      {v.name || `${v.make} ${v.model}`.trim() || "Vehicle"}
+                    </strong>
+                    <br />
+                    <small>
+                      {[v.make, v.model, v.year].filter(Boolean).join(" ") ||
+                        "—"}
+                    </small>
+                  </td>
+                  <td>{v.registration}</td>
+                  <td>{v.odometer_km.toLocaleString()} km</td>
+                  <td>
+                    {v.service_due_in_km == null ? (
+                      "—"
+                    ) : v.service_due_in_km <= 0 ? (
+                      <span className="dangerText">Due now</span>
+                    ) : (
+                      `${v.service_due_in_km.toLocaleString()} km`
+                    )}
+                  </td>
+                  <td>
+                    {canManage ? (
+                      <select
+                        className="select"
+                        value={v.status}
+                        onChange={(e) => upd(v.id, { status: e.target.value })}
+                        aria-label="Status"
+                      >
+                        <option value="ready">Ready</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="out_of_service">Out of service</option>
+                      </select>
+                    ) : (
+                      <StatusPill value={v.status} />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No vehicles have been added.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

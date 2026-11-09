@@ -1,17 +1,13 @@
 "use client";
-import { designCopy } from "@/lib/strings/design";
+import Link from "next/link";
+import { PageHeader, KpiCard } from "./ui/presentation";
+import { uiCopy as c } from "@/lib/strings/redesign";
 import { formatDateTime, formatDate } from "@/lib/formatting";
 import { eventLabel, readableLabel } from "@/lib/strings/content";
 
 import { useEffect, useMemo, useState } from "react";
 import { lodgeApi, operationsApi } from "@/lib/api";
-import {
-  BarChart,
-  OperationsCalendar,
-  CalendarEvent,
-  RingChart,
-} from "./DataViz";
-import UiIcon from "./UiIcon";
+import { OperationsCalendar, CalendarEvent, RingChart } from "./DataViz";
 import SetupChecklist from "./SetupChecklist";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import StatusPill from "./StatusPill";
@@ -92,130 +88,201 @@ export default function DashboardPage() {
     memoryEvents = Array.isArray(data?.events) ? data.events : [],
     taskTotal = m.open_tasks || 0,
     taskHealthy = Math.max((m.open_tasks || 0) - (m.overdue_tasks || 0), 0);
-  const chart = [
-    { label: "Guests", value: m.guests_in_house },
-    { label: "Arrivals", value: m.arrivals_today },
-    { label: "Tasks", value: m.open_tasks },
-    { label: "Maint.", value: m.maintenance_open },
-    { label: "Activities", value: m.activities_today },
-    { label: "Transfers", value: m.transfers_today },
-  ].filter((item) => item.value != null);
+  const today = new Date(),
+    dateKey = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+  const greeting =
+    today.getHours() < 12
+      ? c.morning
+      : today.getHours() < 18
+        ? c.afternoon
+        : c.evening;
+  const firstName = access.displayName?.trim().split(" ")[0];
+  const taskHref =
+    access.permission("tasks.view") && access.feature("tasks")
+      ? "/tasks"
+      : undefined;
+  const stayHref =
+    access.permission("stays.view") && access.feature("stays")
+      ? "/stays"
+      : undefined;
+  const schedule = [
+    ...stays.flatMap((s) => [
+      ...(s.arrival_date === dateKey
+        ? [
+            {
+              id: "a" + s.id,
+              time: s.expected_arrival_time || "",
+              title: c.arrival + " · " + (s.guest_name || c.guests),
+              detail: s.unit_name || "",
+              href: stayHref,
+            },
+          ]
+        : []),
+      ...(s.departure_date === dateKey
+        ? [
+            {
+              id: "d" + s.id,
+              time: s.expected_departure_time || "",
+              title: c.departure + " · " + (s.guest_name || c.guests),
+              detail: s.unit_name || "",
+              href: stayHref,
+            },
+          ]
+        : []),
+    ]),
+    ...activities
+      .filter(
+        (a) =>
+          String(a.starts_at).slice(0, 10) === dateKey &&
+          a.status !== "cancelled",
+      )
+      .map((a) => ({
+        id: a.id,
+        time: new Date(a.starts_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
+        title: a.title || c.activity,
+        detail: [a.guide_name, a.vehicle_name].filter(Boolean).join(" · "),
+        href: "/activities",
+      })),
+  ].sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
   return (
     <>
-      <div className="pageHeader premiumHeader">
-        <div>
-          <span className="eyebrow">LODGE COMMAND CENTRE</span>
-          <h1>
-            {data?.lodge?.branding?.display_name ||
-              data?.lodge?.name ||
-              "Lodge overview"}
-          </h1>
-          <p>Your day at a glance. Guests, people and work, in one place.</p>
-        </div>
-        <div className="headerActions">
-          <span className="liveBadge">
-            <i />
-            {designCopy.overview}
-          </span>
-          <span className="dateChip">
-            {new Date().toLocaleDateString(undefined, {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-            })}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        label={today.toLocaleDateString(undefined, {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        })}
+        title={
+          <>
+            {greeting}
+            {firstName && (
+              <>
+                , <span className="greetingName">{firstName}</span>
+              </>
+            )}
+          </>
+        }
+        description={access.lodgeName || data.lodge?.name || c.greetingHint}
+        action={
+          access.permission("tasks.manage") && access.feature("tasks") ? (
+            <Link href="/tasks?create=1" className="button primary">
+              {c.newTask}
+            </Link>
+          ) : undefined
+        }
+      />
       <SetupChecklist onEmpty={setEmpty} />
-      {!(
-        empty && Object.values(m).every((value) => value === 0 || value == null)
-      ) && (
+      {!(empty && Object.values(m).every((v) => v === 0 || v == null)) && (
         <>
-          <div className="metricGrid dashboardMetrics">
-            {[
-              [
-                "Guests in-house",
-                m.guests_in_house,
-                "people",
-                "Guests currently checked in",
-              ],
-              [
-                "Arrivals today",
-                m.arrivals_today,
-                "calendar",
-                "Expected arrivals",
-              ],
-              [
-                "Open tasks",
-                m.open_tasks,
-                "tasks",
-                "Operational work in progress",
-              ],
-              [
-                "Maintenance",
-                m.maintenance_open,
-                "settings",
-                "Open maintenance tickets",
-              ],
-              [
-                "Activities today",
-                m.activities_today,
-                "leaf",
-                "Scheduled lodge activities",
-              ],
-              [
-                "Transfers today",
-                m.transfers_today,
-                "fleet",
-                "Scheduled transfers",
-              ],
-              [
-                "Vehicles unavailable",
-                m.vehicles_unavailable,
-                "fleet",
-                "Unavailable fleet",
-              ],
-              ["Overdue tasks", m.overdue_tasks, "tasks", "Past due time"],
-            ]
-              .filter(([, value]) => value != null)
-              .map(([label, value, icon, hint]: any) => (
-                <div
-                  className={`metricCard premiumMetric ${label === "Overdue tasks" && Number(value) > 0 ? "attention" : ""}`}
-                  key={label}
-                >
-                  <div className="metricTop">
-                    <span>{label}</span>
-                    <span className="metricIcon">
-                      <UiIcon name={String(icon)} />
-                    </span>
-                  </div>
-                  <strong>{value}</strong>
-                  <small>{hint}</small>
-                </div>
-              ))}
+          <div className="commandMetrics">
+            <KpiCard
+              label={c.inHouse}
+              value={m.guests_in_house}
+              hint={c.guestsHint}
+              href={stayHref && stayHref + "?status=in_house"}
+            />
+            <KpiCard
+              label={c.arrivalsToday}
+              value={m.arrivals_today}
+              hint={c.arrivalsHint}
+              href={stayHref && stayHref + "?view=arrivals"}
+            />
+            <KpiCard
+              label={c.openTasks}
+              value={m.open_tasks}
+              hint={c.tasksHint}
+              href={taskHref}
+            />
+            <KpiCard
+              label={c.overdue}
+              value={m.overdue_tasks}
+              hint={c.overdueHint}
+              href={taskHref && taskHref + "?status=overdue"}
+              attention={Number(m.overdue_tasks) > 0}
+            />
           </div>
-          <div className="dashboardGrid premiumDashboardGrid">
-            <section className="panel span2 premiumPanel">
-              <div className="panelHeader">
-                <div>
-                  <span className="panelKicker">TODAY</span>
-                  <h2>Operational pulse</h2>
-                  <p>Current activity across the lodge</p>
-                </div>
-                <span className="panelMeta">Real-time snapshot</span>
-              </div>
-              <div className="chartSurface">
-                <BarChart data={chart} />
+          <div className="commandColumns">
+            <section className="panel">
+              <h2 className="panelKicker">{c.run}</h2>
+              <div className="runTimeline">
+                {schedule.length ? (
+                  schedule.map((item, index) => (
+                    <div className="runEvent" key={item.id || index}>
+                      <time>{item.time || "—"}</time>
+                      <div>
+                        {item.href ? (
+                          <Link href={item.href}>{item.title}</Link>
+                        ) : (
+                          item.title
+                        )}
+                        {item.detail && <small>{item.detail}</small>}
+                        {!item.time && <small>{c.dateOnly}</small>}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="empty">{c.noSchedule}</div>
+                )}
               </div>
             </section>
+            <section className="panel">
+              <h2 className="panelKicker">{c.attention}</h2>
+              <div className="attentionList">
+                {attention.length ? (
+                  attention.slice(0, 10).map((item: any, index: number) => {
+                    const route =
+                      item.type === "task" && taskHref
+                        ? taskHref
+                        : item.type === "maintenance" &&
+                            access.permission("maintenance.view") &&
+                            access.feature("maintenance")
+                          ? "/maintenance"
+                          : null;
+                    return (
+                      <div className="attentionItem" key={item.id || index}>
+                        <div>
+                          {route ? (
+                            <Link
+                              href={
+                                route +
+                                "?search=" +
+                                encodeURIComponent(
+                                  item.title.replace(/^.*?:\s*/, ""),
+                                )
+                              }
+                            >
+                              <strong>{item.title}</strong>
+                            </Link>
+                          ) : (
+                            <strong>{item.title}</strong>
+                          )}
+                          {(item.detail || item.priority) && (
+                            <small>
+                              {item.detail || readableLabel(item.priority)}
+                            </small>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="empty">{c.quiet}</div>
+                )}
+              </div>
+            </section>
+          </div>
+          <div className="dashboardSecondary">
             {m.open_tasks != null && m.overdue_tasks != null && (
-              <section className="panel premiumPanel">
-                <div className="panelHeader">
-                  <div>
-                    <span className="panelKicker">TASK HEALTH</span>
-                    <h2>{designCopy.tasks}</h2>
-                  </div>
-                </div>
+              <section className="panel">
+                <h2>{c.taskHealth}</h2>
                 <div className="ringPanel">
                   <RingChart
                     value={taskHealthy}
@@ -224,110 +291,23 @@ export default function DashboardPage() {
                   />
                   <div className="ringLegend">
                     <div>
-                      <span>Open</span>
-                      <strong>{m.open_tasks || 0}</strong>
+                      <span>{c.openTasks}</span>
+                      <strong>{m.open_tasks}</strong>
                     </div>
                     <div>
-                      <span>Overdue</span>
-                      <strong className={m.overdue_tasks ? "dangerText" : ""}>
-                        {m.overdue_tasks || 0}
-                      </strong>
+                      <span>{c.overdue}</span>
+                      <strong>{m.overdue_tasks}</strong>
                     </div>
                   </div>
                 </div>
               </section>
             )}
-            <section className="panel span2 premiumPanel">
-              <div className="panelHeader">
-                <div>
-                  <span className="panelKicker">OPERATIONS CALENDAR</span>
-                  <h2>
-                    {new Date().toLocaleDateString(undefined, {
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </h2>
-                  <p>
-                    Arrivals, departures and activities you are authorised to
-                    see
-                  </p>
-                </div>
-              </div>
-              <OperationsCalendar events={events} />
-            </section>
-            <section className="panel premiumPanel">
-              <div className="panelHeader">
-                <div>
-                  <span className="panelKicker">ATTENTION</span>
-                  <h2>Needs review</h2>
-                  <p>Priorities that need your attention</p>
-                </div>
-              </div>
-              <div className="attentionList">
-                {attention.length ? (
-                  attention.slice(0, 8).map((x: any) => (
-                    <div className="attentionItem" key={x.id}>
-                      <span className="attentionDot" />
-                      <div>
-                        <strong>{x.title}</strong>
-                        {x.detail && <small>{x.detail}</small>}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty compact">
-                    Nothing currently requires attention.
-                  </div>
-                )}
-              </div>
-            </section>
-            <section className="panel premiumPanel">
-              <div className="panelHeader">
-                <div>
-                  <span className="panelKicker">SUBSCRIPTION</span>
-                  <h2>Workspace access</h2>
-                </div>
-              </div>
-              <div className="subscriptionCard">
-                <div>
-                  <span>Package</span>
-                  <strong>
-                    {data?.subscription?.package || "Not configured"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Status</span>
-                  <StatusPill
-                    value={String(data?.subscription?.status || "unknown")
-                      .toLowerCase()
-                      .replaceAll(" ", "_")}
-                  />
-                </div>
-                <div>
-                  <span>Expiry</span>
-                  <strong>
-                    {data?.subscription?.expiry_date
-                      ? formatDate(data.subscription.expiry_date)
-                      : "—"}
-                  </strong>
-                </div>
-              </div>
-            </section>
-            <section className="panel span2 premiumPanel">
-              <div className="panelHeader">
-                <div>
-                  <span className="panelKicker">OPERATIONAL MEMORY</span>
-                  <h2>Recent lodge events</h2>
-                  <p>The latest activity across your lodge</p>
-                </div>
-                <span className="panelMeta">
-                  {memoryEvents.length} recorded
-                </span>
-              </div>
+            <section className="panel">
+              <h2>{c.memory}</h2>
               <div className="memoryPreview">
                 {memoryEvents.length ? (
-                  memoryEvents.slice(0, 6).map((e: any, i: number) => (
-                    <div className="memoryEvent" key={e.id || i}>
+                  memoryEvents.slice(0, 6).map((e: any, index: number) => (
+                    <div className="memoryEvent" key={e.id || index}>
                       <span className="memoryRail">
                         <i />
                       </span>
@@ -349,13 +329,31 @@ export default function DashboardPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="empty compact">
-                    No operational events have been recorded yet.
-                  </div>
+                  <div className="empty">{c.noRecords}</div>
                 )}
               </div>
             </section>
           </div>
+          <details className="panel dashboardCalendar">
+            <summary>{c.calendarLabel}</summary>
+            <OperationsCalendar events={events} />
+          </details>
+          {["lodge_admin", "group_admin"].includes(access.roleKey || "") && (
+            <details className="panel dashboardCalendar">
+              <summary>{c.subscription}</summary>
+              <div className="subscriptionCard">
+                <div>
+                  <span>{data.subscription?.package}</span>
+                  <StatusPill value={data.subscription?.status || "unknown"} />
+                </div>
+                <small>
+                  {data.subscription?.expiry_date
+                    ? formatDate(data.subscription.expiry_date)
+                    : "—"}
+                </small>
+              </div>
+            </details>
+          )}
         </>
       )}
     </>

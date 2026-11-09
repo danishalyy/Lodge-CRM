@@ -1,4 +1,6 @@
 "use client";
+import { UserMenu } from "./ui/user-menu";
+import { uiCopy as c } from "@/lib/strings/redesign";
 import { useEffect, useState } from "react";
 import Drawer from "./Drawer";
 import UiIcon, { moduleIcon } from "./UiIcon";
@@ -16,10 +18,12 @@ import {
 } from "lucide-react";
 export default function NavigationEnhancements({
   items,
+  role,
   open,
   onOpenChange,
 }: {
   items?: readonly (readonly string[])[];
+  role?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -50,9 +54,30 @@ export default function NavigationEnhancements({
         ["/super-admin/settings", "Settings", Settings],
       ] as const)
     : ([
-        ["/dashboard", "Home", LayoutDashboard],
-        ["/guests", "Guests", Users],
-        ["/settings", "Settings", Settings],
+        [
+          role === "ranger"
+            ? "/ranger"
+            : role === "driver"
+              ? "/transfers"
+              : role === "housekeeping"
+                ? "/housekeeping"
+                : role === "maintenance"
+                  ? "/maintenance"
+                  : role === "fb"
+                    ? "/food-beverage"
+                    : role === "general_staff"
+                      ? "/tasks"
+                      : "/dashboard",
+          c.fieldDay,
+          LayoutDashboard,
+        ],
+        ["/tasks", "Tasks", LayoutDashboard],
+        [
+          role === "ranger" ? "/wildlife" : "/requests",
+          role === "ranger" ? "Sightings" : "Requests",
+          Users,
+        ],
+        ["/notifications", "Alerts", Settings],
       ] as const);
   const visibleLinks = links.filter(
     ([href]) => platform || !items || items.some(([key]) => href === "/" + key),
@@ -118,6 +143,7 @@ export default function NavigationEnhancements({
               </Link>
             ))}
           </nav>
+          <UserMenu />
         </Drawer>
       )}
     </>

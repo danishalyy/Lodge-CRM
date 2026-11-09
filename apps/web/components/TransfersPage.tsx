@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -46,6 +47,7 @@ const next: Record<string, string | undefined> = {
   arrived: "completed",
 };
 export default function TransfersPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("transfers.manage");
   const canTransition = canManage || access.permission("transfers.own.manage");
@@ -59,6 +61,7 @@ export default function TransfersPage() {
     [error, setError] = useState("");
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
       const [t, s, v, g, st] = await Promise.all([
         operationsApi.transfers.list<Transfer[]>(),
@@ -87,6 +90,8 @@ export default function TransfersPage() {
       setStays(st);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -153,61 +158,72 @@ export default function TransfersPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Guest</th>
-              <th>Route</th>
-              <th>Time</th>
-              <th>Driver</th>
-              <th>Vehicle</th>
-              <th>Status</th>
-              <th>Workflow</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((t) => (
-              <tr key={t.id}>
-                <td>
-                  <strong>{t.guest_name}</strong>
-                  <br />
-                  <small>
-                    {t.transfer_type}
-                    {t.flight_number ? ` · ${t.flight_number}` : ""}
-                  </small>
-                </td>
-                <td>
-                  {t.pickup_location} → {t.dropoff_location}
-                </td>
-                <td>{formatDateTime(t.scheduled_at)}</td>
-                <td>{t.driver_name || "—"}</td>
-                <td>{t.vehicle_name || "—"}</td>
-                <td>
-                  <StatusPill value={t.status} />
-                </td>
-                <td>
-                  {canTransition &&
-                  t.can_transition === true &&
-                  next[t.status] ? (
-                    <button
-                      className="button secondary"
-                      onClick={() => update(t.id, next[t.status]!)}
-                    >
-                      {readableLabel(next[t.status]!)}
-                    </button>
-                  ) : (
-                    "—"
-                  )}
-                </td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="TransfersPage"
+        defaultView="cards"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Route</th>
+                <th>Time</th>
+                <th>Driver</th>
+                <th>Vehicle</th>
+                <th>Status</th>
+                <th>Workflow</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No transfers have been scheduled.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((t) => (
+                <tr key={t.id}>
+                  <td>
+                    <strong>{t.guest_name}</strong>
+                    <br />
+                    <small>
+                      {t.transfer_type}
+                      {t.flight_number ? ` · ${t.flight_number}` : ""}
+                    </small>
+                  </td>
+                  <td>
+                    {t.pickup_location} → {t.dropoff_location}
+                  </td>
+                  <td>{formatDateTime(t.scheduled_at)}</td>
+                  <td>{t.driver_name || "—"}</td>
+                  <td>{t.vehicle_name || "—"}</td>
+                  <td>
+                    <StatusPill value={t.status} />
+                  </td>
+                  <td>
+                    {canTransition &&
+                    t.can_transition === true &&
+                    next[t.status] ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => update(t.id, next[t.status]!)}
+                      >
+                        {readableLabel(next[t.status]!)}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No transfers have been scheduled.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

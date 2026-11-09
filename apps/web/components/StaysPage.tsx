@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -30,6 +31,14 @@ const next: Record<string, string | undefined> = {
   departing: "completed",
 };
 export default function StaysPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
+  const [stayFilter, setStayFilter] = useState(() =>
+    typeof window === "undefined"
+      ? "all"
+      : new URLSearchParams(location.search).get("view") === "arrivals"
+        ? "arrivals"
+        : new URLSearchParams(location.search).get("status") || "all",
+  );
   const access = useWorkspaceAccess();
   const canManage = access.permission("stays.manage");
   const [rows, setRows] = useState<Stay[]>([]),
@@ -38,6 +47,7 @@ export default function StaysPage() {
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    setCollectionLoading(true);
     try {
       const [s, g, r] = await Promise.all([
         operationsApi.stays.list<Stay[]>(),
@@ -55,6 +65,8 @@ export default function StaysPage() {
       setRooms(r);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -91,6 +103,16 @@ export default function StaysPage() {
       setError(e.message);
     }
   }
+  const today = new Date().toLocaleDateString("en-CA");
+  const visibleStays = rows.filter((r) =>
+    stayFilter === "arrivals"
+      ? r.arrival_date === today
+      : stayFilter === "departures"
+        ? r.departure_date === today
+        : stayFilter === "all"
+          ? true
+          : r.status === stayFilter,
+  );
   return (
     <>
       <div className="pageHeader">
@@ -118,54 +140,84 @@ export default function StaysPage() {
         </div>
       )}
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Guest</th>
-              <th>Unit</th>
-              <th>Arrival</th>
-              <th>Departure</th>
-              <th>Party</th>
-              <th>Status</th>
-              <th>Workflow</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.guest_name}</td>
-                <td>{r.unit_name}</td>
-                <td>
-                  {formatDate(r.arrival_date)} {r.expected_arrival_time}
-                </td>
-                <td>
-                  {formatDate(r.departure_date)} {r.expected_departure_time}
-                </td>
-                <td>{r.party_size}</td>
-                <td>
-                  <StatusPill value={r.status} />
-                </td>
-                <td>
-                  {canManage && next[r.status] ? (
-                    <button
-                      className="button secondary"
-                      onClick={() => advance(r)}
-                    >
-                      Mark {readableLabel(next[r.status]!)}
-                    </button>
-                  ) : (
-                    <span>—</span>
-                  )}
-                </td>
+      <div className="filterBar">
+        <div className="viewSwitcher">
+          {[
+            ["all", "All stays"],
+            ["arrivals", "Arrivals"],
+            ["in_house", "In-house"],
+            ["departures", "Departures"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={stayFilter === key}
+              onClick={() => setStayFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="StaysPage"
+        defaultView="cards"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Unit</th>
+                <th>Arrival</th>
+                <th>Departure</th>
+                <th>Party</th>
+                <th>Status</th>
+                <th>Workflow</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No stays have been created.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {visibleStays.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.guest_name}</td>
+                  <td>{r.unit_name}</td>
+                  <td>
+                    {formatDate(r.arrival_date)} {r.expected_arrival_time}
+                  </td>
+                  <td>
+                    {formatDate(r.departure_date)} {r.expected_departure_time}
+                  </td>
+                  <td>{r.party_size}</td>
+                  <td>
+                    <StatusPill value={r.status} />
+                  </td>
+                  <td>
+                    {canManage && next[r.status] ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => advance(r)}
+                      >
+                        Mark {readableLabel(next[r.status]!)}
+                      </button>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No stays have been created.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

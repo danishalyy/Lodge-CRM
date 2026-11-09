@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -37,6 +38,7 @@ const next: Record<string, string | undefined> = {
   in_progress: "completed",
 };
 export default function ActivitiesPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("activities.manage");
   const canTransition = canManage || access.permission("activities.own.manage");
@@ -49,6 +51,7 @@ export default function ActivitiesPage() {
     [error, setError] = useState("");
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
       const [a, s, v, g] = await Promise.all([
         operationsApi.activities.list<Activity[]>(),
@@ -73,6 +76,8 @@ export default function ActivitiesPage() {
       setGuests(g);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -130,63 +135,74 @@ export default function ActivitiesPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Activity</th>
-              <th>Time</th>
-              <th>Guide</th>
-              <th>Vehicle</th>
-              <th>Guests</th>
-              <th>Status</th>
-              <th>Workflow</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  <strong>{a.title}</strong>
-                  <br />
-                  <small>
-                    {readableLabel(a.activity_type)} ·{" "}
-                    {a.meeting_point || "No meeting point"}
-                  </small>
-                </td>
-                <td>
-                  {formatDateTime(a.starts_at)}
-                  <br />
-                  <small>to {formatTime(a.ends_at)}</small>
-                </td>
-                <td>{a.guide_name || "—"}</td>
-                <td>{a.vehicle_name || "—"}</td>
-                <td>{a.guests.map((g) => g.name).join(", ") || "—"}</td>
-                <td>
-                  <StatusPill value={a.status} />
-                </td>
-                <td>
-                  {canTransition &&
-                  a.can_transition === true &&
-                  next[a.status] ? (
-                    <button
-                      className="button secondary"
-                      onClick={() => update(a.id, next[a.status]!)}
-                    >
-                      {readableLabel(next[a.status]!)}
-                    </button>
-                  ) : (
-                    "—"
-                  )}
-                </td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="ActivitiesPage"
+        defaultView="list"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th>Time</th>
+                <th>Guide</th>
+                <th>Vehicle</th>
+                <th>Guests</th>
+                <th>Status</th>
+                <th>Workflow</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No activities have been scheduled.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    <strong>{a.title}</strong>
+                    <br />
+                    <small>
+                      {readableLabel(a.activity_type)} ·{" "}
+                      {a.meeting_point || "No meeting point"}
+                    </small>
+                  </td>
+                  <td>
+                    {formatDateTime(a.starts_at)}
+                    <br />
+                    <small>to {formatTime(a.ends_at)}</small>
+                  </td>
+                  <td>{a.guide_name || "—"}</td>
+                  <td>{a.vehicle_name || "—"}</td>
+                  <td>{a.guests.map((g) => g.name).join(", ") || "—"}</td>
+                  <td>
+                    <StatusPill value={a.status} />
+                  </td>
+                  <td>
+                    {canTransition &&
+                    a.can_transition === true &&
+                    next[a.status] ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => update(a.id, next[a.status]!)}
+                      >
+                        {readableLabel(next[a.status]!)}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No activities have been scheduled.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

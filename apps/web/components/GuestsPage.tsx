@@ -1,4 +1,7 @@
 "use client";
+import Link from "next/link";
+import { DietaryChips } from "./ui/dietary-chips";
+import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { CountryPicker } from "@/components/ui/country-picker";
@@ -233,56 +236,71 @@ export default function GuestsPage() {
           />
         </Field>
       </div>
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Guest</th>
-              <th>Nationality</th>
-              <th>Current unit</th>
-              <th>Current stay</th>
-              <th>Completed stays</th>
-              <th>Profile</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((g) => (
-              <tr
-                key={g.id}
-                className="clickable"
-                onClick={() => setSelected(g)}
-              >
-                <td>
-                  <button className="linkButton" onClick={() => setSelected(g)}>
-                    {g.name}
-                  </button>
-                  <br />
-                  <small>{g.email || g.phone || "—"}</small>
-                </td>
-                <td>{g.nationality || "—"}</td>
-                <td>{g.current_unit || "—"}</td>
-                <td>
-                  {g.stay_status ? (
-                    <StatusPill value={g.stay_status} />
-                  ) : (
-                    <span>—</span>
-                  )}
-                </td>
-                <td>{g.completed_stays}</td>
-                <td>{g.vip ? <StatusPill value="VIP" /> : "Standard"}</td>
+      <CollectionView
+        loading={loading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="GuestsPage"
+        defaultView="list"
+        showSearch={false}
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Nationality</th>
+                <th>Current unit</th>
+                <th>Current stay</th>
+                <th>Completed stays</th>
+                <th>Profile</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && !error && !list.length && (
-          <div className="empty">No guest profiles found.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {list.map((g) => (
+                <tr
+                  key={g.id}
+                  className="clickable"
+                  onClick={() => setSelected(g)}
+                >
+                  <td>
+                    <button
+                      className="linkButton"
+                      onClick={() => setSelected(g)}
+                    >
+                      {g.name}
+                    </button>
+                    <br />
+                    <small>{g.email || g.phone || "—"}</small>
+                  </td>
+                  <td>{g.nationality || "—"}</td>
+                  <td>{g.current_unit || "—"}</td>
+                  <td>
+                    {g.stay_status ? (
+                      <StatusPill value={g.stay_status} />
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </td>
+                  <td>{g.completed_stays}</td>
+                  <td>{g.vip ? <StatusPill value="VIP" /> : "Standard"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && !error && !list.length && (
+            <div className="empty">No guest profiles found.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {selected && (
         <Drawer onClose={() => setSelected(null)}>
           <div className="drawerHead">
             <div>
-              <h1>{selected.name}</h1>
+              <h1 id="guest-overview">{selected.name}</h1>
               <div className="sub">
                 {selected.nationality || "Nationality not recorded"}
               </div>
@@ -296,6 +314,40 @@ export default function GuestsPage() {
               ×
             </button>
           </div>
+          <div className="profileBadges">
+            {selected.vip && <StatusPill value="VIP" />}
+            {selected.repeat_guest && <StatusPill value="Repeat guest" />}
+          </div>
+          <nav className="profileTabs" aria-label="Guest profile sections">
+            <a href="#guest-overview">Overview</a>
+            <a href="#guest-preferences">Preferences & dietary</a>
+            {access.feature("stays") && access.permission("stays.view") && (
+              <Link href={"/stays?search=" + encodeURIComponent(selected.name)}>
+                Stays
+              </Link>
+            )}
+            {access.feature("guest_requests") &&
+              access.permission("requests.view") && (
+                <Link
+                  href={"/requests?search=" + encodeURIComponent(selected.name)}
+                >
+                  Requests
+                </Link>
+              )}
+            {access.feature("guest_feedback") &&
+              access.permission("feedback.view") && (
+                <Link
+                  href={"/feedback?search=" + encodeURIComponent(selected.name)}
+                >
+                  Feedback
+                </Link>
+              )}
+            <a href="#guest-notes">Notes</a>
+          </nav>
+          <DietaryChips
+            allergies={selected.allergies}
+            dietary={selected.dietary_requirements}
+          />
           <Form
             onSubmit={(event) => {
               event.preventDefault();
@@ -363,6 +415,7 @@ export default function GuestsPage() {
                 }
               />
             </Field>
+            <span id="guest-preferences" className="profileAnchor" />
             <Field label="Dietary requirements">
               <textarea
                 className="textarea"
@@ -399,6 +452,7 @@ export default function GuestsPage() {
                 }
               />
             </Field>
+            <span id="guest-notes" className="profileAnchor" />
             <Field label="Internal notes">
               <textarea
                 className="textarea"

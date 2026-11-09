@@ -1,4 +1,5 @@
 "use client";
+import { UserMenu } from "./ui/user-menu";
 import NotificationBell from "./NotificationBell";
 import Link from "next/link";
 import NavigationEnhancements from "./NavigationEnhancements";
@@ -28,6 +29,7 @@ export default function SuperAdminShell({
 }) {
   const p = usePathname();
   const router = useRouter();
+  const [me, setMe] = useState<any>(null);
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => {
     setNavOpen(false);
@@ -49,6 +51,7 @@ export default function SuperAdminShell({
           router.replace("/settings");
           return;
         }
+        setMe(user);
         setStatus("allowed");
       })
       .catch(() => {
@@ -132,11 +135,7 @@ export default function SuperAdminShell({
           ))}
         </nav>
         <div className="sidebarFooter">
-          <div className="avatar">SA</div>
-          <div>
-            <strong>Super Admin</strong>
-            <small>SafariOS platform owner</small>
-          </div>
+          <UserMenu name={me?.full_name} role="Super Admin" />
         </div>
       </aside>
       <main className="mainArea">
@@ -162,8 +161,9 @@ export default function SuperAdminShell({
           </div>
           <div className="topActions">
             <NotificationBell platform />
-            <ThemeToggle />
-            <SignOutButton />
+            <div className="mobileUserMenu">
+              <UserMenu name={me?.full_name} role="Super Admin" />
+            </div>
           </div>
         </header>
         <div className="content">{children}</div>

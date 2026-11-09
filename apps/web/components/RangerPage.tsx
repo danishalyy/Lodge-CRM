@@ -1,4 +1,7 @@
 "use client";
+import Link from "next/link";
+import { SyncChip } from "./ui/sync-chip";
+import { uiCopy as c } from "@/lib/strings/redesign";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { readableLabel } from "@/lib/strings/content";
 import { formatTime, formatDateTime } from "@/lib/formatting";
@@ -115,39 +118,35 @@ export default function RangerPage() {
             workflow.
           </p>
         </div>
-        {canManage && (
-          <button
-            className="button primary"
-            onClick={() => setOpen(true)}
-            disabled={!data}
-          >
-            Pre-drive checklist
-          </button>
-        )}
+        <SyncChip />
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       {data && (
         <>
-          <div className="metricGrid">
-            <div className="metricCard">
-              <span>Ranger</span>
-              <strong style={{ fontSize: 14 }}>{data.staff.name}</strong>
-            </div>
-            <div className="metricCard">
-              <span>Status</span>
-              <strong style={{ fontSize: 14 }}>
-                {readableLabel(data.staff.operational_status)}
-              </strong>
-            </div>
-            <div className="metricCard">
-              <span>Activities today</span>
-              <strong>{data.activities.length}</strong>
-            </div>
-            <div className="metricCard">
-              <span>Open tasks</span>
-              <strong>{data.tasks.length}</strong>
-            </div>
-          </div>
+          <section className="panel fieldNext">
+            <span className="eyebrow">{c.nextUp}</span>
+            <h2>
+              {data.activities.find(
+                (a) => !["completed", "cancelled"].includes(a.status),
+              )?.title || c.noAssignments}
+            </h2>
+            <p>
+              {data.activities.find(
+                (a) => !["completed", "cancelled"].includes(a.status),
+              )?.vehicle_name || readableLabel(data.staff.operational_status)}
+            </p>
+            {canManage && (
+              <button className="button primary" onClick={() => setOpen(true)}>
+                Pre-drive checklist
+              </button>
+            )}
+          </section>
+          {access.feature("wildlife") &&
+            access.permission("wildlife.manage") && (
+              <Link href="/wildlife?record=1" className="mobileFieldAction">
+                {c.recordSighting}
+              </Link>
+            )}
           <div className="twoCol">
             <section className="panel">
               <div className="panelHeader">

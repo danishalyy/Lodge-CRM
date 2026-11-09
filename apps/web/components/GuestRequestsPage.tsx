@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -31,6 +32,7 @@ const next: Record<string, string | undefined> = {
   waiting: "in_progress",
 };
 export default function GuestRequestsPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("requests.manage");
   const [rows, setRows] = useState<Req[]>([]),
@@ -40,6 +42,7 @@ export default function GuestRequestsPage() {
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    setCollectionLoading(true);
     try {
       const [r, g, d, s] = await Promise.all([
         operationsApi.requests.list<Req[]>(),
@@ -63,6 +66,8 @@ export default function GuestRequestsPage() {
       setStaff(s);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -134,83 +139,94 @@ export default function GuestRequestsPage() {
         </div>
       )}
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Guest</th>
-              <th>Request</th>
-              <th>Team</th>
-              <th>Priority</th>
-              <th>Status</th>
-              <th>Task</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.guest_name}</td>
-                <td>
-                  <strong>{readableLabel(r.request_type)}</strong>
-                  <br />
-                  <small>{r.description}</small>
-                </td>
-                <td>
-                  {r.department_name || "—"}
-                  <br />
-                  <small>{r.assigned_staff_name || "Unassigned"}</small>
-                </td>
-                <td>
-                  <StatusPill value={r.priority} />
-                </td>
-                <td>
-                  <StatusPill value={r.status} />
-                </td>
-                <td>
-                  {r.task_id ? (
-                    "Created"
-                  ) : canManage && access.feature("tasks") ? (
-                    <button
-                      className="button secondary"
-                      onClick={() => createTask(r.id)}
-                    >
-                      Create task
-                    </button>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>
-                  {canManage &&
-                    !["resolved", "cancelled"].includes(r.status) && (
-                      <>
-                        <button
-                          className="button secondary"
-                          onClick={() =>
-                            next[r.status] &&
-                            update(r.id, { status: next[r.status] })
-                          }
-                        >
-                          {next[r.status]?.replaceAll("_", " ") || "Update"}
-                        </button>{" "}
-                        <button
-                          className="button secondary"
-                          onClick={() => resolve(r)}
-                        >
-                          Resolve
-                        </button>
-                      </>
-                    )}
-                </td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="GuestRequestsPage"
+        defaultView="board"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Request</th>
+                <th>Team</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Task</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No guest requests have been recorded.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.guest_name}</td>
+                  <td>
+                    <strong>{readableLabel(r.request_type)}</strong>
+                    <br />
+                    <small>{r.description}</small>
+                  </td>
+                  <td>
+                    {r.department_name || "—"}
+                    <br />
+                    <small>{r.assigned_staff_name || "Unassigned"}</small>
+                  </td>
+                  <td>
+                    <StatusPill value={r.priority} />
+                  </td>
+                  <td>
+                    <StatusPill value={r.status} />
+                  </td>
+                  <td>
+                    {r.task_id ? (
+                      "Created"
+                    ) : canManage && access.feature("tasks") ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => createTask(r.id)}
+                      >
+                        Create task
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    {canManage &&
+                      !["resolved", "cancelled"].includes(r.status) && (
+                        <>
+                          <button
+                            className="button secondary"
+                            onClick={() =>
+                              next[r.status] &&
+                              update(r.id, { status: next[r.status] })
+                            }
+                          >
+                            {next[r.status]?.replaceAll("_", " ") || "Update"}
+                          </button>{" "}
+                          <button
+                            className="button secondary"
+                            onClick={() => resolve(r)}
+                          >
+                            Resolve
+                          </button>
+                        </>
+                      )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No guest requests have been recorded.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

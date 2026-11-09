@@ -37,6 +37,12 @@ async function accountPage(user){
   return {context,page,requests};
 }
 
+async function openAccountMenu(page){
+ const desktop=page.locator('.sidebar .userMenu summary');
+ const control=await desktop.isVisible()?desktop:page.locator('.mobileUserMenu .userMenu summary');
+ if((await control.locator('..').getAttribute('open'))===null)await control.click();
+}
+
 test('lodge account cannot render any platform children',async()=>{
   const {context,page,requests}=await accountPage({id:'lodge-user',is_super_admin:false,mfa_enabled:false,memberships:[]});
   try{
@@ -106,7 +112,7 @@ test('sign out clears the account context and returns to login',async()=>{
     });
     await page.goto(base+'/settings');
     await page.getByRole('heading',{name:'Security settings',exact:true}).waitFor();
-    await page.getByRole('button',{name:'Sign out',exact:true}).click();
+    await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();
     await page.waitForURL(base+'/login');
     assert.equal(expectedUser,'signed-in-user');
     assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('active_user_id'),localStorage.getItem('active_lodge_id')]),[null,null]);
@@ -181,27 +187,27 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(54, 54, 54)');
-  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(23, 23, 23)');
-  assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(54, 54, 54)');
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(23, 24, 28)');
+  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(18, 19, 23)');
+  assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(23, 24, 28)');
   assert.equal(await page.locator('.surfaceBackdrop i').first().evaluate(el=>getComputedStyle(el).display),'none');
-  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(242, 238, 231)');
+  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(240, 236, 226)');
   assert.equal(await page.locator('.propertyCard').count(),0);
-  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(32px) saturate(1.15)');
+  assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'none');
   const primary=page.getByRole('button',{name:/Register lodge/});
-  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(198, 165, 104)',text:'rgb(32, 28, 21)'});
-  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Inter"?(?:,|$)/);
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(196, 160, 103)',text:'rgb(23, 24, 28)'});
+  assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Outfit"?(?:,|$)/);
   assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Inter/);
 
   assert.equal(await page.locator('.sidebar').evaluate(el=>Math.round(el.getBoundingClientRect().left)),0);
   await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
   assert.equal(await page.locator('html').getAttribute('data-sidebar'),'collapsed');
-  assert.equal(await page.evaluate(()=>{const button=document.querySelector('.collapseSidebar').getBoundingClientRect(),mark=document.querySelector('.sidebar .safariMark').getBoundingClientRect();return button.left>=mark.right}),true,'collapsed navigation control must not overlap the brand');
+  assert.equal(await page.evaluate(()=>{const button=document.querySelector('.collapseSidebar').getBoundingClientRect(),mark=document.querySelector('.sidebar .safariMark').getBoundingClientRect();return button.left>=mark.right||button.top>=mark.bottom||button.bottom<=mark.top}),true,'collapsed navigation control must not overlap the brand');
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
-  await page.getByRole('button',{name:'Toggle light and dark theme'}).click();
+  await openAccountMenu(page);await page.getByRole('button',{name:'Toggle light and dark theme'}).click();await page.keyboard.press('Escape');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(245, 243, 239)');
-  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(198, 165, 104)',text:'rgb(32, 28, 21)'});
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(246, 243, 236)');
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(196, 160, 103)',text:'rgb(23, 24, 28)'});
 
   await page.reload();await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
@@ -241,26 +247,26 @@ test('branding validates inline, reduced motion is respected, and glass screensh
   assert.equal(await page.locator('.surfaceBackdrop i').first().evaluate(el=>getComputedStyle(el).animationName),'none');
   fs.mkdirSync(path.resolve(__dirname,'../docs/screenshots'),{recursive:true});
   const capture=async name=>{await page.waitForTimeout(200);await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots',name),fullPage:true,animations:'disabled'})};
-  assert.equal(await page.locator('.collectionToolbar .searchField').evaluate(el=>getComputedStyle(el).borderRadius),'10px');
+  assert.equal(await page.locator('.collectionToolbar .searchField').evaluate(el=>getComputedStyle(el).borderRadius),'12px');
   assert.ok(await page.locator('.collectionToolbar .searchField').evaluate(el=>el.getBoundingClientRect().height<=48));
   await capture('safarios-lodges.png');
   const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
   await page.getByRole('button',{name:'Manage branding',exact:true}).click();
-  assert.equal(await page.locator('.glassOverlay').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(12px)');
+  assert.equal(await page.locator('.glassOverlay').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(8px)');
   assert.equal(await page.locator('.glassDialog .drawer').evaluate(el=>getComputedStyle(el).paddingLeft),'0px');
   await page.getByLabel('Workspace display name').fill('   ');await page.getByRole('button',{name:'Save branding',exact:true}).click();
   await page.getByText('Enter a workspace name.',{exact:true}).waitFor();
   await page.getByLabel('Workspace display name').fill('Acacia River Lodge');await page.getByLabel('Workspace display name').blur();
   await capture('safarios-branding.png');
   await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
-  await page.getByRole('button',{name:'Toggle light and dark theme'}).click();await capture('safarios-lodges-light.png');
+  await openAccountMenu(page);await page.getByRole('button',{name:'Toggle light and dark theme'}).click();await page.keyboard.press('Escape');await capture('safarios-lodges-light.png');
   const lightAudit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(lightAudit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
   await page.setViewportSize({width:390,height:844});await capture('safarios-lodges-mobile.png');
   await page.goto(base+'/login');await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();await capture('safarios-login-mobile.png');
   await page.setViewportSize({width:1440,height:1000});await capture('safarios-login.png');
   const loginAudit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(loginAudit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
   await page.route('**/api/**',route=>{const url=route.request().url();return route.fulfill({json:url.endsWith('/auth/me')?{id:'manager',full_name:'Lodge Manager',email:'manager@example.test',is_super_admin:false,mfa_enabled:false,memberships:[{lodge_id:lodge.id,lodge_name:lodge.name,role:'Lodge Admin',subscription_status:'Active',permissions:['dashboard.view'],entitlements:['dashboard']}]}:url.endsWith('/dashboard')?{lodge:{name:lodge.name},metrics:{guests_in_house:0,arrivals_today:0,open_tasks:0,maintenance_open:0,activities_today:0,transfers_today:0,vehicles_unavailable:0,overdue_tasks:0},attention:[],events:[],subscription:{package:'Premium',status:'Active',expiry_date:'2027-10-20'}}:url.endsWith('/branding')?{display_name:lodge.name,logo_url:null}:[]})});
-  await page.goto(base+'/dashboard');await page.getByRole('heading',{name:lodge.name,exact:true}).waitFor();
+  await page.goto(base+'/dashboard');await page.getByRole('heading',{name:/Good (morning|afternoon|evening), Lodge/}).waitFor();
   await capture('safarios-workspace.png');await page.setViewportSize({width:390,height:844});await capture('safarios-workspace-mobile.png');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
 
@@ -362,7 +368,7 @@ test('locked modules and hidden HR subfeatures avoid forbidden requests; saving 
   });
   await page.goto(base+'/hr');await page.getByRole('heading',{name:'Staff HR',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Roster',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Performance',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Incidents',exact:true}).count(),0);
-  assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),1);
+  await page.getByRole('button',{name:'Safari & Fleet',exact:true}).click();assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),1);
   await page.locator('select[name="staff_id"]').selectOption('staff-1');await page.locator('input[name="start_date"]').fill('2026-11-01');await page.locator('input[name="end_date"]').fill('2026-11-02');
   await page.getByRole('button',{name:'Create request',exact:true}).click();await page.getByText('Leave request created',{exact:true}).waitFor();await page.locator('.taskRow').getByText('Team Member',{exact:true}).waitFor();assert.equal(saved,true);assert.equal(await page.locator('input[name="start_date"]').inputValue(),'');
   await page.goto(base+'/fuel');await page.getByRole('heading',{name:'Available on Standard',exact:true}).waitFor();assert.equal(new URL(page.url()).pathname,'/fuel');assert.equal(disabledCalls,0);
@@ -548,11 +554,12 @@ test('lodge registration defaults dates and searchable timezone, formats errors 
   await page.getByLabel('Time zone',{exact:true}).fill('Not a real zone');await page.getByRole('status').filter({hasText:'No matching time zones'}).waitFor();
   await page.getByLabel('Time zone',{exact:true}).fill('Karachi');await page.getByRole('option',{name:'Asia/Karachi',exact:true}).click();assert.equal(await page.getByLabel('Time zone',{exact:true}).inputValue(),'Asia/Karachi');
   await page.getByLabel('Time zone',{exact:true}).focus();await page.keyboard.press('ArrowDown');assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-expanded'),'true');await page.keyboard.press('Escape');assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-expanded'),'false');await page.getByLabel('Time zone',{exact:true}).click();assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-expanded'),'true');await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),1);
+  await page.getByLabel('Lodge name',{exact:true}).fill('Test River Lodge');
+  await page.getByLabel('Time zone',{exact:true}).fill('Unknown/Region');await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByText('Choose a time zone from the list.',{exact:true}).waitFor();assert.equal(calls,0);
+  await page.getByLabel('Time zone',{exact:true}).fill('Karachi');await page.getByRole('option',{name:'Asia/Karachi',exact:true}).click();await page.getByRole('button',{name:'Continue',exact:true}).click();
   const start=await page.getByLabel('Start date',{exact:true}).inputValue(),expiry=await page.getByLabel('Expiry date',{exact:true}).inputValue();assert.ok(start);assert.equal(Number(expiry.slice(0,4)),Number(start.slice(0,4))+1);
   await page.getByLabel('Package',{exact:true}).selectOption('Standard');await page.getByText('Expanded lodge workflows, departments, staff HR, feedback and operational coordination.',{exact:true}).waitFor();
-  await page.getByLabel('Lodge name',{exact:true}).fill('Test River Lodge');await page.getByLabel('Full name',{exact:true}).fill('Lodge Owner');await page.getByLabel('Email address',{exact:true}).fill('owner@example.com');
-  await page.getByLabel('Time zone',{exact:true}).fill('Unknown/Region');await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByText('Choose a time zone from the list.',{exact:true}).waitFor();assert.equal(calls,0);assert.equal(await page.getByLabel('Time zone',{exact:true}).getAttribute('aria-invalid'),'true');
-  await page.getByLabel('Time zone',{exact:true}).fill('Karachi');await page.keyboard.press('Enter');
+  await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByLabel('Full name',{exact:true}).fill('Lodge Owner');await page.getByLabel('Email address',{exact:true}).fill('owner@example.com');
   await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByText('Enter a valid email address.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Email address',{exact:true}).getAttribute('aria-invalid'),'true');
   await page.getByLabel('Email address',{exact:true}).fill('newowner@example.com');await page.getByRole('button',{name:'Register lodge',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Lodge registered',{exact:true}).waitFor();assert.equal(created.package,'Standard');assert.equal(created.start_date,start);assert.equal(created.timezone,'Asia/Karachi');
  }finally{await context.close()}
@@ -591,6 +598,7 @@ test('premium shared surfaces stay accessible at all requested widths and both t
  const lodges={id:'visual-admin',full_name:'Visual Admin',is_super_admin:true,mfa_enabled:true,memberships:[]};
  const {context,page}=await accountPage(lodges);
  try{
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:1000});await page.addInitScript(theme=>localStorage.setItem('theme',theme),theme);
    await page.goto(base+'/super-admin/lodges');await page.getByRole('button',{name:'+ Register lodge',exact:true}).click();await page.getByLabel('Lodge name',{exact:true}).waitFor();
@@ -598,7 +606,7 @@ test('premium shared surfaces stay accessible at all requested widths and both t
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`page overflow at ${width}/${theme}`);
    const dialog=page.getByRole('dialog');const box=await dialog.boundingBox();assert.ok(box&&box.x>=-1&&box.x+box.width<=width+1,`dialog overflow at ${width}/${theme}`);
    await dialog.evaluate(el=>{const controls=[...el.querySelectorAll('button,input,select,textarea,a[href]')].filter(x=>!x.disabled&&x.tabIndex>=0&&x.getClientRects().length);controls[controls.length-1].focus()});await page.keyboard.press('Tab');assert.ok(await dialog.evaluate(el=>el.contains(document.activeElement)),'dialog must trap keyboard focus');
-   const submitBox=await page.getByRole('button',{name:'Register lodge',exact:true}).boundingBox();assert.ok(submitBox&&submitBox.y>=0&&submitBox.y+submitBox.height<=1001,`sticky action offscreen at ${width}/${theme}`);
+   const submitBox=await page.getByRole('button',{name:'Continue',exact:true}).boundingBox();assert.ok(submitBox&&submitBox.y>=0&&submitBox.y+submitBox.height<=1001,`sticky action offscreen at ${width}/${theme}`);
    const material=await dialog.evaluate(el=>({radius:parseFloat(getComputedStyle(el).borderTopLeftRadius),blur:getComputedStyle(el).backdropFilter}));assert.ok(material.radius>=24);assert.match(material.blur,/blur/);
    await page.getByLabel('Lodge name',{exact:true}).focus();await page.screenshot({path:path.join(web,`../../docs/screenshots/safarios-registration-${width}-${theme}.png`),fullPage:true});
    if(width===375||width===1440){const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`registration accessibility at ${width}/${theme}`)}
@@ -643,7 +651,7 @@ test('role preset copy edits, staff assignment and deactivation use server metad
    if(path.endsWith('/staff'))return r.fulfill({json:[{id:'staff-1',full_name:'Test Worker',phone:'',job_title:'',employment_status:'active',operational_status:'available',has_login:true,custom_role_id:assigned,custom_role_name:assigned?roles[0].name:null}]});
    return r.fulfill({json:[]});
   });
-  await page.goto(base+'/roles');await page.getByRole('button',{name:'Duplicate and customise',exact:true}).click();await page.getByLabel('Role name',{exact:true}).fill('Task colleague');assert.equal(await page.getByLabel('Tasks',{exact:true}).inputValue(),'view');await page.getByRole('button',{name:'Create custom role',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.goto(base+'/roles');await page.getByRole('button',{name:'Duplicate and customise',exact:true}).click();await page.getByLabel('Role name',{exact:true}).fill('Task colleague');assert.equal(await page.getByRole('button',{name:'Tasks: Can view',exact:true}).getAttribute('aria-pressed'),'true');await page.getByRole('button',{name:'Create custom role',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Role name',{exact:true}).fill('Task collaborator');await page.getByRole('button',{name:'Save role',exact:true}).click();await page.getByRole('button',{name:'Save role',exact:true}).last().click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(updates,1);
   await page.goto(base+'/staff');await page.getByRole('button',{name:'Edit staff access',exact:true}).click();await page.getByLabel('Custom role (optional)',{exact:true}).selectOption('role-1');await page.getByRole('button',{name:'Save role',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(assigned,'role-1');
   await page.goto(base+'/roles');await page.getByText('1 staff use this role',{exact:false}).waitFor();await page.getByRole('button',{name:'Deactivate',exact:true}).click();await page.getByText('This changes access for 1 people immediately.',{exact:false}).waitFor();await page.getByRole('button',{name:'Deactivate',exact:true}).last().click();await page.getByRole('button',{name:'Reactivate',exact:true}).waitFor();assert.equal(assigned,null);
@@ -673,7 +681,7 @@ test('AI outage shows a real unavailable state while core navigation works',asyn
  try{
   await page.route('**/api/v1/lodges/ai-lodge/ai/status',r=>r.fulfill({json:{state:'unavailable',provider:'vllm',scope:{lodge_id:'ai-lodge',lodge_name:'AI Lodge'},tools:[]}}));
   await page.goto(base+'/lodge-ai');await page.getByRole('heading',{name:'Lodge AI is unavailable',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).count(),0);
-  await page.getByRole('link',{name:'Tasks',exact:true}).click();await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Today',exact:true}).click();await page.getByRole('link',{name:'Tasks',exact:true}).click();await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();
  }finally{await context.close()}
 });
 
@@ -689,7 +697,7 @@ test('AI workspace sends a scoped question and displays server provenance',async
   await page.goto(base+'/lodge-ai');await page.getByRole('button',{name:'Which tasks are overdue?',exact:true}).click();assert.equal(await page.getByLabel('Your question',{exact:true}).inputValue(),'Which tasks are overdue?');
   await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByText('Test fixture summary of approved tasks.',{exact:true}).waitFor();assert.equal(sent.content,'Which tasks are overdue?');
   await page.getByText('Sources checked',{exact:true}).click();await page.locator('.aiMessage li').getByText(/Tasks/).waitFor();assert.equal(await page.getByText('Record created',{exact:true}).count(),0);await page.getByText(/Recorded event 4bd39b56-5b8a-4ac4-ac6c-e317b02fe648/).waitFor();await page.getByText(/History period:/).waitFor();await page.getByText(/Limited coverage/).waitFor();await page.getByText(/Approved document: Emergency SOP/).waitFor();await page.getByText(/Page 1.*Passage 8431a2a9/).waitFor();
-  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-ai-${width}-${theme}.png`,fullPage:true});}
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-ai-${width}-${theme}.png`,fullPage:true});}
   revoked=true;await page.getByLabel('Your question',{exact:true}).fill('Check again');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByRole('alert').filter({hasText:'Your AI access was revoked'}).waitFor();assert.equal(await page.getByText('Test fixture summary of approved tasks.',{exact:true}).count(),0);
  }finally{await context.close()}
 });
@@ -716,7 +724,7 @@ test('knowledge documents upload privately, process, share and remove with scope
   await page.getByRole('dialog').getByRole('button',{name:'Upload document',exact:true}).click();await page.getByText('Document uploaded',{exact:true}).waitFor();assert.ok(uploaded);await page.getByRole('heading',{name:'Emergency SOP',exact:true}).waitFor();
   await page.getByRole('button',{name:'Process document',exact:true}).click();await page.getByText('Document processing queued',{exact:true}).waitFor();assert.ok(processed);await page.getByRole('button',{name:'Download document',exact:true}).waitFor();
   await page.getByRole('button',{name:'Change sharing',exact:true}).click();await page.getByRole('dialog').getByLabel('Who can read this?',{exact:true}).selectOption('lodge');await page.getByRole('button',{name:'Save sharing',exact:true}).click();await page.getByText('Document sharing updated',{exact:true}).waitFor();assert.ok(shared);
-  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`/tmp/safarios-knowledge-${width}-${theme}.png`,fullPage:true});}
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`/tmp/safarios-knowledge-${width}-${theme}.png`,fullPage:true});}
   denied=true;await page.getByRole('button',{name:'Change sharing',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Save sharing',exact:true}).click();await page.getByRole('alert').filter({hasText:'Document access changed'}).waitFor();assert.equal(await page.getByRole('dialog').count(),0);assert.equal(await page.getByRole('heading',{name:'Emergency SOP',exact:true}).count(),0);denied=false;await page.getByRole('button',{name:'Refresh documents',exact:true}).click();await page.getByRole('heading',{name:'Emergency SOP',exact:true}).waitFor();
   await page.getByRole('button',{name:'Remove document',exact:true}).click();await page.getByRole('dialog').getByRole('heading',{name:/Remove this document/}).waitFor();await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);assert.equal(removed,false);
   await page.getByRole('button',{name:'Remove document',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Remove document',exact:true}).click();await page.getByText('Document removed',{exact:true}).waitFor();assert.ok(removed);await page.getByText('No documents are visible to your account.',{exact:true}).waitFor();
@@ -740,7 +748,7 @@ test('Group Owner AI opens explicit group scope, shows property sources and clea
   });
   await page.goto(base+'/group');await page.getByRole('button',{name:'Compare lodges with AI',exact:true}).click();await page.getByRole('heading',{name:'Ask Group Owner AI',exact:true}).waitFor();assert.match(page.url(),/scope=group/);await page.locator('.aiGroupScope > summary').click();await page.getByText('Included lodges: Acacia Lodge, River Lodge',{exact:true}).waitFor();await page.getByText(/1 assigned lodge is excluded/).first().waitFor();await page.locator('.aiGroupScope > summary').click();
   await page.getByRole('button',{name:'Which of my lodges has the most overdue tasks?',exact:true}).click();await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByText('Test fixture: River Lodge has five overdue tasks; Acacia Lodge has two.',{exact:true}).waitFor();assert.ok(created);await page.getByText('Sources checked',{exact:true}).click();await page.locator('.aiMessage li').getByText(/River Lodge.*Africa\/Johannesburg/).waitFor();await page.getByText('Metric coverage',{exact:true}).click();await page.getByText(/Overdue tasks: Acacia Lodge, River Lodge/i).waitFor();
-  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`/tmp/safarios-group-ai-${width}-${theme}.png`,fullPage:true});}
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`/tmp/safarios-group-ai-${width}-${theme}.png`,fullPage:true});}
   revoked=true;await page.getByLabel('Your question',{exact:true}).fill('Compare again');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByRole('alert').filter({hasText:/Group access changed/}).waitFor();assert.equal(await page.getByText('Test fixture: River Lodge has five overdue tasks; Acacia Lodge has two.',{exact:true}).count(),0);
  }finally{await context.close()}
 });
@@ -845,7 +853,7 @@ test('private AI reports schedule, queue, read, download and clear revoked conte
   await page.getByRole('button',{name:'Generate now',exact:true}).click();await page.getByText('Report queued',{exact:true}).waitFor();await page.getByRole('status').filter({hasText:'Queued'}).waitFor();assert.equal(queued,1);
   runs=[{...runs[0],status:'complete',generated_at:detail.generated_at}];await page.getByRole('button',{name:'Refresh reports',exact:true}).click();await page.getByRole('button',{name:'Open report',exact:true}).click();await page.getByRole('heading',{name:'Priorities',exact:true}).waitFor();await page.getByText('Sources checked',{exact:true}).click();await page.getByText(/Operational overview/).waitFor();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download report',exact:true}).click();assert.match((await download).suggestedFilename(),/^SafariOS-daily-/);
-  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-report-${width}-${theme}.png`,fullPage:true});}
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);await page.screenshot({path:`/tmp/safarios-report-${width}-${theme}.png`,fullPage:true});}
   denied=true;await page.getByRole('button',{name:'Download report',exact:true}).click();await page.getByRole('alert').filter({hasText:/Your access changed/}).waitFor();assert.equal(await page.getByText('Test fixture: three overdue tasks need review.',{exact:true}).count(),0);
  }finally{await context.close()}
 });
@@ -882,11 +890,12 @@ test('guest profile occasions and private communication log use guarded forms',a
   await page.getByRole('button',{name:'Record interaction',exact:true}).click();await page.getByText('Guest interaction recorded',{exact:true}).waitFor();await page.getByRole('heading',{name:'Arrival confirmation',exact:true}).waitFor();
   await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:'theme',newValue:'light'})));await page.getByRole('heading',{name:'Arrival confirmation',exact:true}).waitFor();
   assert.match(logged.client_reference,/^[0-9a-f-]{36}$/);assert.deepEqual(Object.keys(logged).sort(),['channel','client_reference','direction','message','subject']);
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:1000});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;localStorage.setItem('theme',theme)},theme);
    await page.waitForTimeout(450);await page.getByRole('heading',{name:'Communication history',exact:true}).scrollIntoViewIfNeeded();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`guest overflow ${width}/${theme}`);
-   const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(axe.violations.map(v=>v.id),[],`guest accessibility ${width}/${theme}`);
+   const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[],`guest accessibility ${width}/${theme}`);
    if(width===375||width===1440)await page.screenshot({path:`/tmp/safarios-guest-profile-${width}-${theme}.png`,fullPage:true});
   }
   await page.setViewportSize({width:375,height:1000});await page.waitForTimeout(450);assert.equal(await page.getByRole('dialog').evaluate(el=>getComputedStyle(el,'::after').display),'none');
@@ -923,6 +932,7 @@ test('task assignment, linked work and lifecycle history use guarded accessible 
   await page.getByRole('button',{name:'Inspect Cruiser',exact:true}).click();await page.getByRole('heading',{name:'Task history',exact:true}).waitFor();await page.getByRole('heading',{name:'Lifecycle timing',exact:true}).waitFor();await page.getByText('Cruiser 02',{exact:true}).first().waitFor();
   await page.getByLabel('Assign staff',{exact:true}).selectOption('staff-2');await page.getByRole('button',{name:'Save task details',exact:true}).click();await page.getByText('Assigned to: Lerato → Sipho',{exact:true}).waitFor();assert.equal(updated.assigned_staff_id,'staff-2');
   await page.getByLabel('Vehicle',{exact:true}).selectOption('');await page.getByLabel('Maintenance ticket',{exact:true}).selectOption('');await page.getByRole('button',{name:'Save task details',exact:true}).click();await page.getByText('Task updated',{exact:true}).first().waitFor();assert.equal(updated.vehicle_id,null);assert.equal(updated.maintenance_ticket_id,null);
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);await page.getByRole('heading',{name:'Task history',exact:true}).scrollIntoViewIfNeeded();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`task overflow ${width}/${theme}`);
@@ -1008,14 +1018,15 @@ test('premium dashboard uses the acacia brand and accurate task health without u
   const today=new Date().toISOString().slice(0,10);
   await page.route('**/api/v1/lodges/premium-lodge/dashboard',r=>r.fulfill({json:{lodge:{name:'Ndlovu House'},metrics:{guests_in_house:1,arrivals_today:1,open_tasks:restricted?null:5,overdue_tasks:restricted?null:2,maintenance_open:1,activities_today:1,transfers_today:1,vehicles_unavailable:restricted?null:1},attention:[{title:'Room readiness',detail:'One room needs an inspection',priority:'high'}],events:[],subscription:{status:'Active',package:'Premium',expiry_date:'2027-11-09'}}}));
   for(const [key,value] of Object.entries({rooms:[{id:'room-1',name:'Suite 01',status:'ready'}],guests:[{id:'guest-1',name:'Test guest'}],staff:[{id:'staff-1',full_name:'Maya Laurent',has_login:true}],stays:[{id:'stay-1',guest_name:'Test guest',arrival_date:today,departure_date:today,status:'in_house'}],activities:[{id:'drive-1',title:'Morning game drive',starts_at:today+'T06:00:00Z',ends_at:today+'T08:00:00Z',status:'scheduled'}]}))await page.route('**/api/v1/lodges/premium-lodge/'+key,r=>r.fulfill({json:value}));
+  await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:1000});await page.goto(base+'/dashboard');await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.getByRole('img',{name:'On track: 60%',exact:true}).waitFor();
-   assert.equal(await page.locator('.premiumMetric').count(),8);assert.equal(await page.locator('.safariBrand[aria-label="SafariOS"] svg path').count()>0,true);
+   assert.equal(await page.locator('.premiumMetric').count(),4);assert.equal(await page.locator('.safariBrand[aria-label="SafariOS"] svg path').count()>0,true);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`dashboard ${width}/${theme}`);
    await page.waitForTimeout(600);await page.screenshot({path:`/tmp/safarios-premium-dashboard-${width}-${theme}.png`,fullPage:true});
   }
-  restricted=true;await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'Ndlovu House',exact:true}).waitFor();await page.waitForTimeout(150);assert.equal(await page.locator('.premiumMetric').count(),5);assert.equal(await page.getByRole('heading',{name:'Task health',exact:true}).count(),0);
+  restricted=true;await page.goto(base+'/dashboard');await page.getByRole('heading',{name:/Good (morning|afternoon|evening), Maya/}).waitFor();await page.waitForTimeout(150);assert.equal(await page.locator('.premiumMetric').count(),4);assert.equal(await page.locator('.commandMetrics').getByText('Unavailable',{exact:true}).count(),2);assert.equal(await page.getByRole('heading',{name:'Task health',exact:true}).count(),0);
   await page.setViewportSize({width:844,height:390});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'landscape overflow');
   await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.safariBrand').evaluate(el=>getComputedStyle(el).animationName),'none');
  }finally{await context.close()}
@@ -1093,4 +1104,65 @@ test('revoking lookup access closes the editor and discards a late staff respons
   release();await page.waitForTimeout(200);
   assert.equal(await page.getByText('Private staff from previous access',{exact:true}).count(),0);assert.equal(staffRequests,1);
  }finally{release?.();await context.close()}
+});
+
+test('canvas record views search, filter, save and review existing authorized records without writes',async()=>{
+ const user=premiumTestAccount();user.memberships[0].permissions=['vehicles.view'];
+ const {context,page}=await accountPage(user);const writes=[];
+ try{
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/vehicles',r=>{if(r.request().method()!=='GET')writes.push(r.request().method());return r.fulfill({json:[{id:'v1',name:'Vehicle 01',registration:'NDL 01',make:'Toyota',model:'Cruiser',odometer_km:1000,status:'ready',notes:''},{id:'v2',name:'Vehicle 02',registration:'NDL 02',make:'Toyota',model:'Cruiser',odometer_km:2000,status:'maintenance',notes:''}]})});
+  await page.goto(base+'/fleet');const collection=page.locator('[data-collection="FleetPage"]');await collection.locator('.recordCard').first().waitFor();assert.equal(await collection.locator('.recordCard').count(),2);
+  await page.getByRole('searchbox',{name:'Search records',exact:true}).fill('Vehicle 01');assert.equal(await collection.locator('.recordCard').count(),1);
+  await page.getByRole('combobox',{name:'Saved views',exact:true}).selectOption('save');
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await collection.locator('.recordCard').count(),2);
+  await page.getByRole('combobox',{name:'Saved views',exact:true}).selectOption('saved');assert.equal(await collection.locator('.recordCard').count(),1);
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();await page.getByRole('combobox',{name:'All statuses',exact:true}).selectOption('ready');assert.equal(await collection.locator('.recordCard').count(),1);
+  await collection.getByRole('checkbox').check();await page.getByRole('button',{name:'Review selected',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByText('Vehicle 01',{exact:true}).waitFor();assert.equal(await page.getByRole('dialog').getByRole('combobox',{name:'Status',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Close details',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Board',exact:true}).click();assert.equal(await collection.locator('.recordCard').count(),1);await page.getByRole('button',{name:'List',exact:true}).click();assert.equal(await collection.locator('tbody tr').count(),1);assert.deepEqual(writes,[]);
+ }finally{await context.close()}
+});
+
+test('canvas navigation persists collapsed groups and keeps the active group open',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());
+ try{
+  await premiumFixtures(page);await page.goto(base+'/fleet');await page.getByRole('heading',{name:'Fleet',exact:true}).waitFor();
+  const guests=page.getByRole('button',{name:'Guests',exact:true}),safari=page.getByRole('button',{name:'Safari & Fleet',exact:true});
+  assert.equal(await guests.getAttribute('aria-expanded'),'false');assert.equal(await safari.getAttribute('aria-expanded'),'true');
+  await guests.click();await page.reload();await page.getByRole('heading',{name:'Fleet',exact:true}).waitFor();assert.equal(await guests.getAttribute('aria-expanded'),'true');
+  await safari.click();assert.equal(await safari.getAttribute('aria-expanded'),'true');
+  await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();assert.equal(await safari.getAttribute('aria-expanded'),'true');
+ }finally{await context.close()}
+});
+
+test('canvas MFA visual digit cells preserve the existing OTP submission contract',async()=>{
+ const {context,page}=await accountPage({id:'otp-canvas',full_name:'User',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'otp-lodge',permissions:['tasks.view'],entitlements:['tasks']}]});let sent;
+ try{
+  await page.route('**/api/v1/auth/login',r=>{sent=r.request().postDataJSON();return sent.otp?r.fulfill({json:{ok:true}}):r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}})});
+  await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('owner@example.com');await page.getByLabel('Password',{exact:true}).fill('Secure-test-passphrase');await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByLabel('Authenticator code',{exact:true}).fill('123456');assert.equal(await page.locator('.codeInputBoxes span').count(),6);assert.deepEqual(await page.locator('.codeInputBoxes span').allTextContents(),['1','2','3','4','5','6']);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL('**/tasks');assert.equal(sent.otp,'123456');assert.equal(sent.recovery_code,undefined);
+ }finally{await context.close()}
+});
+
+test('canvas task calendar opens the existing protected task detail without write controls',async()=>{
+ const user=premiumTestAccount();user.memberships[0].permissions=['tasks.view'];
+ const {context,page}=await accountPage(user);const writes=[];
+ try{
+  await premiumFixtures(page);const due=new Date();due.setHours(12,0,0,0);
+  await page.route('**/api/v1/lodges/premium-lodge/tasks**',r=>{const p=new URL(r.request().url()).pathname;if(r.request().method()!=='GET')writes.push(r.request().method());if(p.endsWith('/tasks'))return r.fulfill({json:[{id:'calendar-task',title:'Inspect Unit 4',description:'Room inspection',status:'assigned',priority:'high',due_at:due.toISOString(),can_transition:false}]});if(p.endsWith('/history'))return r.fulfill({json:{items:[],has_more:false,timing:{}}});return r.fulfill({json:[]})});
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.locator('.calendarAgenda').getByRole('button',{name:'Inspect Unit 4',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByRole('heading',{name:'Inspect Unit 4',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'+ Task',exact:true}).count(),0);assert.deepEqual(writes,[]);
+ }finally{await context.close()}
+});
+
+test('canvas wildlife shows real scoped pending records while offline without issuing a write',async()=>{
+ const user=premiumTestAccount();user.memberships[0].permissions=['wildlife.view','wildlife.manage'];user.memberships[0].entitlements.push('offline_mobile');
+ const {context,page}=await accountPage(user);const writes=[];
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/wildlife',r=>{if(r.request().method()!=='GET')writes.push(r.request().method());return r.fulfill({json:[]})});
+  await page.goto(base+'/wildlife');await page.getByRole('heading',{name:'Wildlife sightings',exact:true}).waitFor();await context.setOffline(true);
+  await page.getByRole('button',{name:'+ Sighting',exact:true}).click();await page.getByLabel('Species',{exact:true}).fill('Elephant');await page.getByLabel('Observed at',{exact:true}).fill('2026-11-10T09:00');await page.getByRole('button',{name:'Save offline',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.locator('.queuedRecord').getByRole('heading',{name:'Elephant',exact:true}).waitFor();assert.equal(await page.locator('.queuedRecord').getByText('Waiting to sync',{exact:true}).count(),1);assert.deepEqual(writes,[]);
+ }finally{await context.setOffline(false);await context.close()}
 });

@@ -1,27 +1,23 @@
-# SafariOS accepted design master
+# SafariOS Premium UI master
 
-Owner-approved direction: premium minimalist operational software. This master synthesizes the installed UI/UX Pro Max Minimalism & Swiss guidance with the actual SafariOS reference. User decisions take precedence over generated search recommendations.
+Source: owner-supplied SafariOS UI UX Redesign Spec.md and 43-page Premium UI Redesign PDF, reviewed 10 November 2026. These supersede the old #363636/#171717 visual reference. The original text is retained in docs/requirements/ui-reference. This is a visual specification; API contracts, data scopes, entitlements, MFA and tenant isolation remain authoritative.
 
-## Palette and identity
+## Material and type
 
-Dark canvas #363636; navigation #171717; warm ivory #F2EEE7; matte gold #C6A568. Light canvas #F5F3EF, navigation #EEEBE5, text #29251E. Gold-filled buttons use #201C15 text. Small reading accents use #DFC899 dark / #70532D light; the light wordmark uses #846437. Use semantic status colours from reference-theme.css. No purple, colourful mesh, metallic gradient or decorative glow.
+Dark: canvas #17181C, nav #121317, surface #1E2026, nested #25272E, text #F0ECE2, secondary #A8A59B. Light: #F6F3EC, #EFEBE2, #FFFFFF, #F1EDE3, text #1C1D21 and secondary #5B5A55. Gold #C4A067, reading gold #D8BB86 dark / #7A5C2C light, on-gold #17181C. Status colours come from the supplied semantic tokens.
 
-Use SafariBrand’s acacia/savannah SVG adaptation of the owner-provided logo. Preserve authorized lodge logos alongside SafariOS. Never imply the hand-coded adaptation is the supplied original vector artwork.
+Outfit 500 headings and figures, Inter 400/500/600 UI, locally bundled. Title 34/28px, card title18px, labels11px with .14em tracking, body14px, tables13px, figures44/36px. Cards20px radius, controls12px, overlays28px, chips99px. Solid surfaces, no card shadows/lift, no gradients. Blur/shadow only on overlays, reduced-motion support and visible contrast-safe focus.
 
-## Hierarchy and material
+## Composition
 
-Locally bundled Inter 400/500/600. Titles 30px desktop / 26px mobile, card headings 16px, body 14px, key numbers 36px with tabular figures. Quiet spacing and readable density, rather than marketing-page hero sections. Cards 24px radius/padding, dialogs 28px radius, buttons/inputs 12px radius. Section spacing 32px and card gaps 24px; mobile gaps 16px. Shared controls provide 44px targets where applicable.
+Grouped sidebar: Today, Guests, Operations, Safari & Fleet, People, Insight. Keep all authorized existing routes, locked package review screens and Group Admin switching. Pin AI and the user menu. Desktop sidebar260px/rail72px and topbar64px. Mobile uses a role-aware bottom bar and the existing focus-managed drawer.
 
-Glass uses neutral translucent fills, blur(32px) saturate(115%), restrained borders/shadows, a Safari prefix and solid fallback. Text remains sharp. Respect reduced motion. Do not animate tables or create decorative card lift.
+Command Centre: personal greeting, one authorized primary action, four authoritative KPIs (unknown remains unavailable), a real today timeline and attention list, then task health/memory and collapsed calendar/subscription. Use existing permitted data; never generate example guests, telemetry, alerts, dietary data or staffing totals.
 
-## Interaction and future components
+Lists reuse CollectionView and TableScroll for local search/status filters, saved presentation, list/cards/board views and detail drawers. Existing field/action permissions and mutations stay in their owning modules. Native field screens prioritize assigned work and permitted actions.
 
-Reuse components/ui and existing guarded shells. Use TableScroll for wide tables, connected field labels, visible focus, inline error messages and real success feedback. Dialogs/drawers retain focus management and mobile behavior. Every data view needs loading, empty and recoverable error states. Preserve RLS, permissions, MFA, audit and subscription checks. Never fabricate operational figures or show unavailable values as zero. Keep new strings in lib/strings.
+## Security precedence
 
-Validate responsive layouts at 375, 768, 1366 and 1440px, both themes; check keyboard scrolling, dialog flow and accessible contrast. Automated fixture checks supplement manual review and do not certify all accessibility or live integrations.
+The source's reference to a Super Admin acting inside a lodge conflicts with the owner's explicit platform-only requirement. Do not implement it. Platform accounts never enter lodge/group operational routes. Real lodge branding remains alongside SafariOS. Live maps/telemetry and other unimplemented capabilities remain unavailable. Do not add unsupported controls or new API contracts to imitate a reference screenshot.
 
-## Source and scope
-
-Skill: nextlevelbuilder/ui-ux-pro-max-skill, commit 4f2dbb67e64969a9a30ab00742f2d55d66ddec2b, MIT; installed in .agents/skills/ui-ux-pro-max. Reviewed Minimalism & Swiss, enterprise dashboard, focus visibility, chip labels and responsive grid guidance. Generic blue/orange palettes, restaurant typography, marketing testimonials and framework upgrade suggestions were rejected as inappropriate for this existing application.
-
-Implementation: apps/web/app/reference-theme.css, app/design-system.css, tailwind.config.ts and shared components. Detailed specification: docs/UI_UX_DESIGN_SYSTEM.md.
+See docs/UI_UX_DESIGN_SYSTEM.md for implementation and docs/ROLE_CONTROLS_DELIVERY.md for protected access behavior.

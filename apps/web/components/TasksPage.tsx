@@ -1,4 +1,8 @@
 "use client";
+import { OperationsCalendar } from "./DataViz";
+import { dateInputValue } from "@/lib/formatting";
+import { CollectionView } from "@/components/ui/collection-view";
+import { uiCopy as ui } from "@/lib/strings/redesign";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -36,7 +40,12 @@ type Task = {
   maintenance_ticket_id?: string | null;
   can_transition?: boolean;
 };
-type Staff = { id: string; full_name: string; employment_status: string };
+type Staff = {
+  user_id?: string;
+  id: string;
+  full_name: string;
+  employment_status: string;
+};
 type Department = { id: string; name: string; is_active: boolean };
 type Room = { id: string; name: string };
 type Guest = { id: string; name: string };
@@ -47,6 +56,13 @@ const next: Record<string, string | undefined> = {
   started: "completed",
 };
 export default function TasksPage() {
+  const [calendarView, setCalendarView] = useState(false);
+  const [taskFilter, setTaskFilter] = useState(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(location.search).get("status") === "overdue"
+      ? "overdue"
+      : "all",
+  );
   const access = useWorkspaceAccess();
   const attachmentsEnabled = access.feature("task_attachments");
   const [rows, setRows] = useState<Task[]>([]),
@@ -383,6 +399,23 @@ export default function TasksPage() {
     }
   }
 
+  useEffect(() => {
+    if (canManage && new URLSearchParams(location.search).get("create") === "1")
+      setOpen(true);
+  }, [canManage]);
+  const visibleTasks = rows.filter((r) =>
+    taskFilter === "overdue"
+      ? !!r.due_at &&
+        new Date(r.due_at) < new Date() &&
+        !["completed", "cancelled"].includes(r.status)
+      : taskFilter === "mine"
+        ? staff.some(
+            (s) =>
+              s.user_id === getActiveUserId() && s.id === r.assigned_staff_id,
+          ) ||
+          (!canManage && Boolean(r.can_transition))
+        : true,
+  );
   return (
     <>
       <div className="pageHeader">
@@ -409,65 +442,135 @@ export default function TasksPage() {
         </div>
       )}
       {loading && <p role="status">{copy.loadingTasks}</p>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Task</th>
-              <th>Department</th>
-              <th>Assignee</th>
-              <th>Priority</th>
-              <th>Due</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <button className="linkButton" onClick={() => openTask(r)}>
-                    <strong>{r.title}</strong>
-                  </button>
-                  <br />
-                  <small>
-                    {r.recurrence_interval_days
-                      ? `Repeats every ${r.recurrence_interval_days} days`
-                      : r.description || "—"}
-                  </small>
-                </td>
-                <td>{r.department_name || "—"}</td>
-                <td>{r.assigned_staff_name || "Unassigned"}</td>
-                <td>
-                  <StatusPill value={r.priority} />
-                </td>
-                <td>{r.due_at ? formatDateTime(r.due_at) : "—"}</td>
-                <td>
-                  <StatusPill value={r.status} />
-                </td>
-                <td>
-                  {next[r.status] && mayProgress(r) && (
-                    <button
-                      className="button secondary"
-                      disabled={busy}
-                      onClick={() =>
-                        r.status === "created"
-                          ? openTask(r)
-                          : update(r.id, { status: next[r.status] })
-                      }
-                    >
-                      {readableLabel(next[r.status]!)}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && !error && !rows.length && (
-          <div className="empty">No tasks have been created.</div>
-        )}
-      </TableScroll>
+      <div className="filterBar">
+        <div className="viewSwitcher">
+          {[
+            ["all", ui.taskTabs[0]],
+            ["mine", ui.taskTabs[1]],
+            ["overdue", ui.taskTabs[2]],
+          ].map(([key, label]) => (
+            <button
+              type="button"
+              key={key}
+              aria-pressed={taskFilter === key}
+              onClick={() => setTaskFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="filterBar">
+        <button
+          type="button"
+          className="button secondary"
+          aria-pressed={calendarView}
+          onClick={() => setCalendarView((value) => !value)}
+        >
+          {ui.calendar}
+        </button>
+      </div>
+      {calendarView ? (
+        <section className="panel">
+          <OperationsCalendar
+            events={visibleTasks
+              .filter((task) => task.due_at)
+              .map((task) => ({
+                date: dateInputValue(new Date(task.due_at!)),
+                label: task.title,
+                kind: "other" as const,
+                onSelect: () => {
+                  void openTask(task);
+                },
+              }))}
+          />
+        </section>
+      ) : (
+        <CollectionView
+          loading={loading}
+          error={Boolean(error)}
+          onRetry={() => {
+            setError("");
+            void load();
+          }}
+          name="TasksPage"
+          defaultView={
+            [
+              "general_staff",
+              "ranger",
+              "driver",
+              "housekeeping",
+              "maintenance",
+              "fb",
+            ].includes(access.roleKey || "")
+              ? "cards"
+              : "list"
+          }
+        >
+          <TableScroll as="section" className="panel tableWrap">
+            <table className="dataTable">
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Department</th>
+                  <th>Assignee</th>
+                  <th>Priority</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTasks.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <button
+                        className="linkButton"
+                        onClick={() => openTask(r)}
+                      >
+                        <strong>{r.title}</strong>
+                      </button>
+                      <br />
+                      <small>
+                        {r.recurrence_interval_days
+                          ? `Repeats every ${r.recurrence_interval_days} days`
+                          : r.description || "—"}
+                      </small>
+                    </td>
+                    <td>{r.department_name || "—"}</td>
+                    <td>{r.assigned_staff_name || "Unassigned"}</td>
+                    <td>
+                      <StatusPill value={r.priority} />
+                    </td>
+                    <td>{r.due_at ? formatDateTime(r.due_at) : "—"}</td>
+                    <td>
+                      <StatusPill value={r.status} />
+                    </td>
+                    <td>
+                      {next[r.status] && mayProgress(r) && (
+                        <button
+                          className="button secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            r.status === "created"
+                              ? openTask(r)
+                              : update(r.id, { status: next[r.status] })
+                          }
+                        >
+                          {readableLabel(next[r.status]!)}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!loading && !error && !rows.length && (
+              <div className="empty">No tasks have been created.</div>
+            )}
+          </TableScroll>
+        </CollectionView>
+      )}
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

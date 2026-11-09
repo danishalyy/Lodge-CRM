@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -70,6 +71,7 @@ async function uploadPhoto(
   );
 }
 export default function WildlifePage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("wildlife.manage");
 
@@ -77,6 +79,7 @@ export default function WildlifePage() {
     [open, setOpen] = useState(false),
     [error, setError] = useState(""),
     [queued, setQueued] = useState(0),
+    [deviceRows, setDeviceRows] = useState<QueuedSighting[]>([]),
     [location, setLocation] = useState<{
       lat: number;
       lng: number;
@@ -84,17 +87,26 @@ export default function WildlifePage() {
     } | null>(null);
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
+      const pending = await queuedSightings(queueScope());
+      if (!access.isCurrent()) return;
+      setDeviceRows(pending);
+      setQueued(pending.length);
       const nextRows = await operationsApi.wildlife.list<Sighting[]>();
       if (!access.isCurrent()) return;
       setRows(nextRows);
-      setQueued((await queuedSightings(queueScope())).length);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
-    setOpen(false);
+    setOpen(
+      canManage &&
+        new URLSearchParams(window.location.search).get("record") === "1",
+    );
     load();
     const fn = () => syncQueue();
     window.addEventListener("online", fn);
@@ -214,41 +226,66 @@ export default function WildlifePage() {
           They remain stored locally until a successful authenticated sync.
         </div>
       )}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Observed</th>
-              <th>Species</th>
-              <th>Reporter</th>
-              <th>GPS</th>
-              <th>Photos</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((s) => (
-              <tr key={s.id}>
-                <td>{formatDateTime(s.observed_at)}</td>
-                <td>
-                  <strong>{s.species}</strong>
-                </td>
-                <td>{s.reported_by || "Account user"}</td>
-                <td>
-                  {s.latitude == null || s.longitude == null
-                    ? "Not captured"
-                    : `${s.latitude.toFixed(5)}, ${s.longitude.toFixed(5)}${s.gps_accuracy_m ? ` ±${Math.round(s.gps_accuracy_m)}m` : ""}`}
-                </td>
-                <td>{s.media.length}</td>
-                <td>{s.notes || "—"}</td>
+      {deviceRows.length > 0 && (
+        <div className="collectionCards">
+          {deviceRows.map((record) => (
+            <article className="recordCard queuedRecord" key={record.id}>
+              <span className="statusPill">Waiting to sync</span>
+              <h2>{record.payload.species}</h2>
+              <p>{formatDateTime(record.payload.observed_at)}</p>
+              {record.photo && <small>Photo saved on this device</small>}
+            </article>
+          ))}
+        </div>
+      )}
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="WildlifePage"
+        defaultView="cards"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Observed</th>
+                <th>Species</th>
+                <th>Reporter</th>
+                <th>GPS</th>
+                <th>Photos</th>
+                <th>Notes</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No wildlife sightings have been recorded.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <tr key={s.id}>
+                  <td>{formatDateTime(s.observed_at)}</td>
+                  <td>
+                    <strong>{s.species}</strong>
+                  </td>
+                  <td>{s.reported_by || "Account user"}</td>
+                  <td>
+                    {s.latitude == null || s.longitude == null
+                      ? "Not captured"
+                      : `${s.latitude.toFixed(5)}, ${s.longitude.toFixed(5)}${s.gps_accuracy_m ? ` ±${Math.round(s.gps_accuracy_m)}m` : ""}`}
+                  </td>
+                  <td>{s.media.length}</td>
+                  <td>{s.notes || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">
+              No wildlife sightings have been recorded.
+            </div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

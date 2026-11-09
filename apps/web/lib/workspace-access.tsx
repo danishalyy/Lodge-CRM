@@ -2,6 +2,9 @@
 import { createContext, useContext, useRef, useEffect } from "react";
 export type WorkspaceAccess = {
   contextId?: string;
+  displayName?: string;
+  roleKey?: string;
+  lodgeName?: string;
   features: readonly string[];
   permissions: readonly string[];
   platform: boolean;
@@ -30,6 +33,9 @@ export function useWorkspaceAccess() {
   }, []);
   return {
     scopeKey,
+    displayName: value.displayName,
+    roleKey: value.roleKey,
+    lodgeName: value.lodgeName,
     isCurrent: () => mounted.current && currentScope.current === scopeKey,
     feature: (key: string) => !value.platform && value.features.includes(key),
     permission: (key: string) =>

@@ -226,33 +226,88 @@ export default function HousekeepingPage() {
         )}
         <section className="panel">
           <h2>Active housekeeping</h2>
-          {jobs.map((j) => (
-            <div className="taskRow" key={j.id}>
-              <div>
-                <strong>
-                  {j.unit_name} · {readableLabel(j.job_type)}
-                </strong>
-                <small>
-                  {j.assigned_staff_name || "Unassigned"} · Due{" "}
-                  {j.due_at ? formatDateTime(j.due_at) : "—"}
-                </small>
-                {j.linen_notes && <p>{j.linen_notes}</p>}
-              </div>
-              <div>
-                <StatusPill value={j.status} />
-                {next[j.status] && (
-                  <div style={{ marginTop: 6 }}>
-                    <button
-                      className="button secondary"
-                      onClick={() => update(j.id, next[j.status]!)}
-                    >
-                      {readableLabel(next[j.status]!)}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+          <div
+            className="collectionBoard"
+            tabIndex={0}
+            role="region"
+            aria-label="Workflow board"
+          >
+            {[
+              {
+                label: "Cleaning",
+                states: [
+                  "created",
+                  "assigned",
+                  "pending",
+                  "cleaning",
+                  "in_progress",
+                ],
+              },
+              {
+                label: "Inspection",
+                states: ["awaiting_inspection", "inspected"],
+              },
+              { label: "Ready", states: ["ready", "completed", "cancelled"] },
+            ].map((column) => {
+              const known = [
+                {
+                  label: "Cleaning",
+                  states: [
+                    "created",
+                    "assigned",
+                    "pending",
+                    "cleaning",
+                    "in_progress",
+                  ],
+                },
+                {
+                  label: "Inspection",
+                  states: ["awaiting_inspection", "inspected"],
+                },
+                { label: "Ready", states: ["ready", "completed", "cancelled"] },
+              ].flatMap((g) => g.states);
+              const items = jobs.filter(
+                (item) =>
+                  column.states.includes(item.status) ||
+                  (column.label === "Cleaning" && !known.includes(item.status)),
+              );
+              return (
+                <section className="boardColumn" key={column.label}>
+                  <h2>
+                    {column.label}
+                    <span>{items.length}</span>
+                  </h2>
+                  {items.map((j) => (
+                    <div className="taskRow" key={j.id}>
+                      <div>
+                        <strong>
+                          {j.unit_name} · {readableLabel(j.job_type)}
+                        </strong>
+                        <small>
+                          {j.assigned_staff_name || "Unassigned"} · Due{" "}
+                          {j.due_at ? formatDateTime(j.due_at) : "—"}
+                        </small>
+                        {j.linen_notes && <p>{j.linen_notes}</p>}
+                      </div>
+                      <div>
+                        <StatusPill value={j.status} />
+                        {canManage && next[j.status] && (
+                          <div style={{ marginTop: 6 }}>
+                            <button
+                              className="button secondary"
+                              onClick={() => update(j.id, next[j.status]!)}
+                            >
+                              {readableLabel(next[j.status]!)}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              );
+            })}
+          </div>
           {!jobs.length && (
             <div className="empty">No housekeeping jobs have been created.</div>
           )}

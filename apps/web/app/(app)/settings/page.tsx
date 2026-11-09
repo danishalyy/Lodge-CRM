@@ -1,4 +1,5 @@
 "use client";
+import { CodeInput } from "@/components/ui/code-input";
 import LodgePreferences from "@/components/LodgePreferences";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -176,7 +177,7 @@ export default function Settings() {
             }}
           >
             <Field label={copy.code}>
-              <input
+              <CodeInput
                 className="field"
                 name="code"
                 autoComplete="one-time-code"

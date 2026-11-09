@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -28,6 +29,7 @@ type Fuel = {
   recorded_at: string;
 };
 export default function FuelPage() {
+  const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("fuel.manage");
 
@@ -38,6 +40,7 @@ export default function FuelPage() {
     [error, setError] = useState("");
   const load = async () => {
     if (!access.isCurrent()) return;
+    setCollectionLoading(true);
     try {
       const [r, v, s] = await Promise.all([
         operationsApi.fuel.list<Fuel[]>(),
@@ -56,6 +59,8 @@ export default function FuelPage() {
       setStaff(s);
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setCollectionLoading(false);
     }
   };
   useEffect(() => {
@@ -106,37 +111,48 @@ export default function FuelPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <TableScroll as="section" className="panel tableWrap">
-        <table className="dataTable">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Vehicle</th>
-              <th>Litres</th>
-              <th>Odometer</th>
-              <th>Cost</th>
-              <th>Recorded by</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{formatDateTime(r.recorded_at)}</td>
-                <td>{r.vehicle_name}</td>
-                <td>{r.litres.toFixed(2)} L</td>
-                <td>{r.odometer_km.toLocaleString()} km</td>
-                <td>
-                  {r.cost_cents == null ? "—" : formatMoney(r.cost_cents)}
-                </td>
-                <td>{r.recorded_by || "—"}</td>
+      <CollectionView
+        loading={collectionLoading}
+        error={Boolean(error)}
+        onRetry={() => {
+          setError("");
+          void load();
+        }}
+        name="FuelPage"
+        defaultView="list"
+      >
+        <TableScroll as="section" className="panel tableWrap">
+          <table className="dataTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Vehicle</th>
+                <th>Litres</th>
+                <th>Odometer</th>
+                <th>Cost</th>
+                <th>Recorded by</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <div className="empty">No fuel records have been entered.</div>
-        )}
-      </TableScroll>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>{formatDateTime(r.recorded_at)}</td>
+                  <td>{r.vehicle_name}</td>
+                  <td>{r.litres.toFixed(2)} L</td>
+                  <td>{r.odometer_km.toLocaleString()} km</td>
+                  <td>
+                    {r.cost_cents == null ? "—" : formatMoney(r.cost_cents)}
+                  </td>
+                  <td>{r.recorded_by || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && (
+            <div className="empty">No fuel records have been entered.</div>
+          )}
+        </TableScroll>
+      </CollectionView>
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

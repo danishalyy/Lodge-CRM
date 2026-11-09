@@ -1,4 +1,5 @@
 "use client";
+import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -95,42 +96,57 @@ export default function DepartmentsPage() {
         {loading ? (
           <div className="empty">Loading…</div>
         ) : (
-          <TableScroll className="tableWrap">
-            <table className="dataTable">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Description</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td>{r.description || "—"}</td>
-                    <td>
-                      <StatusPill value={r.is_active ? "Active" : "Inactive"} />
-                    </td>
-                    <td>
-                      {canManage && (
-                        <button
-                          className="button secondary"
-                          onClick={() => toggle(r)}
-                        >
-                          {r.is_active ? "Deactivate" : "Activate"}
-                        </button>
-                      )}
-                    </td>
+          <CollectionView
+            loading={loading}
+            error={Boolean(error)}
+            onRetry={() => {
+              setError("");
+              void load();
+            }}
+            name="DepartmentsPage"
+            defaultView="cards"
+          >
+            <TableScroll className="tableWrap">
+              <table className="dataTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {!rows.length && (
-              <div className="empty">No departments have been created yet.</div>
-            )}
-          </TableScroll>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td>{r.description || "—"}</td>
+                      <td>
+                        <StatusPill
+                          value={r.is_active ? "Active" : "Inactive"}
+                        />
+                      </td>
+                      <td>
+                        {canManage && (
+                          <button
+                            className="button secondary"
+                            onClick={() => toggle(r)}
+                          >
+                            {r.is_active ? "Deactivate" : "Activate"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!rows.length && (
+                <div className="empty">
+                  No departments have been created yet.
+                </div>
+              )}
+            </TableScroll>
+          </CollectionView>
         )}
       </section>
       {open && canManage && (

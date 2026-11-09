@@ -1,4 +1,5 @@
 "use client";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -36,6 +37,7 @@ export default function LodgeAIPage({
   initialReportId?: string;
   scopeType?: "lodge" | "group";
 }) {
+  const panelParams = useSearchParams();
   const [status, setStatus] = useState<any>(null),
     [conversations, setConversations] = useState<any[]>([]),
     [conversation, setConversation] = useState(""),
@@ -56,6 +58,16 @@ export default function LodgeAIPage({
   const busy = stage !== "idle";
   const ready = status?.state === "ready" && status.tools?.length > 0;
   const scope = () => `${getActiveUserId()}:${getActiveLodgeId()}:${scopeType}`;
+  useEffect(() => {
+    if (
+      panelParams.get("panel") === "knowledge" &&
+      scopeType === "lodge" &&
+      status?.knowledge_enabled
+    ) {
+      setReportsOpen(false);
+      setKnowledgeOpen(true);
+    }
+  }, [panelParams, scopeType, status?.knowledge_enabled]);
   function clearAccess() {
     setConversations([]);
     setHistorySearch("");
@@ -95,6 +107,12 @@ export default function LodgeAIPage({
       ]);
       if (token !== generation.current || origin !== scope()) return;
       setStatus(s);
+      if (
+        scopeType === "lodge" &&
+        s.knowledge_enabled &&
+        new URLSearchParams(location.search).get("panel") === "knowledge"
+      )
+        setKnowledgeOpen(true);
       setConversations(c);
       if (
         !initialReportId &&

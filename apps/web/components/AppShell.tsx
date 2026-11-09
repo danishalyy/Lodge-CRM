@@ -1,4 +1,8 @@
 "use client";
+import { GroupedNavigation } from "./ui/grouped-navigation";
+import { UserMenu } from "./ui/user-menu";
+import { uiCopy as c } from "@/lib/strings/redesign";
+import StatusPill from "./StatusPill";
 import MfaPrompt from "./MfaPrompt";
 import { navigationCopy } from "@/lib/strings/navigation";
 import LockedFeature from "./LockedFeature";
@@ -261,7 +265,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <SafariBrand />
           <div className="lodgeMini">
             <strong>{membership.lodge_name}</strong>
-            <small>{membership.subscription_status}</small>
+            <small>
+              {membership.package || membership.subscription_status}
+            </small>
           </div>
           <nav>
             <div className="navSection">Account</div>
@@ -301,6 +307,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="appShell">
       <AccountChangeGuard />
       <NavigationEnhancements
+        role={membership?.role_key}
         items={visible}
         open={navOpen}
         onOpenChange={setNavOpen}
@@ -319,10 +326,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="roleSelect"
                 value={realMembership?.lodge_id || ""}
                 onChange={(e) => {
+                  if (e.target.value === "group") {
+                    location.href = "/group";
+                    return;
+                  }
                   setActiveLodgeId(e.target.value);
                   location.reload();
                 }}
               >
+                {me.groups?.length > 0 && (
+                  <option value="group">{c.group}</option>
+                )}
                 {me.memberships.map((m: any) => (
                   <option value={m.lodge_id} key={m.lodge_id}>
                     {m.lodge_name}
@@ -345,44 +359,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {membership?.role || (me.is_super_admin ? "Super Admin" : "")}
           </small>
           {membership?.subscription_status && (
-            <small>{membership.subscription_status}</small>
+            <small>
+              {membership.package || membership.subscription_status}
+            </small>
           )}
         </div>
         {membership && (
-          <nav>
-            {visible.map(([key, label, icon]) => {
-              const g = groupFor(key);
-              const heading = g !== last;
-              last = g;
-              return (
-                <div key={key}>
-                  {heading && <div className="navSection">{g}</div>}
-                  <Link
-                    href={`/${key}`}
-                    aria-label={label}
-                    aria-current={path === `/${key}` ? "page" : undefined}
-                    title={
-                      locked(key)
-                        ? "Available with additional workspace access"
-                        : undefined
-                    }
-                    className={
-                      path === `/${key}` ? "navItem active" : "navItem"
-                    }
-                  >
-                    <span className="navIcon">
-                      <UiIcon name={moduleIcon(key)} />
-                    </span>
-                    <span>{label}</span>
-                    {locked(key) && (
-                      <LockKeyhole size={14} aria-label="Locked feature" />
-                    )}
-                    {path === `/${key}` && <i className="activeRail" />}
-                  </Link>
-                </div>
-              );
-            })}
-          </nav>
+          <GroupedNavigation
+            items={visible}
+            knowledge={
+              allowed("lodge-ai") &&
+              membership.entitlements?.includes("ai_knowledge") &&
+              membership.entitlements?.includes("document_knowledge") &&
+              membership.permissions?.includes("knowledge.view")
+            }
+          />
+        )}
+        {visible.some(([key]) => key === "lodge-ai") && (
+          <Link className="navItem pinnedAI" href="/lodge-ai">
+            <UiIcon name="ai" />
+            <span>Ask Lodge AI</span>
+            {locked("lodge-ai") && (
+              <LockKeyhole size={14} aria-label="Locked feature" />
+            )}
+          </Link>
         )}
         {me.is_super_admin && (
           <nav className="platformNav">
@@ -396,17 +396,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         )}
         <div className="sidebarFooter">
-          <div className="avatar">
-            {me.full_name
-              ?.split(" ")
-              .map((x: string) => x[0])
-              .join("")
-              .slice(0, 2)}
-          </div>
-          <div className="profileText">
-            <strong>{me.full_name}</strong>
-            <small>{me.email}</small>
-          </div>
+          <UserMenu
+            name={me.full_name}
+            role={membership?.role || "Super Admin"}
+          />
         </div>
       </aside>
       <main className="mainArea">
@@ -446,20 +439,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <kbd>⌘ K</kbd>
             </button>
             {allowed("notifications") && <NotificationBell />}
-            <ThemeToggle />
-            <SignOutButton />
-            <Link
-              href="/settings"
-              className="avatarButton"
-              aria-label={designCopy.account}
-              title={me.full_name}
-            >
-              {me.full_name
-                ?.split(" ")
-                .map((x: string) => x[0])
-                .join("")
-                .slice(0, 2)}
-            </Link>
+            {["Expiring Soon", "Expired"].includes(
+              membership?.subscription_status,
+            ) && <StatusPill value={membership.subscription_status} />}
+            <div className="mobileUserMenu">
+              <UserMenu name={me.full_name} role={membership?.role} />
+            </div>
           </div>
         </header>
         <div className="content">
@@ -480,6 +465,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             value={{
               features: membership?.entitlements || [],
               permissions: membership?.permissions || [],
+              displayName: me.full_name,
+              roleKey: membership?.role_key,
+              lodgeName:
+                membership?.branding?.display_name || membership?.lodge_name,
               contextId: `${me.id}:${membership?.lodge_id || ""}`,
               platform: !!me.is_super_admin,
             }}

@@ -622,7 +622,7 @@ test('guest profile edits show inline errors and read-only accounts cannot edit'
  for(const manage of [true,false]){
   const {context,page}=await accountPage({id:'profile-'+manage,full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'profile-lodge',permissions:['guests.view',...(manage?['guests.manage']:[])],entitlements:['guests']}]});let writes=0;
   try{
-   await page.route('**/api/v1/lodges/profile-lodge/guests**',async r=>{if(r.request().method()==='PATCH'){writes++;return r.fulfill({status:422,json:{detail:[{loc:['body','notes'],type:'string_too_long',ctx:{max_length:4000}}]}})}return r.fulfill({json:[guest]})});
+   await page.route('**/api/v1/lodges/profile-lodge/guests**',async r=>{if(r.request().url().includes('/communications'))return r.fulfill({json:{items:[],has_more:false}});if(r.request().method()==='PATCH'){writes++;return r.fulfill({status:422,json:{detail:[{loc:['body','notes'],type:'string_too_long',ctx:{max_length:4000}}]}})}return r.fulfill({json:[guest]})});
    await page.goto(base+'/guests');await page.getByRole('button',{name:'Maya Laurent',exact:true}).click();await page.getByRole('dialog').waitFor();
    if(manage){await page.getByLabel('Internal notes',{exact:true}).fill('Updated notes');await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByText('Use no more than 4000 characters.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Internal notes',{exact:true}).getAttribute('aria-invalid'),'true');assert.equal(writes,1)}
    else {assert.equal(await page.getByRole('button',{name:'Save profile',exact:true}).count(),0);assert.equal(await page.getByLabel('Internal notes',{exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'+ Guest',exact:true}).count(),0);assert.equal(writes,0)}
@@ -846,5 +846,51 @@ test('private AI reports schedule, queue, read, download and clear revoked conte
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download report',exact:true}).click();assert.match((await download).suggestedFilename(),/^SafariOS-daily-/);
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-report-${width}-${theme}.png`,fullPage:true});}
   denied=true;await page.getByRole('button',{name:'Download report',exact:true}).click();await page.getByRole('alert').filter({hasText:/Your access changed/}).waitFor();assert.equal(await page.getByText('Test fixture: three overdue tasks need review.',{exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('guest profile occasions and private communication log use guarded forms',async()=>{
+ const user={id:'guest-profile-owner',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'guest-profile-lodge',role_key:'lodge_admin',permissions:['guests.view','guests.manage'],entitlements:['guests']}]};
+ const {context,page}=await accountPage(user);let created,updated,logged,logs=[],denied=false;
+ try{
+  await page.route('**/api/v1/lodges/guest-profile-lodge/guests**',async route=>{
+   const req=route.request(),url=new URL(req.url());
+   if(url.pathname.endsWith('/communications')){
+    if(denied)return route.fulfill({status:403,json:{detail:'Your role does not permit this action'}});
+    if(req.method()==='POST'){logged=req.postDataJSON();logs=[{id:'interaction-1',...logged,occurred_at:'2026-11-09T08:00:00Z',created_at:'2026-11-09T08:00:00Z'}];return route.fulfill({json:logs[0]})}
+    return route.fulfill({json:{items:logs,has_more:false}});
+   }
+   if(req.method()==='POST'){created=req.postDataJSON();return route.fulfill({json:{id:'profile-guest',...created}})}
+   if(req.method()==='PATCH'){updated=req.postDataJSON();created={...created,...updated};return route.fulfill({json:{id:'profile-guest',...created}})}
+   return route.fulfill({json:created?[{id:'profile-guest',...created,name:created.first_name+' '+created.last_name,completed_stays:2}]:[]});
+  });
+  await page.goto(base+'/guests');await page.getByRole('button',{name:'+ Guest',exact:true}).click();
+  await page.getByLabel('First name',{exact:true}).fill('Maya');await page.getByLabel('Last name',{exact:true}).fill('Laurent');
+  await page.getByLabel('Birthday',{exact:true}).fill('1985-03-21');await page.getByLabel('Anniversary',{exact:true}).fill('2012-09-18');
+  await page.getByLabel('Repeat guest / previous visits',{exact:true}).check();await page.getByLabel('Safari preferences',{exact:true}).fill('Birding at sunrise');
+  await page.getByRole('button',{name:'Create guest',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+  assert.equal(created.birthday,'1985-03-21');assert.equal(created.anniversary,'2012-09-18');assert.equal(created.repeat_guest,true);assert.equal(created.safari_preferences,'Birding at sunrise');
+  await page.getByRole('button',{name:'Maya Laurent',exact:true}).click();
+  assert.equal(await page.getByLabel('Birthday',{exact:true}).inputValue(),'1985-03-21');
+  await page.getByLabel('Birthday',{exact:true}).fill('');await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(updated.birthday,null);
+  await page.getByRole('button',{name:'Maya Laurent',exact:true}).click();await page.getByText('No interactions recorded yet.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Log interaction',exact:true}).click();await page.getByRole('button',{name:'Record interaction',exact:true}).click();
+  await page.getByText('This field is required.').first().waitFor();assert.equal(logged,undefined);
+  await page.getByLabel('Channel',{exact:true}).selectOption('phone');await page.getByLabel('Direction',{exact:true}).selectOption('inbound');
+  await page.getByLabel('Subject',{exact:true}).fill('Arrival confirmation');await page.getByLabel('Interaction notes',{exact:true}).fill('Private arrival confirmation recorded by phone.');
+  await page.getByRole('button',{name:'Record interaction',exact:true}).click();await page.getByText('Guest interaction recorded',{exact:true}).waitFor();await page.getByRole('heading',{name:'Arrival confirmation',exact:true}).waitFor();
+  await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:'theme',newValue:'light'})));await page.getByRole('heading',{name:'Arrival confirmation',exact:true}).waitFor();
+  assert.match(logged.client_reference,/^[0-9a-f-]{36}$/);assert.deepEqual(Object.keys(logged).sort(),['channel','client_reference','direction','message','subject']);
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+   await page.setViewportSize({width,height:1000});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;localStorage.setItem('theme',theme)},theme);
+   await page.waitForTimeout(450);await page.getByRole('heading',{name:'Communication history',exact:true}).scrollIntoViewIfNeeded();
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`guest overflow ${width}/${theme}`);
+   const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(axe.violations.map(v=>v.id),[],`guest accessibility ${width}/${theme}`);
+   if(width===375||width===1440)await page.screenshot({path:`/tmp/safarios-guest-profile-${width}-${theme}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:375,height:1000});await page.waitForTimeout(450);assert.equal(await page.getByRole('dialog').evaluate(el=>getComputedStyle(el,'::after').display),'none');
+  denied=true;await page.getByRole('button',{name:'Log interaction',exact:true}).click();await page.getByLabel('Subject',{exact:true}).fill('Do not publish');await page.getByLabel('Interaction notes',{exact:true}).fill('Denied message');await page.getByRole('button',{name:'Record interaction',exact:true}).click();
+  await page.getByText('Your role does not permit this action',{exact:true}).first().waitFor();assert.equal(await page.getByText('Private arrival confirmation recorded by phone.',{exact:true}).count(),0);
+  await page.evaluate(()=>{localStorage.setItem('active_lodge_id','different-lodge');window.dispatchEvent(new StorageEvent('storage',{key:'active_lodge_id',newValue:'different-lodge'}))});await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(await page.getByRole('button',{name:'Maya Laurent',exact:true}).count(),0);
  }finally{await context.close()}
 });

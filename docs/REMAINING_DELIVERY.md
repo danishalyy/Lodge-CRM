@@ -14,7 +14,7 @@ Implemented in migration 0022: private opt-in daily/weekly schedules, local lodg
 
 ## 3. Product completion review and implementation
 
-Reconcile current source against the original requirements, rather than treating old milestone inventories as current completion evidence. Track guest/stay profiles and histories, connected task relationships/timing, restricted guest web access, expanded report/export views, offline workflow scope and operational acceptance. Payroll, native applications and payment processing remain outside the agreed initial web release. South Africa is the target market; preserve ZAR defaults and lodge formatting choices.
+The three originals are reconciled in the 63-item source map. Guest occasions, repeat/safari preferences and a tenant-scoped communication log are implemented in `0023_guest_profiles`; see [the guest CRM checkpoint](GUEST_CRM_DELIVERY.md). Validated: 725 API tests, production build, all 44 browser checks and guest migration roundtrip. Guest CRM remains partial pending the unified operational timeline and connected-role acceptance. Next are task responsibility/timing/vehicle-maintenance relationships. Reconcile current source against the original requirements, rather than treating old milestone inventories as current completion evidence. Track guest/stay profiles and histories, connected task relationships/timing, restricted guest web access, expanded report/export views, offline workflow scope and operational acceptance. Payroll, native applications and payment processing remain outside the agreed initial web release. South Africa is the target market; preserve ZAR defaults and lodge formatting choices.
 
 ## 4. Operational and real-provider acceptance
 

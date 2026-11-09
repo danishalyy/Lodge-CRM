@@ -112,6 +112,18 @@ class GuestCreate(StrictModel):
     preferences: str = Field(default="", max_length=4000)
     notes: str = Field(default="", max_length=4000)
 
+    birthday: date | None = None
+    anniversary: date | None = None
+    repeat_guest: bool = False
+    safari_preferences: str = Field(default="", max_length=4000)
+
+    @field_validator("birthday", "anniversary")
+    @classmethod
+    def occasion_in_past(cls, value):
+        if value and value > date.today():
+            raise ValueError("Date must be today or earlier")
+        return value
+
 
 class GuestUpdate(StrictModel):
     first_name: str | None = Field(default=None, min_length=1, max_length=120)
@@ -124,6 +136,18 @@ class GuestUpdate(StrictModel):
     allergies: str | None = Field(default=None, max_length=4000)
     preferences: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=4000)
+
+    birthday: date | None = None
+    anniversary: date | None = None
+    repeat_guest: bool | None = None
+    safari_preferences: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("birthday", "anniversary")
+    @classmethod
+    def occasion_in_past(cls, value):
+        if value and value > date.today():
+            raise ValueError("Date must be today or earlier")
+        return value
 
 
 class StayCreate(StrictModel):

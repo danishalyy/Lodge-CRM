@@ -179,7 +179,7 @@ class Unit(Base):
 
 class Guest(Base):
     __tablename__ = "guests"
-    __table_args__ = (Index("ix_guests_lodge_name", "lodge_id", "last_name", "first_name"),)
+    __table_args__ = (Index("ix_guests_lodge_name", "lodge_id", "last_name", "first_name"), UniqueConstraint("id", "lodge_id", name="uq_guests_tenant"))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
     first_name: Mapped[str] = mapped_column(String(120))
@@ -192,6 +192,11 @@ class Guest(Base):
     allergies: Mapped[str] = mapped_column(Text, default="")
     preferences: Mapped[str] = mapped_column(Text, default="")
     notes: Mapped[str] = mapped_column(Text, default="")
+    birthday: Mapped[date | None] = mapped_column(Date, nullable=True)
+    anniversary: Mapped[date | None] = mapped_column(Date, nullable=True)
+    repeat_guest: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    safari_preferences: Mapped[str] = mapped_column(Text, default="", server_default="")
+    anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -992,3 +997,26 @@ class AIReportRun(AIPrivate,Base):
     generated_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     period: Mapped[dict]=mapped_column(JSONB,default=dict,server_default='{}')
     insights: Mapped[list]=mapped_column(JSONB,default=list,server_default='[]')
+
+
+class GuestCommunication(Base):
+    __tablename__ = "guest_communications"
+    __table_args__ = (
+        ForeignKeyConstraint(["guest_id", "lodge_id"], ["guests.id", "guests.lodge_id"], ondelete="CASCADE"),
+        UniqueConstraint("lodge_id", "guest_id", "client_reference", name="uq_guest_communication_reference"),
+        Index("ix_guest_communication_history", "lodge_id", "guest_id", "occurred_at", "id"),
+        CheckConstraint("channel IN ('email','phone','in_person','whatsapp','other')", name="ck_guest_communication_channel"),
+        CheckConstraint("direction IN ('inbound','outbound','internal')", name="ck_guest_communication_direction"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
+    guest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    client_reference: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
+    channel: Mapped[str] = mapped_column(String(20))
+    direction: Mapped[str] = mapped_column(String(20))
+    subject: Mapped[str] = mapped_column(String(200))
+    message: Mapped[str] = mapped_column(Text)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    redacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

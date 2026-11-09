@@ -1,0 +1,40 @@
+export const guestCopy = {
+  birthday: "Birthday",
+  anniversary: "Anniversary",
+  safari: "Safari preferences",
+  repeat: "Repeat guest / previous visits",
+  repeatHint:
+    "Use for visits recorded before SafariOS. Completed stays are counted separately.",
+  occasionsHint: "Optional. Record only with the guest’s permission.",
+  communications: "Communication history",
+  log: "Log interaction",
+  saveLog: "Record interaction",
+  logHint:
+    "Record an interaction that has already taken place. This does not send a message.",
+  channel: "Channel",
+  direction: "Direction",
+  subject: "Subject",
+  message: "Interaction notes",
+  channels: {
+    email: "Email",
+    phone: "Phone",
+    in_person: "In person",
+    whatsapp: "WhatsApp",
+    other: "Other",
+  },
+  directions: {
+    inbound: "From guest",
+    outbound: "To guest",
+    internal: "Internal note",
+  },
+  loading: "Loading communication history…",
+  empty: "No interactions recorded yet.",
+  retry: "Try again",
+  more: "Load more",
+  redacted: "Personal details removed",
+  logged: "Guest interaction recorded",
+  saving: "Saving…",
+  loadingGuests: "Loading guests…",
+  anonymized:
+    "This profile has been anonymised. Personal details cannot be added again.",
+};

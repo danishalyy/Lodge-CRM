@@ -1026,6 +1026,7 @@ def update_room(lodge_id:str,record_id:str,body:UnitUpdate,request:Request,user:
 
 
 # Guests
+from .guest_profiles import details as guest_details, lock_guest, redact_communications, export_communications
 @app.get("/api/v1/lodges/{lodge_id}/guests")
 def guests(lodge_id:str,limit:int=Query(50,ge=1,le=250),offset:int=Query(0,ge=0),user:User=Depends(require_permission("guests.view")),db:Session=Depends(get_db)):
     out=[]
@@ -1033,7 +1034,7 @@ def guests(lodge_id:str,limit:int=Query(50,ge=1,le=250),offset:int=Query(0,ge=0)
         current=db.scalar(select(Stay).where(Stay.guest_id==g.id,Stay.status.in_(["arriving","in_house","departing"])).order_by(Stay.arrival_date.desc()).limit(1))
         unit=db.get(Unit,current.unit_id) if current else None
         stay_count=db.scalar(select(func.count()).select_from(Stay).where(Stay.guest_id==g.id,Stay.status=="completed")) or 0
-        out.append({"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,"current_unit":unit.name if unit else None,"stay_status":current.status if current else None,"completed_stays":stay_count})
+        out.append({"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,**guest_details(g),"current_unit":unit.name if unit else None,"stay_status":current.status if current else None,"completed_stays":stay_count})
     return out
 
 
@@ -1051,19 +1052,23 @@ def create_guest(lodge_id:str,body:GuestCreate,request:Request,user:User=Depends
     if body.email:
         duplicate=db.scalar(select(Guest.id).where(Guest.lodge_id==lodge_id,func.lower(Guest.first_name)==body.first_name.strip().lower(),func.lower(Guest.last_name)==body.last_name.strip().lower(),func.lower(Guest.email)==str(body.email).lower()))
         if duplicate:raise HTTPException(409,"A guest with the same name and email already exists")
-    g=Guest(lodge_id=lodge_id,first_name=body.first_name.strip(),last_name=body.last_name.strip(),email=str(body.email).lower() if body.email else None,phone=body.phone.strip(),nationality=body.nationality.strip(),vip=body.vip,dietary_requirements=body.dietary_requirements,allergies=body.allergies,preferences=body.preferences,notes=body.notes)
+    g=Guest(lodge_id=lodge_id,first_name=body.first_name.strip(),last_name=body.last_name.strip(),email=str(body.email).lower() if body.email else None,phone=body.phone.strip(),nationality=body.nationality.strip(),vip=body.vip,dietary_requirements=body.dietary_requirements,allergies=body.allergies,preferences=body.preferences,notes=body.notes,birthday=body.birthday,anniversary=body.anniversary,repeat_guest=body.repeat_guest,safari_preferences=body.safari_preferences)
     db.add(g);db.flush();audit(db,request,g.lodge_id,user.id,"guest.created","guest",str(g.id));event(db,g.lodge_id,user.id,"guest.created","guest",str(g.id),f"Guest {g.first_name} {g.last_name} added to CRM");db.commit()
-    return {"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,"current_unit":None,"stay_status":None,"completed_stays":0}
+    return {"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,**guest_details(g),"current_unit":None,"stay_status":None,"completed_stays":0}
 
 
 @app.patch("/api/v1/lodges/{lodge_id}/guests/{record_id}",dependencies=[Depends(require_csrf)])
 def update_guest(lodge_id:str,record_id:str,body:GuestUpdate,request:Request,user:User=Depends(require_permission("guests.manage",write=True)),db:Session=Depends(get_db)):
-    g=tenant_get(db,Guest,record_id,lodge_id,"Guest")
-    for f in ["first_name","last_name","email","phone","nationality","vip","dietary_requirements","allergies","preferences","notes"]:
+    g=lock_guest(db,lodge_id,record_id)
+    if g.anonymized_at:raise HTTPException(409,"Anonymised profiles cannot be edited")
+    for f in ["first_name","last_name","email","phone","nationality","vip","dietary_requirements","allergies","preferences","notes","repeat_guest","safari_preferences"]:
         v=getattr(body,f)
         if v is not None:setattr(g,f,str(v).strip() if isinstance(v,str) else v)
+    for f in ("birthday","anniversary"):
+        if f in body.model_fields_set:setattr(g,f,getattr(body,f))
+    event(db,g.lodge_id,user.id,"guest.updated","guest",str(g.id),"Guest profile updated")
     audit(db,request,g.lodge_id,user.id,"guest.updated","guest",str(g.id));db.commit()
-    return {"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes}
+    return {"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,**guest_details(g)}
 
 
 @app.get("/api/v1/lodges/{lodge_id}/guests/{record_id}/export")
@@ -1071,14 +1076,15 @@ def export_guest_data(lodge_id:str,record_id:str,user:User=Depends(require_permi
     guest=tenant_get(db,Guest,record_id,lodge_id,"Guest")
     stays_rows=db.scalars(select(Stay).where(Stay.guest_id==guest.id).order_by(Stay.arrival_date)).all()
     requests_rows=db.scalars(select(GuestRequest).where(GuestRequest.guest_id==guest.id).order_by(GuestRequest.created_at)).all()
-    return {"guest":{"id":str(guest.id),"first_name":guest.first_name,"last_name":guest.last_name,"email":guest.email,"phone":guest.phone,"nationality":guest.nationality,"vip":guest.vip,"dietary_requirements":guest.dietary_requirements,"allergies":guest.allergies,"preferences":guest.preferences,"notes":guest.notes},"stays":[{"id":str(x.id),"arrival_date":x.arrival_date.isoformat(),"departure_date":x.departure_date.isoformat(),"status":x.status,"unit_id":str(x.unit_id)} for x in stays_rows],"requests":[{"id":str(x.id),"type":x.request_type,"status":x.status,"description":x.description,"resolution":x.resolution} for x in requests_rows]}
+    return {"guest":{"id":str(guest.id),"first_name":guest.first_name,"last_name":guest.last_name,"email":guest.email,"phone":guest.phone,"nationality":guest.nationality,"vip":guest.vip,"dietary_requirements":guest.dietary_requirements,"allergies":guest.allergies,"preferences":guest.preferences,"notes":guest.notes,**guest_details(guest)},"communications":export_communications(db,guest),"stays":[{"id":str(x.id),"arrival_date":x.arrival_date.isoformat(),"departure_date":x.departure_date.isoformat(),"status":x.status,"unit_id":str(x.unit_id)} for x in stays_rows],"requests":[{"id":str(x.id),"type":x.request_type,"status":x.status,"description":x.description,"resolution":x.resolution} for x in requests_rows]}
 
 @app.post("/api/v1/lodges/{lodge_id}/guests/{record_id}/anonymize",dependencies=[Depends(require_csrf)])
 def anonymize_guest(lodge_id:str,record_id:str,request:Request,user:User=Depends(require_permission("guests.manage",write=True)),db:Session=Depends(get_db)):
-    guest=tenant_get(db,Guest,record_id,lodge_id,"Guest")
+    guest=lock_guest(db,lodge_id,record_id)
     active=db.scalar(select(Stay.id).where(Stay.guest_id==guest.id,Stay.status.in_(["upcoming","arriving","in_house","departing"])).limit(1))
     if active:raise HTTPException(409,"Guest data cannot be anonymised while an active or upcoming stay exists")
-    suffix=str(guest.id).split("-")[0];guest.first_name="Anonymised";guest.last_name=f"Guest {suffix}";guest.email=None;guest.phone="";guest.nationality="";guest.dietary_requirements="";guest.allergies="";guest.preferences="";guest.notes="";guest.vip=False
+    suffix=str(guest.id).split("-")[0];guest.first_name="Anonymised";guest.last_name=f"Guest {suffix}";guest.email=None;guest.phone="";guest.nationality="";guest.dietary_requirements="";guest.allergies="";guest.preferences="";guest.notes="";guest.vip=False;guest.birthday=None;guest.anniversary=None;guest.repeat_guest=False;guest.safari_preferences="";guest.anonymized_at=datetime.now(timezone.utc)
+    redact_communications(db,guest)
     audit(db,request,lodge_id,user.id,"guest.anonymized","guest",str(guest.id));event(db,lodge_id,user.id,"guest.anonymized","guest",str(guest.id),"Guest personal data anonymised under retention rules");db.commit();return {"id":str(guest.id),"anonymized":True}
 
 
@@ -2350,3 +2356,6 @@ app.include_router(ai_action_router)
 
 from .ai.report_routes import router as ai_report_router
 app.include_router(ai_report_router)
+
+from .guest_profiles import router as guest_profile_router
+app.include_router(guest_profile_router)

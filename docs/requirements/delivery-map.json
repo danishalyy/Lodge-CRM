@@ -31,7 +31,7 @@
       "package_reference": "§3.2",
       "workflow_reference": "§9.1",
       "status": "partial",
-      "acceptance_gap": "Dedicated birthday/anniversary, repeat/safari preferences and structured communication/history remain to be completed."
+      "acceptance_gap": "Birthday/anniversary, repeat-guest/safari preferences and a scoped interaction log implemented. Finish unified stay/activity/request/feedback history, contextual role acceptance and live communication adapters."
     },
     {
       "id": "B03",

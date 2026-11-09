@@ -240,9 +240,10 @@ const tenantCollection = (name: string) => ({
       headers: scopedHeaders(scope),
       body: JSON.stringify(body),
     }),
-  update: <T = any>(recordId: string, body: any) =>
-    request<T>(lodgePath(`${name}/${recordId}`), {
+  update: <T = any>(recordId: string, body: any, scope?: AccountScope) =>
+    request<T>(scopedPath(`${name}/${recordId}`, scope), {
       method: "PATCH",
+      headers: scopedHeaders(scope),
       body: JSON.stringify(body),
     }),
 });
@@ -312,6 +313,8 @@ export const lodgeApi: any = {
   guests: tenantCollection("guests").list,
   createGuest: tenantCollection("guests").create,
   updateGuest: tenantCollection("guests").update,
+  guestCommunications: (id: string, offset = 0, scope?: AccountScope) => request<any>(scopedPath(`guests/${id}/communications?limit=25&offset=${offset}`, scope), {headers:scopedHeaders(scope)}),
+  logGuestCommunication: (id: string, body: unknown, scope?: AccountScope) => request<any>(scopedPath(`guests/${id}/communications`,scope), {method:"POST", headers:scopedHeaders(scope), body:JSON.stringify(body)}),
   tasks: tenantCollection("tasks").list,
   createTask: tenantCollection("tasks").create,
   updateTask: tenantCollection("tasks").update,

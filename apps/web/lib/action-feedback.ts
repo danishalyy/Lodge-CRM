@@ -1,3 +1,4 @@
+import { guestCopy } from "./strings/guests";
 import { accessCopy } from "./strings/access";
 import { contentCopy } from "./strings/content";
 import { toast } from "sonner";
@@ -93,5 +94,6 @@ export function actionFeedback(path: string, method: string, result: any) {
       ? accessCopy.reviewPending
       : accessCopy.reviewSent;
   if (/\/platform\/plans\//.test(path)) message = accessCopy.packageSaved;
+  if (/\/guests\/[^/]+\/communications$/.test(path)) message = guestCopy.logged;
   toast.success(message, { id: `action:${path}` });
 }

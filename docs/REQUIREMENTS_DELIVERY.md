@@ -27,7 +27,7 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | ID / source | Requirement | Current state | Work needed for acceptance |
 | --- | --- | --- | --- |
 | B01 / §3.1 | Lodge dashboard | partial | Finish the complete command-centre journey, scoped AI brief/recommendations where enabled, and connected readiness/alert acceptance. |
-| B02 / §3.2 | Guest CRM | partial | Dedicated birthday/anniversary, repeat/safari preferences and structured communication/history remain to be completed. |
+| B02 / §3.2 | Guest CRM | partial | Birthday/anniversary, repeat-guest/safari preferences and a scoped interaction log are implemented. Finish the unified stay/activity/request/feedback history and connected-role acceptance. |
 | B03 / §3.3 | Arrivals and departures | implemented core | Run the connected front-office, kitchen, transfer and room-preparation acceptance journey. |
 | B04 / §3.4 | Operational stay records | implemented core | Verify the complete guest/stay history and concurrent room-assignment journey; a booking engine is not required. |
 | B05 / §3.5 | Staff profiles | implemented core | Verify all role-confidentiality, supervisor, employment and operational-availability journeys. |
@@ -88,8 +88,8 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | P09 / §5.9 | Advanced fuel alerts | partial | Existing low-fuel rules do not establish abnormal-consumption/drop detection; add evidence-based rules and any required sensor adapter. |
 | P10 / §5.10 | Satellite tracking | provider dependent | Requires compatible hardware, subscriptions and a selected supported provider. |
 | P11 / §5.11 | Advanced lodge AI | partial | Scoped reads, memory, documents, comparisons and confirmed proposals exist; complete all source question/scenario coverage. |
-| P12 / §5.12 | AI daily lodge summary | implemented core | Private scheduled implementation is under final verification; retain all permitted daily operational sources and real-model acceptance. |
-| P13 / §5.13 | AI weekly management report | implemented core | Private weekly jobs are under final verification; expand the complete documented KPI/pattern report set and real-model acceptance. |
+| P12 / §5.12 | AI daily lodge summary | implemented core | Private opt-in daily reports pass 706 API tests, the build and 43 browser checks. Real-model and live worker/delivery acceptance remain. |
+| P13 / §5.13 | AI weekly management report | implemented core | Private weekly reports pass 706 API tests, the build and 43 browser checks. Complete the wider documented KPI/pattern set and real-model acceptance. |
 | P14 / §5.14 | AI operational insights | partial | Current advisory count rules are a subset; repeated maintenance, downtime and recurring service issues need complete authoritative data. |
 | P15 / §5.15 | Advanced wildlife analytics | missing | Add authorised species frequency, periods, location trends/maps and comparative views. |
 | P16 / §5.16 | Workflow automation | partial | Fixed background alerts exist; configurable rules, acknowledgement and source-event history remain. |

@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { useEffect, useState } from "react";
 import { superApi } from "@/lib/api";
@@ -90,7 +92,7 @@ export default function EmailDeliverySettings() {
             “Sent” means the mail server accepted the email. Delivery to an
             inbox depends on the provider.
           </p>
-          <div className="tableWrap">
+          <TableScroll className="tableWrap">
             <table className="dataTable">
               <thead>
                 <tr>
@@ -128,7 +130,7 @@ export default function EmailDeliverySettings() {
             {!data.account_deliveries?.length && (
               <p className="empty">No account emails have been queued yet.</p>
             )}
-          </div>
+          </TableScroll>
         </>
       )}
     </section>

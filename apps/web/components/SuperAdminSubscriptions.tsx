@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { useEffect, useState } from "react";
 import { superApi } from "@/lib/api";
 export default function SuperAdminSubscriptions() {
@@ -75,7 +77,7 @@ export default function SuperAdminSubscriptions() {
         </section>
       )}
       <section className="panel">
-        <div className="tableWrap">
+        <TableScroll className="tableWrap">
           <table className="dataTable">
             <thead>
               <tr>
@@ -168,7 +170,7 @@ export default function SuperAdminSubscriptions() {
               })}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         {!rows.length && (
           <p style={{ color: "var(--tx3)" }}>No subscriptions yet.</p>
         )}

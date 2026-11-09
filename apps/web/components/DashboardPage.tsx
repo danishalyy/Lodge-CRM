@@ -1,4 +1,5 @@
 "use client";
+import { designCopy } from "@/lib/strings/design";
 import { formatDateTime, formatDate } from "@/lib/formatting";
 import { eventLabel, readableLabel } from "@/lib/strings/content";
 
@@ -89,16 +90,16 @@ export default function DashboardPage() {
   const m = data?.metrics || {},
     attention = Array.isArray(data?.attention) ? data.attention : [],
     memoryEvents = Array.isArray(data?.events) ? data.events : [],
-    taskTotal = (m.open_tasks || 0) + (m.overdue_tasks || 0),
+    taskTotal = m.open_tasks || 0,
     taskHealthy = Math.max((m.open_tasks || 0) - (m.overdue_tasks || 0), 0);
   const chart = [
-    { label: "Guests", value: m.guests_in_house || 0 },
-    { label: "Arrivals", value: m.arrivals_today || 0 },
-    { label: "Tasks", value: m.open_tasks || 0 },
-    { label: "Maint.", value: m.maintenance_open || 0 },
-    { label: "Activities", value: m.activities_today || 0 },
-    { label: "Transfers", value: m.transfers_today || 0 },
-  ];
+    { label: "Guests", value: m.guests_in_house },
+    { label: "Arrivals", value: m.arrivals_today },
+    { label: "Tasks", value: m.open_tasks },
+    { label: "Maint.", value: m.maintenance_open },
+    { label: "Activities", value: m.activities_today },
+    { label: "Transfers", value: m.transfers_today },
+  ].filter((item) => item.value != null);
   return (
     <>
       <div className="pageHeader premiumHeader">
@@ -114,7 +115,7 @@ export default function DashboardPage() {
         <div className="headerActions">
           <span className="liveBadge">
             <i />
-            Live operations
+            {designCopy.overview}
           </span>
           <span className="dateChip">
             {new Date().toLocaleDateString(undefined, {
@@ -175,21 +176,23 @@ export default function DashboardPage() {
                 "Unavailable fleet",
               ],
               ["Overdue tasks", m.overdue_tasks, "tasks", "Past due time"],
-            ].map(([label, value, icon, hint]: any) => (
-              <div
-                className={`metricCard premiumMetric ${label === "Overdue tasks" && Number(value) > 0 ? "attention" : ""}`}
-                key={label}
-              >
-                <div className="metricTop">
-                  <span>{label}</span>
-                  <span className="metricIcon">
-                    <UiIcon name={String(icon)} />
-                  </span>
+            ]
+              .filter(([, value]) => value != null)
+              .map(([label, value, icon, hint]: any) => (
+                <div
+                  className={`metricCard premiumMetric ${label === "Overdue tasks" && Number(value) > 0 ? "attention" : ""}`}
+                  key={label}
+                >
+                  <div className="metricTop">
+                    <span>{label}</span>
+                    <span className="metricIcon">
+                      <UiIcon name={String(icon)} />
+                    </span>
+                  </div>
+                  <strong>{value}</strong>
+                  <small>{hint}</small>
                 </div>
-                <strong>{value}</strong>
-                <small>{hint}</small>
-              </div>
-            ))}
+              ))}
           </div>
           <div className="dashboardGrid premiumDashboardGrid">
             <section className="panel span2 premiumPanel">
@@ -205,33 +208,35 @@ export default function DashboardPage() {
                 <BarChart data={chart} />
               </div>
             </section>
-            <section className="panel premiumPanel">
-              <div className="panelHeader">
-                <div>
-                  <span className="panelKicker">TASK HEALTH</span>
-                  <h2>Completion pressure</h2>
-                </div>
-              </div>
-              <div className="ringPanel">
-                <RingChart
-                  value={taskHealthy}
-                  total={taskTotal}
-                  label="On track"
-                />
-                <div className="ringLegend">
+            {m.open_tasks != null && m.overdue_tasks != null && (
+              <section className="panel premiumPanel">
+                <div className="panelHeader">
                   <div>
-                    <span>Open</span>
-                    <strong>{m.open_tasks || 0}</strong>
-                  </div>
-                  <div>
-                    <span>Overdue</span>
-                    <strong className={m.overdue_tasks ? "dangerText" : ""}>
-                      {m.overdue_tasks || 0}
-                    </strong>
+                    <span className="panelKicker">TASK HEALTH</span>
+                    <h2>{designCopy.tasks}</h2>
                   </div>
                 </div>
-              </div>
-            </section>
+                <div className="ringPanel">
+                  <RingChart
+                    value={taskHealthy}
+                    total={taskTotal}
+                    label="On track"
+                  />
+                  <div className="ringLegend">
+                    <div>
+                      <span>Open</span>
+                      <strong>{m.open_tasks || 0}</strong>
+                    </div>
+                    <div>
+                      <span>Overdue</span>
+                      <strong className={m.overdue_tasks ? "dangerText" : ""}>
+                        {m.overdue_tasks || 0}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
             <section className="panel span2 premiumPanel">
               <div className="panelHeader">
                 <div>

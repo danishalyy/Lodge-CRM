@@ -1,2 +1,36 @@
-export function SafariMark(){return <svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" stroke="currentColor" strokeOpacity=".4"/><path d="m24 10-3 13-10 6 5-13 8-6Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="m16 16 5 7M28 13l2-2M11 29l-2 2" stroke="currentColor" strokeWidth="1.5"/></svg>}
-export default function SafariBrand(){return <div className="safariBrand"><span className="safariMark"><SafariMark/></span><div><strong>Safari<span>OS</span></strong><small>LODGE OPERATING SYSTEM</small></div></div>}
+// Scalable UI adaptation of the owner's acacia/savannah logo reference.
+export function SafariMark() {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" aria-hidden="true">
+      <g
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M8 58a41 41 0 1 1 80 7C59 66 35 52 8 58Z" />
+        <path d="M10 69c25-4 47 9 75 5M22 84c19 0 36-13 61-10" />
+        <path d="M60 63V51m0 7-8-10m8 8 9-9m-9 4-2-8" />
+      </g>
+      <path
+        fill="currentColor"
+        d="M36 44c4-3 8-3 12-4 3-4 8-3 12-4 5 0 8 3 12 3 5 0 7 3 12 5-8 3-15 2-24 3-8-1-16 0-24-3Z"
+      />
+    </svg>
+  );
+}
+export default function SafariBrand() {
+  return (
+    <div className="safariBrand" role="img" aria-label="SafariOS">
+      <span className="safariMark">
+        <SafariMark />
+      </span>
+      <div>
+        <strong>
+          Safari<span>OS</span>
+        </strong>
+        <small>LODGE OPERATING SYSTEM</small>
+      </div>
+    </div>
+  );
+}

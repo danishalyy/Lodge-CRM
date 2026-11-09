@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -201,7 +203,7 @@ export default function WildlifePage() {
           They remain stored locally until a successful authenticated sync.
         </div>
       )}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -235,7 +237,7 @@ export default function WildlifePage() {
         {!rows.length && (
           <div className="empty">No wildlife sightings have been recorded.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

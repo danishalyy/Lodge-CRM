@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { useState } from "react";
 import {
   useReactTable,
@@ -28,7 +30,7 @@ export function DataTable<T>({
     getSortedRowModel: getSortedRowModel(),
   });
   return (
-    <div className="tableWrap">
+    <TableScroll className="tableWrap">
       <table className="dataTable">
         <thead>
           {table.getHeaderGroups().map((group) => (
@@ -79,6 +81,6 @@ export function DataTable<T>({
           )}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }

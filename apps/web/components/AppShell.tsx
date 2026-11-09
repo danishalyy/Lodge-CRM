@@ -20,7 +20,8 @@ import {
 } from "@/lib/api";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import NavigationEnhancements from "./NavigationEnhancements";
-import SafariBrand from "./SafariBrand";
+import { designCopy } from "@/lib/strings/design";
+import SafariBrand, { SafariMark } from "./SafariBrand";
 import LodgeIdentity from "./LodgeIdentity";
 import ThemeToggle from "./ThemeToggle";
 import SignOutButton from "./SignOutButton";
@@ -370,6 +371,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Link
                     href={`/${key}`}
                     aria-label={label}
+                    aria-current={path === `/${key}` ? "page" : undefined}
                     title={
                       locked(key)
                         ? "Available with additional workspace access"
@@ -429,7 +431,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <UiIcon name="menu" />
             </button>
             <span className="statusDot" />
-            <span className="desktopOnly">SafariOS / Workspace</span>
+            <span className="desktopOnly workspaceBreadcrumb">
+              <span>{membership?.lodge_name || designCopy.workspace}</span>
+              <span className="breadcrumbDivider" aria-hidden="true">
+                /
+              </span>
+              <strong>
+                {visible.find(([key]) => key === requestedModule)?.[1] ||
+                  designCopy.workspace}
+              </strong>
+            </span>
+            <span className="mobileBrandMark">
+              <SafariMark />
+            </span>
             <strong className="mobilePlatformName">SafariOS</strong>
           </div>
           <div className="topActions">
@@ -445,13 +459,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {allowed("notifications") && <NotificationBell />}
             <ThemeToggle />
             <SignOutButton />
-            <button className="avatarButton" title={me.full_name}>
+            <Link
+              href="/settings"
+              className="avatarButton"
+              aria-label={designCopy.account}
+              title={me.full_name}
+            >
               {me.full_name
                 ?.split(" ")
                 .map((x: string) => x[0])
                 .join("")
                 .slice(0, 2)}
-            </button>
+            </Link>
           </div>
         </header>
         <div className="content">

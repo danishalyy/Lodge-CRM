@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { useEffect, useState } from "react";
 import { superApi } from "@/lib/api";
 import { accessCopy as copy } from "@/lib/strings/access";
@@ -150,7 +152,7 @@ export default function SuperAdminPackages() {
           {selected && !ent && <p>{copy.loading}</p>}
         </div>
         {ent && (
-          <div className="tableWrap">
+          <TableScroll className="tableWrap">
             <table className="dataTable">
               <thead>
                 <tr>
@@ -214,7 +216,7 @@ export default function SuperAdminPackages() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </section>
       {draft && (

@@ -34,7 +34,7 @@ export default function StatusPill({ value }: { value: string }) {
   const t = statusTone(value);
   return (
     <em className={`statusPill ${t}`}>
-      <i className={`dot ${t}`}></i>
+      <i className={`dot ${t}`} aria-hidden="true"></i>
       {readableLabel(value)}
     </em>
   );

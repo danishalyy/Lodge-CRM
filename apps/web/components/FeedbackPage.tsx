@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
@@ -77,7 +79,7 @@ export default function FeedbackPage() {
         )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -113,7 +115,7 @@ export default function FeedbackPage() {
         {!rows.length && (
           <div className="empty">No guest feedback has been recorded.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

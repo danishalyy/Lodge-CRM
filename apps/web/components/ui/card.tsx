@@ -15,7 +15,7 @@ export function CardTitle({
   className,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-lg", className)} {...props} />;
+  return <h2 className={cn("cardTitle", className)} {...props} />;
 }
 export function CardContent(props: React.HTMLAttributes<HTMLDivElement>) {
   return <div {...props} />;

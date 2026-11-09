@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { formatDateTime } from "@/lib/formatting";
 import { eventLabel, readableLabel } from "@/lib/strings/content";
 
@@ -27,7 +29,7 @@ export default function Page() {
       </div>
       {err && <p className="dangerText">{err}</p>}
       <section className="panel">
-        <div className="tableWrap">
+        <TableScroll className="tableWrap">
           <table className="dataTable">
             <thead>
               <tr>
@@ -55,7 +57,7 @@ export default function Page() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         {!rows.length && !err && <p>No audit events yet.</p>}
       </section>
     </>

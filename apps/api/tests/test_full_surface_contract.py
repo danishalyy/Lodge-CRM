@@ -184,7 +184,9 @@ def test_ui_has_glass_design_tokens_and_reduced_motion():
     legacy=(WEB/'app'/'design-system.css').read_text().lower()
     layout=(WEB/'app'/'layout.tsx').read_text()
     assert '--bg-base: #363636' in css
-    assert '--color-olive: #7f8967' in css
+    assert '--color-gold: #c6a568' in css
+    assert '--color-olive: var(--color-gold)' in css
+    assert '--surface-navigation: #171717' in css
     assert '--surface-glass:' in css and 'backdrop-filter:' in css
     assert '@supports not' in css and 'data-theme="light"' in css
     assert 'prefers-reduced-motion' in legacy

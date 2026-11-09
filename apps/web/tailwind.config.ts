@@ -13,6 +13,8 @@ export default {
       colors: {
         charcoal: "var(--color-charcoal)",
         olive: "var(--color-olive)",
+        gold: "var(--color-gold)",
+        surface: "var(--surface-glass)",
         beige: "var(--color-beige)",
         gray: "var(--color-gray)",
         brown: "var(--color-brown)",

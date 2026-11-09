@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
@@ -123,7 +125,7 @@ export default function TransfersPage() {
         </button>
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -175,7 +177,7 @@ export default function TransfersPage() {
         {!rows.length && (
           <div className="empty">No transfers have been scheduled.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

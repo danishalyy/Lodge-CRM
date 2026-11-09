@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { accessCopy } from "@/lib/strings/access";
 import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
@@ -228,7 +230,7 @@ export default function StaffPage() {
       )}
       {error && <div className="panel dangerText">{error}</div>}
       <section className="panel">
-        <div className="tableWrap">
+        <TableScroll className="tableWrap">
           {loading ? (
             <div className="empty">Loading…</div>
           ) : (
@@ -364,7 +366,7 @@ export default function StaffPage() {
               No staff profiles have been created yet.
             </div>
           )}
-        </div>
+        </TableScroll>
       </section>
       {editing && (
         <Drawer onClose={() => setEditing(null)}>

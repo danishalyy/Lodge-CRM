@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { formatDateTime, formatTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
@@ -103,7 +105,7 @@ export default function ActivitiesPage() {
         </button>
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -157,7 +159,7 @@ export default function ActivitiesPage() {
         {!rows.length && (
           <div className="empty">No activities have been scheduled.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

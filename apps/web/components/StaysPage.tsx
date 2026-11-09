@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { formatDate } from "@/lib/formatting";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
@@ -116,7 +118,7 @@ export default function StaysPage() {
         </div>
       )}
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -163,7 +165,7 @@ export default function StaysPage() {
         {!rows.length && (
           <div className="empty">No stays have been created.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

@@ -1,4 +1,6 @@
 'use client';
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import {useEffect,useMemo,useState} from 'react';
 import Link from 'next/link';
 import StatusPill from './StatusPill';
@@ -53,9 +55,9 @@ export default function SuperAdminOverview(){
       <div className="metricCard"><span>Expiring in 30 days</span><strong>{loading?'—':stats.expiring}</strong><small className="warningText">Calculated from real subscription dates</small></div>
       <div className="metricCard"><span>Platform attention</span><strong>{loading?'—':stats.attention}</strong><small>Expiry, suspension or setup issues</small></div>
     </div>
-    <section className="panel tableWrap"><div className="panelHeader"><div><h2>Lodge subscriptions</h2><p>External payment · manual access control</p></div><Link href="/super-admin/subscriptions" className="linkButton">View all →</Link></div>
+    <TableScroll as="section" className="panel tableWrap"><div className="panelHeader"><div><h2>Lodge subscriptions</h2><p>External payment · manual access control</p></div><Link href="/super-admin/subscriptions" className="linkButton">View all →</Link></div>
       <table className="dataTable"><thead><tr><th>Lodge</th><th>Package</th><th>Expiry</th><th>Days</th><th>Status</th></tr></thead><tbody>{rows.slice(0,8).map(r=>{const days=daysLeft(r),status=subscriptionStatus(r);return <tr key={r.id}><td>{r.name}</td><td>{r.subscription?.package||'—'}</td><td>{r.subscription?.expiry_date||'—'}</td><td>{days===null?'—':days}</td><td><StatusPill value={status}/></td></tr>})}</tbody></table>
       {!loading&&!rows.length&&<p style={{color:'var(--tx3)'}}>No lodges registered yet.</p>}
-    </section>
+    </TableScroll>
   </>;
 }

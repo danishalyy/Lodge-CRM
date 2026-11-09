@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
@@ -132,7 +134,7 @@ export default function GuestRequestsPage() {
         </div>
       )}
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -208,7 +210,7 @@ export default function GuestRequestsPage() {
         {!rows.length && (
           <div className="empty">No guest requests have been recorded.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

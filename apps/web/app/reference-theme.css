@@ -1,19 +1,21 @@
-/* Current SafariOS reference: quiet charcoal, mineral gray and muted olive.
+/* Current SafariOS reference: quiet charcoal, warm ivory and matte gold.
    Loaded after legacy component styles so every existing and future shared
    component uses this single semantic palette. */
 :root {
   color-scheme: dark;
   --color-charcoal: #363636;
-  --color-olive: #7f8967;
+  --color-gold: #c6a568;
+  --brand-mark: var(--color-gold);
+  --color-olive: var(--color-gold);
   --bg-base: #363636;
-  --surface-glass: rgba(39, 39, 39, 0.68);
+  --surface-glass: rgba(39, 39, 39, 0.86);
   --surface-navigation: #171717;
-  --text-primary: #eeeeeb;
-  --text-secondary: #b3b3b3;
-  --text-muted: #a4a4a4;
-  --accent: #7f8967;
-  --accent-hover: #929d78;
-  --text-accent: #c2cbb0;
+  --text-primary: #f2eee7;
+  --text-secondary: #c0bcb4;
+  --text-muted: #b3aea5;
+  --accent: var(--color-gold);
+  --accent-hover: #d3b67f;
+  --text-accent: #dfc899;
   --premium: var(--text-primary);
   --success: #b9c8a3;
   --warning: #d2bc95;
@@ -30,12 +32,12 @@
   --tx3: var(--text-muted);
   --ac: var(--text-accent);
   --ac2: var(--text-accent);
-  --acText: #151810;
+  --acText: #201c15;
   --red: var(--danger);
   --amb: var(--warning);
   --ok: var(--success);
-  --selection: rgba(127, 137, 103, 0.22);
-  --focus-glow: rgba(162, 176, 132, 0.2);
+  --selection: rgba(198, 165, 104, 0.14);
+  --focus-glow: rgba(198, 165, 104, 0.2);
   --glass-fallback: #272727;
   --shadow: var(--material-shadow);
   --shadow-sm: var(--material-shadow-small);
@@ -58,23 +60,24 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg-base: #f3f4ef;
-  --surface-glass: rgba(255, 255, 253, 0.7);
-  --surface-navigation: rgba(234, 237, 228, 0.86);
-  --text-primary: #252820;
-  --text-secondary: #575d50;
-  --text-muted: #606658;
-  --text-accent: #4b593b;
+  --brand-mark: #846437;
+  --bg-base: #f5f3ef;
+  --surface-glass: rgba(255, 253, 249, 0.90);
+  --surface-navigation: #eeebe5;
+  --text-primary: #29251e;
+  --text-secondary: #59544b;
+  --text-muted: #655e53;
+  --text-accent: #70532d;
   --premium: var(--text-primary);
   --success: #435d36;
   --warning: #725728;
   --danger: #934a42;
   --info: #415e54;
-  --sec: rgba(44, 54, 33, 0.035);
-  --hov: rgba(44, 54, 33, 0.07);
-  --bd: rgba(44, 54, 33, 0.16);
-  --selection: rgba(127, 137, 103, 0.16);
-  --glass-fallback: #f7f8f3;
+  --sec: rgba(41, 37, 30, 0.035);
+  --hov: rgba(41, 37, 30, 0.07);
+  --bd: rgba(41, 37, 30, 0.14);
+  --selection: rgba(164, 122, 60, 0.10);
+  --glass-fallback: #fcfaf7;
   --shadow: var(--material-shadow);
   --shadow-sm: var(--material-shadow-small);
 }
@@ -162,7 +165,7 @@ h3 {
 }
 .safariMark,
 .safariBrand strong span {
-  color: var(--tx);
+  color: var(--text-accent);
 }
 .surfaceBackdrop {
   background: var(--bg-base);
@@ -232,7 +235,7 @@ h3 {
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
 :root[data-theme="light"] .topbar {
-  background: rgba(243, 244, 239, 0.6);
+  background: rgba(245, 243, 239, 0.86);
 }
 .content {
   max-width: 1600px;
@@ -555,7 +558,7 @@ select:focus-visible {
   }
 }
 :root[data-theme="light"] {
-  --acText: #151810;
+  --acText: #201c15;
 }
 .collapseSidebar {
   left: 198px;
@@ -944,3 +947,185 @@ select:focus-visible {
 .taskHistoryEvent ul { margin-bottom: 0; padding-left: 20px; }
 .taskManagement { border-top: 1px solid var(--bd); margin: 24px 0; padding-top: 24px; }
 .taskHistory .sub, .taskHistory time, .taskTiming dt { color: var(--tx); }
+
+/* UI/UX Pro Max refinement: restrained hierarchy, matte gold and readable glass.
+   Shared selectors deliberately cover existing modules and future UI primitives. */
+:root { --acText: #201c15; --radius-pill: 9999px; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+.safariBrand { gap: 12px; align-items: center; }
+.safariBrand .safariMark { width: 42px; height: 42px; flex: 0 0 42px; color: var(--brand-mark); }
+.safariBrand strong { font-size: 25px; line-height: 1; font-weight: 400 !important; letter-spacing: -.065em !important; }
+.safariBrand strong span { color: var(--brand-mark); }
+.safariBrand small { font-size: 9px; line-height: 1.5; letter-spacing: .11em; margin-top: 7px; color: var(--tx2); }
+.sidebar { gap: 28px; }
+.sidebar .lodgeMini { padding: 16px 0 20px; margin: 0; border: 0; border-bottom: 1px solid var(--bd); }
+.lodgeIdentity { column-gap: 12px; }
+.lodgeIdentity .lodgeLogo { border-radius: 12px; background: var(--sec); border: 1px solid var(--bd); }
+.lodgeIdentity strong { font-weight: 500; overflow-wrap: anywhere; }
+.lodgeIdentity small { font-size: 11px; }
+.lodgeMini > small { display: inline; font-size: 11px; line-height: 1.8; }
+.lodgeMini > small + small::before { content: ' · '; color: var(--tx3); }
+.sidebar .navSection { padding: 20px 12px 8px; font-size: 10px; letter-spacing: .09em; }
+.sidebar .navItem { min-height: 44px; transition: background-color var(--duration-fast), color var(--duration-fast); }
+.sidebar .navItem:hover { background: var(--hov); }
+.sidebar .navItem.active { border: 1px solid var(--bd); padding: 9px 11px; background: var(--selection); }
+.sidebar .activeRail { display: none; }
+.sidebarFooter { padding: 20px 0 0; gap: 12px; }
+.sidebarFooter strong { font-size: 13px; font-weight: 500; }
+.sidebarFooter small { font-size: 11px; overflow-wrap: anywhere; }
+.sidebarFooter .avatar { width: 36px; height: 36px; flex-shrink: 0; }
+.platformBadge { padding: 18px 0; border: 0; border-bottom: 1px solid var(--bd); }
+.platformBadge strong { font-size: 15px; font-weight: 500; }
+.platformBadge > span { font-size: 10px; }
+.workspaceBreadcrumb { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.workspaceBreadcrumb > span:first-child { max-width: 24vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspaceBreadcrumb strong { color: var(--tx); font-weight: 400; }
+.topContext { min-width: 0; font-size: 12px; }
+.topActions { gap: 12px; }
+.topbar .statusDot { display: none; }
+.avatarButton { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.iconButton, .avatarButton, .closeButton { min-width: 44px; min-height: 44px; width: 44px; height: 44px; color: var(--tx2); }
+.iconButton:hover, .avatarButton:hover, .closeButton:hover { background: var(--hov); color: var(--tx); }
+.searchButton { min-height: 44px; padding: 10px 14px; border: 1px solid var(--bd); background: var(--sec); border-radius: var(--radius-md); }
+.searchButton kbd { background: transparent; border: 1px solid var(--bd); border-radius: 5px; padding: 2px 5px; font-size: 10px; }
+.pageHeader > div:first-child { min-width: 0; }
+.pageHeader h1 { margin: 8px 0 0; font-size: 30px; line-height: 1.25; }
+.pageHeader p { max-width: 68ch; margin-top: 10px; font-size: 14px; }
+.eyebrow { color: var(--tx2); font-size: 10px; letter-spacing: .10em; line-height: 1.5; }
+.headerActions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.panel, .card, .glassCard, .propertyCard, .metricCard, .formCard, .summaryBox, .roomCard, .taskCard {
+  border-color: var(--bd); background-image: none; box-shadow: var(--shadow-sm), var(--glass-highlight);
+}
+.glassCard { padding: var(--space-card); border-radius: var(--radius-lg); border: 1px solid var(--bd); background: var(--surface-glass); }
+.panel:hover, .card:hover, .glassCard:hover, .propertyCard:hover, .metricCard:hover { transform: none; box-shadow: var(--shadow-sm), var(--glass-highlight); }
+.panel > .panelHeader { padding: 0; margin-bottom: 24px; }
+.panel.tableWrap > .panelHeader, .tableWrap > .panelHeader { padding: 24px; margin: 0; }
+.panelHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.panelHeader p { margin: 6px 0 0; font-size: 12px; }
+.panelKicker { display: block; color: var(--tx2); margin-bottom: 6px; font-size: 10px; letter-spacing: .09em; }
+.panelMeta { color: var(--tx2); font-size: 11px; }
+.metricCard { padding: 24px; min-height: 148px; }
+.metricCard > span, .metricTop > span:first-child { font-size: 12px; font-weight: 400; line-height: 1.5; color: var(--tx2); }
+.metricCard strong, .metricValue, .statValue { display: block; font-size: 34px; font-weight: 500; line-height: 1.25; letter-spacing: -.04em; margin: 16px 0 6px; font-variant-numeric: tabular-nums; }
+.metricCard small { font-size: 11px; line-height: 1.6; color: var(--tx2); }
+.metricIcon { width: 32px; height: 32px; background: var(--sec); border: 1px solid var(--bd); border-radius: 9px; color: var(--tx2); }
+.metricIcon svg { width: 16px; height: 16px; }
+.metricCard.attention { border-color: color-mix(in srgb, var(--warning) 35%, var(--bd)); }
+.premiumMetric.attention::after { display: none; }
+.liveBadge, .dateChip, .panelMeta { background: var(--sec); border: 1px solid var(--bd); border-radius: 8px; padding: 8px 10px; font-size: 11px; color: var(--tx2); box-shadow: none; }
+.liveBadge i { display: none; }
+.toolbar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin: 0 0 24px; }
+.toolbar .formField { flex: 1 1 180px; max-width: 340px; margin-bottom: 0; }
+.collectionToolbar { gap: 16px; margin-bottom: 24px; }
+.tableWrap { background: var(--surface-glass); box-shadow: var(--shadow-sm); overflow-x: auto; overscroll-behavior-x: contain; }
+.dataTable { width: 100%; border-collapse: separate; border-spacing: 0; }
+.dataTable th { padding: 14px 20px; background: var(--sec); font-size: 11px; line-height: 1.5; font-weight: 500; border-bottom: 1px solid var(--bd); white-space: nowrap; }
+.dataTable td { padding: 18px 20px; font-size: 13px; vertical-align: middle; border-bottom: 1px solid var(--bd); }
+.dataTable tr:last-child td { border-bottom: 0; }
+.dataTable td small { display: inline-block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--tx2); }
+.dataTable td .button { white-space: nowrap; }
+.dataTable tbody tr:hover td { background: var(--sec); }
+.tableSort { gap: 8px; min-height: 28px; color: inherit; }
+.statusPill, .badge, .tag, .chip { font-style: normal; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.4; font-weight: 400; min-height: 28px; padding: 4px 9px; border: 1px solid var(--bd); border-radius: 8px; background: var(--sec); letter-spacing: 0; }
+.statusPill { white-space: nowrap; }
+.statusPill .dot { width: 5px; height: 5px; flex: 0 0 5px; }
+.button, .primaryButton { min-height: 44px; font-size: 13px; font-weight: 500; padding: 11px 16px; line-height: 1.5; text-decoration: none; transition: background-color var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast); }
+.button.secondary, .button:not(.primary):not(.danger):not(.ghost) { background: var(--sec); color: var(--tx); }
+.button:hover:not(:disabled), .button.secondary:hover:not(:disabled) { border-color: var(--control-border); }
+.button.primary:hover:not(:disabled) { border-color: transparent; }
+button:disabled, .button:disabled { opacity: .65; cursor: not-allowed; }
+.button:active:not(:disabled), .iconButton:active:not(:disabled) { filter: brightness(.94); }
+input:not([type=checkbox]):not([type=radio]), select, textarea { accent-color: var(--accent); }
+.field, .select, .textarea, .roleSelect { color: var(--tx); box-shadow: inset 0 1px 2px rgba(0,0,0,.03); }
+.field::placeholder, .textarea::placeholder { color: var(--tx3); opacity: 1; }
+.fieldLabel, label.label { color: var(--tx2); margin-bottom: 8px; font-size: 13px; }
+.formField { margin-bottom: 20px; }
+.formField input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+.textarea { min-height: 104px; resize: vertical; }
+.glassDialog, .glassDrawer, .confirmationDialog, .commandPalette { background: var(--glass-fallback); background: color-mix(in srgb, var(--glass-fallback) 94%, transparent); box-shadow: var(--shadow), var(--glass-highlight); }
+.glassDialog .drawer, .glassDrawer .drawer { scroll-padding-block: 100px; }
+.drawerHead { margin-bottom: 24px; padding-bottom: 24px; }
+.drawerHead h1, .drawerHead h2 { font-size: 24px; line-height: 1.3; }
+.drawerHead .sub { font-size: 12px; color: var(--tx2); }
+.drawerActions { gap: 12px; padding: 16px 0; }
+.drawerActions .button { min-width: 124px; }
+.empty, .statePanel { padding: 48px 24px; color: var(--tx2); font-size: 14px; line-height: 1.7; }
+.empty { background: transparent; }
+.authShell { background: var(--bg-base); }
+.authStory { background: var(--side); background-image: none; border-right: 1px solid var(--bd); }
+.authStoryInner { max-width: 560px; gap: 48px; }
+.authStatement h1 { max-width: 12ch; font-size: clamp(36px, 3.5vw, 52px) !important; line-height: 1.15 !important; }
+.authStatement p { font-size: 15px; line-height: 1.8; color: var(--tx2); max-width: 42ch; }
+.authSignals { border-top: 1px solid var(--bd); padding-top: 24px; gap: 16px; }
+.authSignals .statusDot { background: var(--color-gold); width: 4px; height: 4px; }
+.authCard { border: 1px solid var(--bd); padding: 40px; max-width: 480px; box-shadow: var(--shadow); }
+.authCard h1 { font-size: 28px; margin: 12px 0; }
+.authCard > p { font-size: 14px; line-height: 1.7; margin-bottom: 28px; }
+.authFormSide { padding: 48px; }
+.authFoot { font-size: 11px; color: var(--tx2); }
+.workspaceFooter { padding: 24px 32px 32px; color: var(--tx2); border-top: 0; font-size: 11px; }
+.skeleton, .dashboardSkeleton > div { background: var(--sec); background-image: none; animation: skeleton-breathe 1.8s ease-in-out infinite; }
+@keyframes skeleton-breathe { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
+@media (max-width: 1100px) { .topActions { gap: 8px; } .topbar { padding-inline: 28px; } }
+@media (max-width: 1023px) {
+  .topbar { padding-inline: 20px; }
+  .topContext .workspaceBreadcrumb { display: none; }
+  .bottomTabs { background: var(--surface-glass); border-color: var(--bd); box-shadow: var(--shadow); }
+  .bottomTabs a, .bottomTabs button { min-height: 48px; border-radius: 10px; }
+  .bottomTabs a[aria-current=page] { background: var(--selection); color: var(--text-accent); }
+  .workspaceFooter { padding: 24px 20px 110px; }
+}
+@media (max-width: 767px) {
+  .content { padding: 24px 20px 104px; }
+  .pageHeader { align-items: flex-start; }
+  .pageHeader h1 { font-size: 26px; }
+  .pageHeader p { font-size: 13px; }
+  .pageHeader > .button, .headerActions > .button { flex-shrink: 0; }
+  .metricGrid, .dashboardMetrics, .superStats, .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .metricCard { min-height: 132px; padding: 20px; }
+  .metricCard strong, .metricValue { font-size: 30px; }
+  .metricTop { gap: 8px; align-items: flex-start; }
+  .metricIcon { width: 24px; height: 24px; flex-shrink: 0; }
+  .metricIcon svg { width: 14px; height: 14px; }
+  .twoCol, .notificationLayout, .dashboardGrid, .premiumDashboardGrid { grid-template-columns: minmax(0,1fr); }
+  .summaryStrip { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .toolbar { gap: 12px; }
+  .toolbar .formField { flex-basis: 100%; max-width: none; }
+  .toolbar > .button { min-width: 120px; }
+  .dataTable th, .dataTable td { padding: 14px 16px; }
+  .panel > .panelHeader { margin-bottom: 20px; }
+  .panel.tableWrap > .panelHeader, .tableWrap > .panelHeader { padding: 20px; margin: 0; }
+  .glassDrawer, .glassDialog { padding: 24px 20px; }
+  .drawerActions .button { min-width: 0; }
+  .authFormSide { padding: 24px 20px; }
+  .authCard { padding: 28px 24px; }
+  .authStoryInner { padding: 32px 24px; gap: 32px; }
+  .authStatement h1 { font-size: 36px !important; }
+  .field, .select, .textarea { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+  .skeleton, .dashboardSkeleton > div { animation: none; }
+  .button, .iconButton, .navItem { transition: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glassCard, .panel, .card, .propertyCard, .metricCard, .tableWrap, .glassDialog, .glassDrawer, .commandPalette, .bottomTabs, .topbar { background: var(--glass-fallback); }
+  .sidebar { background: var(--surface-navigation); }
+}
+
+.collapseSidebar { left: 186px; }
+:root[data-sidebar="collapsed"] .sidebar .safariBrand .safariMark { width: 32px; height: 32px; flex-basis: 32px; }
+.formField:has(> input[type="checkbox"]) { display: grid; grid-template-columns: 24px minmax(0,1fr); column-gap: 12px; align-items: center; min-height: 44px; }
+.formField:has(> input[type="checkbox"]) > .fieldLabel { grid-column: 2; grid-row: 1; margin: 0; min-height: 44px; display: flex; align-items: center; }
+.formField > input[type="checkbox"] { grid-column: 1; grid-row: 1; width: 24px; height: 24px; margin: 0; }
+.formField:has(> input[type="checkbox"]) > .fieldHint { grid-column: 2; }
+.label:has(> input[type="checkbox"]), .checkRow { min-height: 44px; }
+.mobileBrandMark { display: none; color: var(--brand-mark); }
+@media (max-width: 1023px) { .mobileBrandMark { display: inline-flex; flex: 0 0 26px; width: 26px; height: 26px; } }
+html { scroll-padding-top: 96px; }
+.glassDialog, .glassDrawer { scroll-padding-block: 96px; }
+.field:focus, .select:focus, .textarea:focus { border-color: var(--text-accent); }
+
+.tableWrap:focus-visible { outline: 2px solid var(--text-accent); outline-offset: 3px; }

@@ -1,10 +1,12 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { accessCopy as copy } from "@/lib/strings/access";
 export default function PackageComparison({ plans }: { plans: any[] }) {
   const features = plans[0]?.feature_catalog || [];
   if (!plans.length) return <p>{copy.loading}</p>;
   return (
-    <div className="tableWrap">
+    <TableScroll className="tableWrap">
       <table className="dataTable">
         <caption className="sr-only">{copy.compare}</caption>
         <thead>
@@ -43,6 +45,6 @@ export default function PackageComparison({ plans }: { plans: any[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }

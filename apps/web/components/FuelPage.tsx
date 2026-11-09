@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { formatMoney, formatting } from "@/lib/formatting";
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
@@ -86,7 +88,7 @@ export default function FuelPage() {
         </button>
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -116,7 +118,7 @@ export default function FuelPage() {
         {!rows.length && (
           <div className="empty">No fuel records have been entered.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

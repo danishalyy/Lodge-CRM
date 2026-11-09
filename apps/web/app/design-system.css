@@ -3126,3 +3126,25 @@ textarea:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
+
+/* SafariOS material tokens: project-wide, consumed by shared components. */
+:root {
+  --space-card: 24px;
+  --space-section: 32px;
+  --space-gap: 24px;
+  --surface-card-radius: 24px;
+  --surface-input-radius: 12px;
+  --surface-modal-radius: 28px;
+  --control-border: #8e8a82;
+  --material-shadow: 0 8px 24px rgba(0,0,0,.12);
+  --material-shadow-small: 0 2px 8px rgba(0,0,0,.08);
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,.055);
+  --duration-fast: 160ms;
+  --duration-base: 240ms;
+}
+:root[data-theme="light"] {
+  --control-border: #888278;
+  --material-shadow: 0 8px 28px rgba(41,37,30,.045);
+  --material-shadow-small: 0 2px 8px rgba(41,37,30,.04);
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,.85);
+}

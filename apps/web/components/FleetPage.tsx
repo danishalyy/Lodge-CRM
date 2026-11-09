@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -81,7 +83,7 @@ export default function FleetPage() {
         </button>
       </div>
       {error && <div className="panel dangerText">{error}</div>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -135,7 +137,7 @@ export default function FleetPage() {
         {!rows.length && (
           <div className="empty">No vehicles have been added.</div>
         )}
-      </section>
+      </TableScroll>
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

@@ -2,7 +2,7 @@
 import NotificationBell from "./NotificationBell";
 import Link from "next/link";
 import NavigationEnhancements from "./NavigationEnhancements";
-import SafariBrand from "./SafariBrand";
+import SafariBrand, { SafariMark } from "./SafariBrand";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -149,7 +149,10 @@ export default function SuperAdminShell({
             >
               <UiIcon name="menu" />
             </button>
-            <span>SafariOS</span>
+            <span className="mobileBrandMark">
+              <SafariMark />
+            </span>
+            <span className="desktopOnly">SafariOS</span>
             <span className="breadcrumbDivider">/</span>
             <strong>
               {items.find(

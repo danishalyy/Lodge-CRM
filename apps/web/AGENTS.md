@@ -2,7 +2,7 @@
 
 Apply the shared warm-neutral, translucent design system to every new or edited screen. Read `../../docs/UI_UX_DESIGN_SYSTEM.md` before introducing a new visual pattern.
 
-- The latest owner reference supersedes earlier beige/orange rules. Use exact dark background `#363636` and sidebar `#171717`, olive `#7F8967`, gray reading text, and the semantic dark/light tokens in `app/reference-theme.css`. Keep background layers neutral, with no olive wash or gradient. Olive is reserved for actions and active states. No orange, purple or bright gradients.
+- The latest owner reference supersedes earlier beige/orange rules. Use exact dark background `#363636` and sidebar `#171717`, matte gold `#C6A568` from the owner’s SafariOS logo, warm ivory reading text, and the semantic dark/light tokens in `app/reference-theme.css`. Keep background layers neutral, with no colour wash or gradient. Matte gold is reserved for actions and brand details. No orange, purple, metallic gradients or glows.
 - Inter 400/500/600 is bundled locally. Operational headings use 500 weight at 30px desktop/26px mobile; card headings 16px. Avoid oversized bold display typography.
 - Default to dark on fresh browsers; preserve explicit saved preferences and retain the light alternative.
 - Use shared material tokens from `app/design-system.css`: cards 24px, inputs/buttons 12px, dialogs 28px. Buttons are no longer pills. Keep the sidebar flush to the left with its divider; cards use 24px padding and 24px gutters, mobile 20px/16px.
@@ -18,3 +18,7 @@ Apply the shared warm-neutral, translucent design system to every new or edited 
 - Group Admin is an explicitly assigned multi-lodge role, never a platform role. Preserve lodge isolation, per-lodge subscriptions and account-change guards when switching. Ordinary accounts remain single-lodge.
 - Use `WorkspaceAccessContext`/`useWorkspaceAccess` for per-feature tabs and controls. Show role-authorized package-gated modules as locked navigation items with an access-review screen. Keep unavailable subfeature controls hidden and avoid disabled-feature API requests. Keep backend feature and role checks intact.
 - Mutations through `lib/api.ts` receive shared success/error feedback. Avoid duplicate manual success toasts; keep inline validation and destructive-action confirmation.
+
+- The owner’s latest acacia/savannah SafariOS logo and matte gold/ivory palette supersede the earlier olive accent. Reuse `SafariBrand` and the bundled mark; never replace a lodge’s own logo. `design-system/safarios/MASTER.md` records the accepted UI/UX Pro Max synthesis. Consult the installed project skill at `.agents/skills/ui-ux-pro-max/SKILL.md` for future design work.
+
+- Wrap operational tables with `components/ui/table-scroll.tsx` so horizontal overflow remains keyboard accessible without adding unnecessary tab stops.

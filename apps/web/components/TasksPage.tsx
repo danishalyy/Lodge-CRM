@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { readableLabel } from "@/lib/strings/content";
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
@@ -407,7 +409,7 @@ export default function TasksPage() {
         </div>
       )}
       {loading && <p role="status">{copy.loadingTasks}</p>}
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -465,7 +467,7 @@ export default function TasksPage() {
         {!loading && !error && !rows.length && (
           <div className="empty">No tasks have been created.</div>
         )}
-      </section>
+      </TableScroll>
       {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

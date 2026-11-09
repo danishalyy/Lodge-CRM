@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { CountryPicker } from "@/components/ui/country-picker";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
@@ -231,7 +233,7 @@ export default function GuestsPage() {
           />
         </Field>
       </div>
-      <section className="panel tableWrap">
+      <TableScroll as="section" className="panel tableWrap">
         <table className="dataTable">
           <thead>
             <tr>
@@ -275,7 +277,7 @@ export default function GuestsPage() {
         {!loading && !error && !list.length && (
           <div className="empty">No guest profiles found.</div>
         )}
-      </section>
+      </TableScroll>
       {selected && (
         <Drawer onClose={() => setSelected(null)}>
           <div className="drawerHead">

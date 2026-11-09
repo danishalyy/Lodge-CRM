@@ -11,6 +11,7 @@ const base='http://127.0.0.1:3107';
 let server,browser;
 before(async()=>{
   fs.cpSync(path.join(web,'.next/static'),path.join(web,'.next/standalone/.next/static'),{recursive:true});
+  fs.cpSync(path.join(web,'public'),path.join(web,'.next/standalone/public'),{recursive:true});
   server=spawn(process.execPath,[path.join(web,'.next/standalone/server.js')],{env:{...process.env,HOSTNAME:'127.0.0.1',PORT:'3107'},stdio:'ignore'});
   for(let i=0;i<100;i++){
     try{if((await fetch(base+'/login')).ok)break;}catch{}
@@ -184,11 +185,11 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
   assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(23, 23, 23)');
   assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(54, 54, 54)');
   assert.equal(await page.locator('.surfaceBackdrop i').first().evaluate(el=>getComputedStyle(el).display),'none');
-  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(238, 238, 235)');
+  assert.equal(await page.locator('.sidebar .navItem.active .navIcon').evaluate(el=>getComputedStyle(el).color),'rgb(242, 238, 231)');
   assert.equal(await page.locator('.propertyCard').count(),0);
   assert.equal(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'blur(32px) saturate(1.15)');
   const primary=page.getByRole('button',{name:/Register lodge/});
-  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(127, 137, 103)',text:'rgb(21, 24, 16)'});
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(198, 165, 104)',text:'rgb(32, 28, 21)'});
   assert.match(await page.getByRole('heading',{name:'Lodges',exact:true}).evaluate(el=>getComputedStyle(el).fontFamily),/^"?Inter"?(?:,|$)/);
   assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Inter/);
 
@@ -199,8 +200,8 @@ test('glass themes persist, desktop navigation collapses, mobile navigation uses
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Toggle light and dark theme'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
-  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(243, 244, 239)');
-  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(127, 137, 103)',text:'rgb(21, 24, 16)'});
+  assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(245, 243, 239)');
+  assert.deepEqual(await primary.evaluate(el=>({background:getComputedStyle(el).backgroundColor,text:getComputedStyle(el).color})),{background:'rgb(198, 165, 104)',text:'rgb(32, 28, 21)'});
 
   await page.reload();await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
@@ -945,4 +946,77 @@ test('task read-only views avoid forbidden lookups and discard late history afte
   await page.goto(base+'/tasks');await page.getByRole('button',{name:'Read-only task',exact:true}).click();await page.getByText('Loading task history…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'+ Task',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Accepted',exact:true}).count(),0);assert.deepEqual(forbidden,[]);
   await page.evaluate(()=>{localStorage.setItem('active_lodge_id','other-property');window.dispatchEvent(new StorageEvent('storage',{key:'active_lodge_id',newValue:'other-property'}))});release();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(await page.getByText('Private former context',{exact:false}).count(),0);
  }finally{release?.();await context.close()}
+});
+
+// Presentation fixtures only; no customer data or real service credentials.
+function premiumTestAccount(platform=false){
+ const sources=fs.readdirSync(path.join(web,'components')).filter(f=>f.endsWith('.tsx')).map(f=>fs.readFileSync(path.join(web,'components',f),'utf8')).join('\n');
+ const permissions=[...new Set([...sources.matchAll(/["']([a-z_]+\.[a-z_.]+)["']/g)].map(m=>m[1]))];
+ const entitlements=['dashboard','guests','stays','units','guest_requests','guest_feedback','staff','staff_hr','staff_roster','staff_performance','custom_roles','departments','tasks','advanced_tasks','task_attachments','housekeeping','housekeeping_full','maintenance','maintenance_workshop','fb_operations','activities','transfers','ranger','fleet','fuel','wildlife','reports','notifications','ai','advanced_ai','ai_knowledge'];
+ return {id:'premium-design-owner',full_name:'Maya Laurent',email:'maya@example.test',is_super_admin:platform,mfa_enabled:true,groups:[],memberships:platform?[]:[{lodge_id:'premium-lodge',lodge_name:'Ndlovu House',role:'Lodge Admin',role_key:'lodge_admin',permissions,entitlements,subscription_status:'Active'}]};
+}
+async function premiumFixtures(page){
+ await page.route('**/api/**',async route=>{
+  const url=new URL(route.request().url()),p=url.pathname;
+  if(p.endsWith('/auth/me')||p.endsWith('/platform/plans')||p.endsWith('/role-catalog'))return route.fallback();
+  if(p.endsWith('/branding'))return route.fulfill({json:{display_name:'Ndlovu House',logo_url:null}});
+  if(p.endsWith('/preferences')&&!p.includes('notification'))return route.fulfill({json:{currency:'ZAR',date_format:'dd/MM/yyyy',timezone:'Africa/Johannesburg'}});
+  if(p.endsWith('/dashboard'))return route.fulfill({json:{lodge:{name:'Ndlovu House'},metrics:{guests_in_house:0,arrivals_today:0,open_tasks:0,overdue_tasks:0,maintenance_open:0,activities_today:0,transfers_today:0,vehicles_unavailable:0},attention:[],events:[],subscription:{status:'Active',package:'Premium',expiry_date:'2027-11-09'}}});
+  if(p.endsWith('/reports/summary'))return route.fulfill({json:{tasks:{created:0,completed:0,completion_rate:0},maintenance:{created:0,completed:0,critical:0,cost_cents:0},guest_requests:{created:0,resolved:0},fleet:{vehicles:0,fuel_litres:0,fuel_cost_cents:0},stays:{created:0},rooms:{},safari:{activities:0,transfers:0,wildlife_sightings:0}}});
+  if(p.endsWith('/ranger/today'))return route.fulfill({json:{staff:{id:'staff-1',name:'Maya Laurent',operational_status:'available'},activities:[],tasks:[]}});
+  if(p.endsWith('/ai/status'))return route.fulfill({json:{state:'ready',scope:{lodge_id:'premium-lodge',lodge_name:'Ndlovu House'},tools:[{name:'get_tasks',suggestion:'Which tasks need attention?'}]}});
+  if(p.endsWith('/notification-preferences'))return route.fulfill({json:{email_enabled:false,email_min_severity:'normal',email_verified:true,email_configured:false}});
+  if(p.endsWith('/unread-count'))return route.fulfill({json:{count:0}});
+  if(p.endsWith('/email/status'))return route.fulfill({json:{configured:false,account_deliveries:[]}});
+  return route.fulfill({json:[]});
+ });
+}
+
+test('premium design covers every lodge module and platform screen in both themes',async()=>{
+ const modules=['dashboard','guests','stays','rooms','requests','feedback','staff','hr','roles','departments','tasks','housekeeping','maintenance','food-beverage','activities','transfers','ranger','fleet','fuel','wildlife','reports','memory','lodge-ai','notifications','settings'];
+ const platform=['','lodges','groups','users','subscriptions','packages','audit','notifications','settings'].map(p=>'/super-admin'+(p?'/'+p:''));
+ const audit=[];
+ for(const isPlatform of [false,true]){
+  const {context,page}=await accountPage(premiumTestAccount(isPlatform));const crashes=[];
+  page.on('pageerror',e=>crashes.push(e.message));
+  await context.addInitScript(()=>{const theme=new URL(location.href).searchParams.get('visualTheme');if(theme)localStorage.setItem('theme',theme)});
+  try{
+   await premiumFixtures(page);
+   for(const route of isPlatform?platform:modules.map(m=>'/'+m))for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+    await page.setViewportSize({width,height:1000});await page.goto(base+route+'?visualTheme='+theme);
+    await page.locator('.content h1').first().waitFor().catch(async e=>{throw new Error(`${route} ${width}/${theme}: ${e.message}; ${await page.locator('body').innerText()}`)});await page.waitForTimeout(120);
+    assert.equal(await page.getByText('Access denied',{exact:true}).count(),0,route+' unexpected access block');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${route} overflow ${width}/${theme}`);
+    assert.deepEqual(crashes,[],`${route} crashed ${width}/${theme}`);
+    if((width===375&&theme==='light')||(width===1440&&theme==='dark')){
+     const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;
+     assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`${route} accessibility ${width}/${theme}`);
+    }
+    audit.push({route,width,theme});
+   }
+  }finally{await context.close()}
+ }
+ fs.writeFileSync('/tmp/safarios-premium-route-matrix.json',JSON.stringify(audit,null,2));
+});
+
+test('premium dashboard uses the acacia brand and accurate task health without unknown zero cards',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());
+ let restricted=false;
+ const brandResponse=await fetch(base+'/branding/safarios-mark.svg');assert.equal(brandResponse.status,200);assert.match(await brandResponse.text(),/<svg/);
+ try{
+  await premiumFixtures(page);
+  const today=new Date().toISOString().slice(0,10);
+  await page.route('**/api/v1/lodges/premium-lodge/dashboard',r=>r.fulfill({json:{lodge:{name:'Ndlovu House'},metrics:{guests_in_house:1,arrivals_today:1,open_tasks:restricted?null:5,overdue_tasks:restricted?null:2,maintenance_open:1,activities_today:1,transfers_today:1,vehicles_unavailable:restricted?null:1},attention:[{title:'Room readiness',detail:'One room needs an inspection',priority:'high'}],events:[],subscription:{status:'Active',package:'Premium',expiry_date:'2027-11-09'}}}));
+  for(const [key,value] of Object.entries({rooms:[{id:'room-1',name:'Suite 01',status:'ready'}],guests:[{id:'guest-1',name:'Test guest'}],staff:[{id:'staff-1',full_name:'Maya Laurent',has_login:true}],stays:[{id:'stay-1',guest_name:'Test guest',arrival_date:today,departure_date:today,status:'in_house'}],activities:[{id:'drive-1',title:'Morning game drive',starts_at:today+'T06:00:00Z',ends_at:today+'T08:00:00Z',status:'scheduled'}]}))await page.route('**/api/v1/lodges/premium-lodge/'+key,r=>r.fulfill({json:value}));
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+   await page.setViewportSize({width,height:1000});await page.goto(base+'/dashboard');await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.getByRole('img',{name:'On track: 60%',exact:true}).waitFor();
+   assert.equal(await page.locator('.premiumMetric').count(),8);assert.equal(await page.locator('.safariBrand[aria-label="SafariOS"] svg path').count()>0,true);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+   const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`dashboard ${width}/${theme}`);
+   await page.waitForTimeout(600);await page.screenshot({path:`/tmp/safarios-premium-dashboard-${width}-${theme}.png`,fullPage:true});
+  }
+  restricted=true;await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'Ndlovu House',exact:true}).waitFor();await page.waitForTimeout(150);assert.equal(await page.locator('.premiumMetric').count(),5);assert.equal(await page.getByRole('heading',{name:'Task health',exact:true}).count(),0);
+  await page.setViewportSize({width:844,height:390});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'landscape overflow');
+  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.safariBrand').evaluate(el=>getComputedStyle(el).animationName),'none');
+ }finally{await context.close()}
 });

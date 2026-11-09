@@ -70,7 +70,7 @@ export default function Login() {
             </div>
             <div>
               <i className="statusDot" />
-              <span>Offline-ready workflows</span>
+              <span>Connected lodge workflows</span>
             </div>
           </div>
           <small className="authFoot">

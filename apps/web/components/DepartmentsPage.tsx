@@ -1,4 +1,6 @@
 "use client";
+import { TableScroll } from "@/components/ui/table-scroll";
+
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
@@ -81,7 +83,7 @@ export default function DepartmentsPage() {
         {loading ? (
           <div className="empty">Loading…</div>
         ) : (
-          <div className="tableWrap">
+          <TableScroll className="tableWrap">
             <table className="dataTable">
               <thead>
                 <tr>
@@ -114,7 +116,7 @@ export default function DepartmentsPage() {
             {!rows.length && (
               <div className="empty">No departments have been created yet.</div>
             )}
-          </div>
+          </TableScroll>
         )}
       </section>
       {open && (

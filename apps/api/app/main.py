@@ -1151,8 +1151,10 @@ def stay_transfer_proposal(lodge_id:str,record_id:str,user:User=Depends(require_
 
 
 # Tasks
+from .task_history import task_details, validate_links, lock_task
 @app.get("/api/v1/lodges/{lodge_id}/tasks")
 def tasks(lodge_id:str,status:str|None=None,assignee_id:uuid.UUID|None=None,limit:int=Query(50,ge=1,le=250),offset:int=Query(0,ge=0),user:User=Depends(require_permission("tasks.view")),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ctx=_ctx(db,user,lodge_id);q=select(Task).where(Task.lodge_id==lodge_id)
     if ctx.role_key=="department_manager":q=q.where(Task.department_id==ctx.department_id)
     elif ctx.role_key in {"housekeeping","ranger","maintenance","driver","fb","general_staff"}:
@@ -1162,7 +1164,7 @@ def tasks(lodge_id:str,status:str|None=None,assignee_id:uuid.UUID|None=None,limi
     out=[]
     for t in db.scalars(q.order_by(Task.created_at.desc()).offset(offset).limit(limit)).all():
         staff=db.get(StaffProfile,t.assigned_staff_id) if t.assigned_staff_id else None;dep=db.get(Department,t.department_id) if t.department_id else None;unit=db.get(Unit,t.unit_id) if t.unit_id else None
-        out.append({"id":str(t.id),"title":t.title,"description":t.description,"department_id":str(t.department_id) if t.department_id else None,"department_name":dep.name if dep else None,"assigned_staff_id":str(t.assigned_staff_id) if t.assigned_staff_id else None,"assigned_staff_name":staff.full_name if staff else None,"unit_id":str(t.unit_id) if t.unit_id else None,"unit_name":unit.name if unit else None,"priority":t.priority,"status":t.status,"due_at":t.due_at.isoformat() if t.due_at else None,"accepted_at":t.accepted_at.isoformat() if t.accepted_at else None,"started_at":t.started_at.isoformat() if t.started_at else None,"completed_at":t.completed_at.isoformat() if t.completed_at else None,"recurrence_interval_days":t.recurrence_interval_days,"recurrence_end_date":t.recurrence_end_date.isoformat() if t.recurrence_end_date else None})
+        out.append({"id":str(t.id),"title":t.title,"description":t.description,"department_id":str(t.department_id) if t.department_id else None,"department_name":dep.name if dep else None,"assigned_staff_id":str(t.assigned_staff_id) if t.assigned_staff_id else None,"assigned_staff_name":staff.full_name if staff else None,"unit_id":str(t.unit_id) if t.unit_id else None,"unit_name":unit.name if unit else None,"priority":t.priority,"status":t.status,"due_at":t.due_at.isoformat() if t.due_at else None,"accepted_at":t.accepted_at.isoformat() if t.accepted_at else None,"started_at":t.started_at.isoformat() if t.started_at else None,"completed_at":t.completed_at.isoformat() if t.completed_at else None,"recurrence_interval_days":t.recurrence_interval_days,"recurrence_end_date":t.recurrence_end_date.isoformat() if t.recurrence_end_date else None,**task_details(db,ctx,t)})
     return out
 
 @app.post("/api/v1/lodges/{lodge_id}/tasks",dependencies=[Depends(require_csrf)])
@@ -1172,18 +1174,24 @@ def create_task(lodge_id:str,body:TaskCreate,request:Request,user:User=Depends(r
     return result
 
 def _create_task_record(lodge_id, body, request, user, db):
+    ensure_feature(db,lodge_id,"tasks")
     if body.recurrence_interval_days or body.recurrence_end_date: ensure_feature(db,lodge_id,"advanced_tasks")
     if body.recurrence_interval_days and body.due_at is None: raise HTTPException(422,"Recurring tasks require a due date")
     ctx=_ctx(db,user,lodge_id);dep=ensure_fk(db,Department,body.department_id,lodge_id,"Department");staff=ensure_fk(db,StaffProfile,body.assigned_staff_id,lodge_id,"Staff profile");ensure_fk(db,Guest,body.guest_id,lodge_id,"Guest");ensure_fk(db,Unit,body.unit_id,lodge_id,"Unit")
+    validate_links(db,ctx,lodge_id,body.vehicle_id,body.maintenance_ticket_id,body.unit_id)
     department_id=_set_department_from_staff_or_context(ctx,staff,body.department_id)
     if staff and department_id and staff.department_id and str(staff.department_id)!=str(department_id):raise HTTPException(409,"Assigned staff member is not in the selected department")
+    if staff and staff.employment_status!="active":raise HTTPException(409,"Choose an active staff member for this task")
     status="assigned" if body.assigned_staff_id else "created"
-    t=Task(lodge_id=lodge_id,title=body.title.strip(),description=body.description,department_id=department_id,assigned_staff_id=body.assigned_staff_id,guest_id=body.guest_id,unit_id=body.unit_id,priority=body.priority,status=status,due_at=body.due_at,recurrence_interval_days=body.recurrence_interval_days,recurrence_end_date=body.recurrence_end_date,proof_required=body.proof_required,created_by_user_id=user.id)
+    t=Task(lodge_id=lodge_id,title=body.title.strip(),description=body.description,department_id=department_id,assigned_staff_id=body.assigned_staff_id,guest_id=body.guest_id,unit_id=body.unit_id,vehicle_id=body.vehicle_id,maintenance_ticket_id=body.maintenance_ticket_id,priority=body.priority,status=status,due_at=body.due_at,recurrence_interval_days=body.recurrence_interval_days,recurrence_end_date=body.recurrence_end_date,proof_required=body.proof_required,created_by_user_id=user.id)
     db.add(t);db.flush()
-    if t.assigned_staff_id:
-        recipient=staff_user_id(db,lodge_id,t.assigned_staff_id)
-        create_notification(db,lodge_id=lodge_id,notification_type="task.assigned",severity="high" if t.priority in {"high","critical"} else "normal",title="Task assigned",body=t.title,resource_type="task",resource_id=t.id,dedupe_key=f"task-assigned:{t.id}:{t.assigned_staff_id}",recipient_user_ids=[recipient] if recipient else [])
+    _notify_task_assignment(db,t)
     audit(db,request,t.lodge_id,user.id,"task.created","task",str(t.id));event(db,t.lodge_id,user.id,"task.created","task",str(t.id),f"Task created: {t.title}");return {"id":str(t.id),"status":t.status}
+
+def _notify_task_assignment(db,task):
+    if task.assigned_staff_id:
+        recipient=staff_user_id(db,task.lodge_id,task.assigned_staff_id)
+        create_notification(db,lodge_id=task.lodge_id,notification_type="task.assigned",severity="high" if task.priority in {"high","critical"} else "normal",title="Task assigned",body=task.title,resource_type="task",resource_id=task.id,dedupe_key=f"task-assigned:{task.id}:{task.assigned_staff_id}",recipient_user_ids=[recipient] if recipient else [])
 
 TASK_TRANSITIONS={"created":{"assigned","cancelled"},"assigned":{"accepted","cancelled"},"accepted":{"started","cancelled"},"started":{"completed","cancelled"},"completed":set(),"cancelled":set()}
 
@@ -1194,53 +1202,69 @@ def update_task(lodge_id:str,record_id:str,body:TaskUpdate,request:Request,user:
     return result
 
 def _update_task_record(lodge_id, record_id, body, request, user, db):
-    ctx=_ctx(db,user,lodge_id);t=tenant_get(db,Task,record_id,lodge_id,"Task");_ensure_department_scope(ctx,t.department_id,"task")
-    full=_may(db,ctx,"tasks.manage");own=_may(db,ctx,"tasks.own.manage") and ctx.staff and t.assigned_staff_id==ctx.staff.id
-    if not full and not own:raise HTTPException(403,"You may only update tasks assigned to you")
-    if not full:
-        if any(getattr(body,f) is not None for f in ["assigned_staff_id","department_id","priority","due_at","description","title","proof_required","recurrence_interval_days","recurrence_end_date"]):raise HTTPException(403,"Assigned staff can only transition their own task status")
-        if body.status not in {"accepted","started","completed"}:raise HTTPException(403,"Assigned staff can only accept, start or complete their task")
-    if body.assigned_staff_id is not None:
-        staff=ensure_fk(db,StaffProfile,body.assigned_staff_id,lodge_id,"Staff profile")
-        dep=body.department_id or t.department_id
-        _ensure_department_scope(ctx,dep,"task")
-        if dep and staff.department_id and str(dep)!=str(staff.department_id):raise HTTPException(409,"Assigned staff member is not in the task department")
-        changed_assignee=t.assigned_staff_id!=body.assigned_staff_id
-        t.assigned_staff_id=body.assigned_staff_id
-        if changed_assignee:
-            t.status="assigned";t.accepted_at=None;t.started_at=None;t.completed_at=None
-            recipient=staff_user_id(db,lodge_id,t.assigned_staff_id)
-            create_notification(db,lodge_id=lodge_id,notification_type="task.assigned",severity="high" if t.priority in {"high","critical"} else "normal",title="Task assigned",body=t.title,resource_type="task",resource_id=t.id,dedupe_key=f"task-reassigned:{t.id}:{t.assigned_staff_id}:{datetime.now(timezone.utc).date()}",recipient_user_ids=[recipient] if recipient else [])
-        elif t.status=="created":t.status="assigned"
-    if body.department_id is not None:
-        ensure_fk(db,Department,body.department_id,lodge_id,"Department");_ensure_department_scope(ctx,body.department_id,"task");t.department_id=body.department_id
-    if body.status is not None and body.status!=t.status:
-        if body.status not in TASK_TRANSITIONS.get(t.status,set()):raise HTTPException(409,f"Task cannot transition from {t.status} to {body.status}")
-        t.status=body.status;now=datetime.now(timezone.utc)
-        if t.status=="accepted":t.accepted_at=now
-        elif t.status=="started":t.started_at=now
-        elif t.status=="completed":
-            required_open=db.scalar(select(func.count()).select_from(TaskChecklistItem).where(TaskChecklistItem.task_id==t.id,TaskChecklistItem.is_required.is_(True),TaskChecklistItem.completed_at.is_(None))) or 0
-            if required_open: raise HTTPException(409,"Complete all required checklist items before completing this task")
-            if t.proof_required and not db.scalar(select(TaskAttachment.id).where(TaskAttachment.task_id==t.id).limit(1)):raise HTTPException(409,"Proof attachment is required before completing this task")
-            t.completed_at=now
-            linked_request=db.scalar(select(GuestRequest).where(GuestRequest.task_id==t.id))
-            if linked_request and linked_request.status not in {"resolved","cancelled"}:
-                linked_request.status="resolved";linked_request.resolution=linked_request.resolution or "Resolved by linked task completion";linked_request.resolved_at=now
-            if t.recurrence_interval_days and t.due_at:
-                next_due=t.due_at+timedelta(days=t.recurrence_interval_days)
-                if not t.recurrence_end_date or next_due.date()<=t.recurrence_end_date:
-                    nxt=Task(lodge_id=t.lodge_id,title=t.title,description=t.description,department_id=t.department_id,assigned_staff_id=t.assigned_staff_id,guest_id=t.guest_id,unit_id=t.unit_id,priority=t.priority,status="assigned" if t.assigned_staff_id else "created",due_at=next_due,recurrence_interval_days=t.recurrence_interval_days,recurrence_end_date=t.recurrence_end_date,proof_required=t.proof_required,created_by_user_id=user.id)
-                    db.add(nxt);db.flush()
-                    for ci in db.scalars(select(TaskChecklistItem).where(TaskChecklistItem.task_id==t.id).order_by(TaskChecklistItem.position)).all():
-                        db.add(TaskChecklistItem(lodge_id=t.lodge_id,task_id=nxt.id,label=ci.label,position=ci.position,is_required=ci.is_required))
-                    event(db,t.lodge_id,user.id,"task.recurrence_created","task",str(nxt.id),f"Recurring task created from {t.title}")
-        event(db,t.lodge_id,user.id,"task.status_changed","task",str(t.id),f"Task '{t.title}' changed to {t.status}")
-    for f in ["title","priority","due_at","description","proof_required","recurrence_interval_days","recurrence_end_date"]:
-        v=getattr(body,f)
-        if v is not None:setattr(t,f,v)
-    if t.recurrence_interval_days and not t.due_at: raise HTTPException(422,"Recurring tasks require a due date")
-    audit(db,request,t.lodge_id,user.id,"task.updated","task",str(t.id));return {"id":str(t.id),"status":t.status}
+    ensure_feature(db,lodge_id,"tasks")
+    with db.no_autoflush:
+        ctx=_ctx(db,user,lodge_id);t=lock_task(db,lodge_id,record_id,body);_ensure_department_scope(ctx,t.department_id,"task")
+        full=_may(db,ctx,"tasks.manage");own=_may(db,ctx,"tasks.own.manage") and ctx.staff and t.assigned_staff_id==ctx.staff.id
+        if not full and not own:raise HTTPException(403,"You may only update tasks assigned to you")
+        if not full:
+            if {"vehicle_id","maintenance_ticket_id"}.intersection(body.model_fields_set):raise HTTPException(403,"Assigned staff can only transition their own task status")
+            if any(getattr(body,f) is not None for f in ["assigned_staff_id","department_id","priority","due_at","description","title","proof_required","recurrence_interval_days","recurrence_end_date"]):raise HTTPException(403,"Assigned staff can only transition their own task status")
+            if body.status not in {"accepted","started","completed"}:raise HTTPException(403,"Assigned staff can only accept, start or complete their task")
+        if {"vehicle_id","maintenance_ticket_id"}.intersection(body.model_fields_set):
+            vehicle_id=body.vehicle_id if "vehicle_id" in body.model_fields_set else t.vehicle_id
+            maintenance_id=body.maintenance_ticket_id if "maintenance_ticket_id" in body.model_fields_set else t.maintenance_ticket_id
+            validate_links(db,ctx,lodge_id,vehicle_id,maintenance_id,t.unit_id)
+            t.vehicle_id=vehicle_id;t.maintenance_ticket_id=maintenance_id
+        if body.recurrence_interval_days is not None or body.recurrence_end_date is not None:ensure_feature(db,lodge_id,"advanced_tasks")
+        if body.assigned_staff_id is not None:
+            staff=ensure_fk(db,StaffProfile,body.assigned_staff_id,lodge_id,"Staff profile")
+            if staff.employment_status!="active":raise HTTPException(409,"Choose an active staff member for this task")
+            dep=body.department_id or t.department_id
+            _ensure_department_scope(ctx,dep,"task")
+            if dep and staff.department_id and str(dep)!=str(staff.department_id):raise HTTPException(409,"Assigned staff member is not in the task department")
+            changed_assignee=t.assigned_staff_id!=body.assigned_staff_id
+            t.assigned_staff_id=body.assigned_staff_id
+            if changed_assignee:
+                t.status="assigned";t.accepted_at=None;t.started_at=None;t.completed_at=None
+                recipient=staff_user_id(db,lodge_id,t.assigned_staff_id)
+                create_notification(db,lodge_id=lodge_id,notification_type="task.assigned",severity="high" if t.priority in {"high","critical"} else "normal",title="Task assigned",body=t.title,resource_type="task",resource_id=t.id,dedupe_key=f"task-reassigned:{t.id}:{t.assigned_staff_id}:{datetime.now(timezone.utc).date()}",recipient_user_ids=[recipient] if recipient else [])
+            elif t.status=="created":t.status="assigned"
+        if body.department_id is not None:
+            ensure_fk(db,Department,body.department_id,lodge_id,"Department");_ensure_department_scope(ctx,body.department_id,"task");t.department_id=body.department_id
+        if body.status=="assigned" and not t.assigned_staff_id:raise HTTPException(422,"Choose a staff member before assigning this task")
+        if (body.assigned_staff_id is not None or body.department_id is not None) and t.assigned_staff_id and t.department_id:
+            assigned=tenant_get(db,StaffProfile,t.assigned_staff_id,lodge_id,"Staff profile")
+            if assigned.department_id and assigned.department_id!=t.department_id:raise HTTPException(409,"Assigned staff member is not in the task department")
+        if body.status is not None and body.status!=t.status:
+            if body.status not in TASK_TRANSITIONS.get(t.status,set()):raise HTTPException(409,f"Task cannot transition from {t.status} to {body.status}")
+            t.status=body.status;now=datetime.now(timezone.utc)
+            if t.status=="accepted":t.accepted_at=now
+            elif t.status=="started":t.started_at=now
+            elif t.status=="completed":
+                required_open=db.scalar(select(func.count()).select_from(TaskChecklistItem).where(TaskChecklistItem.task_id==t.id,TaskChecklistItem.is_required.is_(True),TaskChecklistItem.completed_at.is_(None))) or 0
+                if required_open: raise HTTPException(409,"Complete all required checklist items before completing this task")
+                if t.proof_required and not db.scalar(select(TaskAttachment.id).where(TaskAttachment.task_id==t.id).limit(1)):raise HTTPException(409,"Proof attachment is required before completing this task")
+                t.completed_at=now
+                linked_request=db.scalar(select(GuestRequest).where(GuestRequest.task_id==t.id))
+                if linked_request and linked_request.status not in {"resolved","cancelled"}:
+                    linked_request.status="resolved";linked_request.resolution=linked_request.resolution or "Resolved by linked task completion";linked_request.resolved_at=now
+                if t.recurrence_interval_days and t.due_at and entitlement_enabled(db,str(lodge_id),"advanced_tasks"):
+                    next_due=t.due_at+timedelta(days=t.recurrence_interval_days)
+                    if not t.recurrence_end_date or next_due.date()<=t.recurrence_end_date:
+                        recurrence_staff=db.get(StaffProfile,t.assigned_staff_id) if t.assigned_staff_id else None
+                        recurrence_staff_id=t.assigned_staff_id if recurrence_staff and recurrence_staff.employment_status=="active" and (not t.department_id or not recurrence_staff.department_id or recurrence_staff.department_id==t.department_id) else None
+                        nxt=Task(lodge_id=t.lodge_id,title=t.title,description=t.description,department_id=t.department_id,assigned_staff_id=recurrence_staff_id,guest_id=t.guest_id,unit_id=t.unit_id,vehicle_id=t.vehicle_id,maintenance_ticket_id=t.maintenance_ticket_id,priority=t.priority,status="assigned" if recurrence_staff_id else "created",due_at=next_due,recurrence_interval_days=t.recurrence_interval_days,recurrence_end_date=t.recurrence_end_date,proof_required=t.proof_required,created_by_user_id=user.id)
+                        db.add(nxt);db.flush();_notify_task_assignment(db,nxt)
+                        for ci in db.scalars(select(TaskChecklistItem).where(TaskChecklistItem.task_id==t.id).order_by(TaskChecklistItem.position)).all():
+                            db.add(TaskChecklistItem(lodge_id=t.lodge_id,task_id=nxt.id,label=ci.label,position=ci.position,is_required=ci.is_required))
+                        event(db,t.lodge_id,user.id,"task.recurrence_created","task",str(nxt.id),f"Recurring task created from {t.title}")
+            event(db,t.lodge_id,user.id,"task.status_changed","task",str(t.id),f"Task '{t.title}' changed to {t.status}")
+        for f in ["title","priority","due_at","description","proof_required","recurrence_interval_days","recurrence_end_date"]:
+            v=getattr(body,f)
+            if v is not None:setattr(t,f,v)
+        if t.recurrence_interval_days and not t.due_at: raise HTTPException(422,"Recurring tasks require a due date")
+        audit(db,request,t.lodge_id,user.id,"task.updated","task",str(t.id));return {"id":str(t.id),"status":t.status}
 
 
 # Guest requests
@@ -1275,7 +1299,7 @@ REQUEST_TRANSITIONS={"open":{"assigned","in_progress","cancelled"},"assigned":{"
 
 @app.patch("/api/v1/lodges/{lodge_id}/requests/{record_id}",dependencies=[Depends(require_csrf)])
 def update_request(lodge_id:str,record_id:str,body:GuestRequestUpdate,request:Request,user:User=Depends(require_permission("requests.view",write=True)),db:Session=Depends(get_db)):
-    ctx=_ctx(db,user,lodge_id);r=tenant_get(db,GuestRequest,record_id,lodge_id,"Guest request");_ensure_department_scope(ctx,r.department_id,"guest request")
+    ctx=_ctx(db,user,lodge_id);r=tenant_get(db,GuestRequest,record_id,lodge_id,"Guest request");db.refresh(r,with_for_update=True);_ensure_department_scope(ctx,r.department_id,"guest request")
     full=_may(db,ctx,"requests.manage")
     if ctx.role_key=="general_staff":
         own=_may(db,ctx,"requests.own.manage") and ctx.staff and r.assigned_staff_id==ctx.staff.id
@@ -1299,7 +1323,7 @@ def update_request(lodge_id:str,record_id:str,body:GuestRequestUpdate,request:Re
         if r.status=="resolved":
             r.resolved_at=datetime.now(timezone.utc)
             if r.task_id:
-                linked=db.get(Task,r.task_id)
+                linked=lock_task(db,lodge_id,r.task_id)
                 if linked and linked.status not in {"completed","cancelled"}:
                     required_open=db.scalar(select(func.count()).select_from(TaskChecklistItem).where(TaskChecklistItem.task_id==linked.id,TaskChecklistItem.is_required.is_(True),TaskChecklistItem.completed_at.is_(None))) or 0
                     if required_open:raise HTTPException(409,"Complete the linked task checklist before resolving this request")
@@ -1313,10 +1337,14 @@ def update_request(lodge_id:str,record_id:str,body:GuestRequestUpdate,request:Re
 
 @app.post("/api/v1/lodges/{lodge_id}/requests/{record_id}/create-task",dependencies=[Depends(require_csrf)])
 def request_to_task(lodge_id:str,record_id:str,request:Request,user:User=Depends(require_permission("requests.manage",write=True)),db:Session=Depends(get_db)):
-    ctx=_ctx(db,user,lodge_id);r=tenant_get(db,GuestRequest,record_id,lodge_id,"Guest request");_ensure_department_scope(ctx,r.department_id,"guest request")
+    ensure_feature(db,lodge_id,"tasks")
+    ctx=_ctx(db,user,lodge_id);r=tenant_get(db,GuestRequest,record_id,lodge_id,"Guest request");db.refresh(r,with_for_update=True);_ensure_department_scope(ctx,r.department_id,"guest request")
     if r.task_id:raise HTTPException(409,"This guest request already has a task")
+    assigned=ensure_fk(db,StaffProfile,r.assigned_staff_id,lodge_id,"Staff profile")
+    if assigned and assigned.employment_status!="active":raise HTTPException(409,"Choose an active staff member before creating this task")
+    if assigned and assigned.department_id and r.department_id and assigned.department_id!=r.department_id:raise HTTPException(409,"The request assignee is no longer in its department")
     t=Task(lodge_id=lodge_id,title=f"Guest request: {r.request_type}",description=r.description,department_id=r.department_id,assigned_staff_id=r.assigned_staff_id,guest_id=r.guest_id,priority=r.priority,status="assigned" if r.assigned_staff_id else "created",created_by_user_id=user.id)
-    db.add(t);db.flush();r.task_id=t.id
+    db.add(t);db.flush();r.task_id=t.id;_notify_task_assignment(db,t)
     audit(db,request,r.lodge_id,user.id,"guest_request.task_created","guest_request",str(r.id));event(db,r.lodge_id,user.id,"guest_request.task_created","guest_request",str(r.id),f"Task created from guest request: {r.request_type}");db.commit();return {"task_id":str(t.id)}
 
 
@@ -2067,16 +2095,19 @@ def assign_custom_role(lodge_id:str,record_id:str,body:MembershipRoleUpdate,requ
 
 @app.get("/api/v1/lodges/{lodge_id}/tasks/{record_id}/checklist")
 def task_checklist(lodge_id:str,record_id:str,user:User=Depends(require_permission("tasks.view")),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,record_id,lodge_id,"Task");_assert_task_visible(db,ctx,task)
     return [{"id":str(x.id),"label":x.label,"position":x.position,"is_required":x.is_required,"completed":bool(x.completed_at),"completed_at":x.completed_at.isoformat() if x.completed_at else None} for x in db.scalars(select(TaskChecklistItem).where(TaskChecklistItem.task_id==task.id).order_by(TaskChecklistItem.position)).all()]
 
 @app.post("/api/v1/lodges/{lodge_id}/tasks/{record_id}/checklist",dependencies=[Depends(require_csrf)])
 def add_task_checklist(lodge_id:str,record_id:str,body:TaskChecklistCreate,request:Request,user:User=Depends(require_permission("tasks.manage",write=True)),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ensure_feature(db,lodge_id,"advanced_tasks");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,record_id,lodge_id,"Task");_ensure_department_scope(ctx,task.department_id,"task")
     row=TaskChecklistItem(lodge_id=lodge_id,task_id=task.id,label=body.label,position=body.position,is_required=body.is_required);db.add(row);db.flush();audit(db,request,lodge_id,user.id,"task.checklist_added","task",str(task.id));db.commit();return {"id":str(row.id)}
 
 @app.patch("/api/v1/lodges/{lodge_id}/tasks/{record_id}/checklist/{item_id}",dependencies=[Depends(require_csrf)])
 def update_task_checklist(lodge_id:str,record_id:str,item_id:str,body:TaskChecklistUpdate,request:Request,user:User=Depends(require_permission("tasks.view",write=True)),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,record_id,lodge_id,"Task");_ensure_department_scope(ctx,task.department_id,"task");full=_may(db,ctx,"tasks.manage");own=_may(db,ctx,"tasks.own.manage") and ctx.staff and task.assigned_staff_id==ctx.staff.id
     if not full and not own:raise HTTPException(403,"You may only update checklist items on tasks assigned to you")
     item=tenant_get(db,TaskChecklistItem,item_id,lodge_id,"Checklist item")
@@ -2085,11 +2116,13 @@ def update_task_checklist(lodge_id:str,record_id:str,item_id:str,body:TaskCheckl
 
 @app.get("/api/v1/lodges/{lodge_id}/tasks/{record_id}/comments")
 def task_comments(lodge_id:str,record_id:str,user:User=Depends(require_permission("tasks.view")),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,record_id,lodge_id,"Task");_assert_task_visible(db,ctx,task)
     rows=db.scalars(select(TaskComment).where(TaskComment.task_id==task.id).order_by(TaskComment.created_at)).all();return [{"id":str(x.id),"user_id":str(x.user_id),"author":db.get(User,x.user_id).full_name if db.get(User,x.user_id) else "User","body":x.body,"created_at":x.created_at.isoformat()} for x in rows]
 
 @app.post("/api/v1/lodges/{lodge_id}/tasks/{record_id}/comments",dependencies=[Depends(require_csrf)])
 def add_task_comment(lodge_id:str,record_id:str,body:TaskCommentCreate,request:Request,user:User=Depends(require_permission("tasks.view",write=True)),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ensure_feature(db,lodge_id,"advanced_tasks");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,record_id,lodge_id,"Task");_ensure_department_scope(ctx,task.department_id,"task")
     full=_may(db,ctx,"tasks.manage");own=_may(db,ctx,"tasks.own.manage") and ctx.staff and task.assigned_staff_id==ctx.staff.id
     if not full and not own:raise HTTPException(403,"You may only comment on tasks you are authorised to manage")
@@ -2302,6 +2335,7 @@ def update_meal_service(lodge_id:str,record_id:str,body:MealServiceUpdate,reques
 
 @app.post("/api/v1/lodges/{lodge_id}/tasks/{task_id}/attachments/upload-url",dependencies=[Depends(require_csrf)])
 def task_attachment_upload_url(lodge_id:str,task_id:str,body:TaskAttachmentUploadRequest,user:User=Depends(require_permission("tasks.view",write=True)),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ensure_feature(db,lodge_id,"task_attachments");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,task_id,lodge_id,"Task");_assert_task_visible(db,ctx,task)
     can_upload=_may(db,ctx,"tasks.manage") or (_may(db,ctx,"tasks.own.manage") and ctx.staff and task.assigned_staff_id==ctx.staff.id)
     if not can_upload: raise HTTPException(403,"Your role cannot upload files to this task")
@@ -2311,6 +2345,7 @@ def task_attachment_upload_url(lodge_id:str,task_id:str,body:TaskAttachmentUploa
 
 @app.post("/api/v1/lodges/{lodge_id}/tasks/{task_id}/attachments",dependencies=[Depends(require_csrf)])
 def register_task_attachment(lodge_id:str,task_id:str,body:TaskAttachmentRegister,request:Request,user:User=Depends(require_permission("tasks.view",write=True)),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ensure_feature(db,lodge_id,"task_attachments");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,task_id,lodge_id,"Task");_assert_task_visible(db,ctx,task)
     if not (_may(db,ctx,"tasks.manage") or (_may(db,ctx,"tasks.own.manage") and ctx.staff and task.assigned_staff_id==ctx.staff.id)):raise HTTPException(403,"Only task managers or the assigned staff member can add attachments")
     prefix=f"lodges/{lodge_id}/tasks/{task_id}/"
@@ -2326,10 +2361,12 @@ def register_task_attachment(lodge_id:str,task_id:str,body:TaskAttachmentRegiste
 
 @app.get("/api/v1/lodges/{lodge_id}/tasks/{task_id}/attachments")
 def list_task_attachments(lodge_id:str,task_id:str,user:User=Depends(require_permission("tasks.view")),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ensure_feature(db,lodge_id,"task_attachments");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,task_id,lodge_id,"Task");_assert_task_visible(db,ctx,task);rows=db.scalars(select(TaskAttachment).where(TaskAttachment.task_id==task.id).order_by(TaskAttachment.created_at)).all();return [{"id":str(x.id),"file_name":x.file_name,"content_type":x.content_type,"size_bytes":x.size_bytes,"created_at":x.created_at.isoformat()} for x in rows]
 
 @app.get("/api/v1/lodges/{lodge_id}/tasks/{task_id}/attachments/{attachment_id}/download-url")
 def task_attachment_download_url(lodge_id:str,task_id:str,attachment_id:str,user:User=Depends(require_permission("tasks.view")),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"tasks")
     ensure_feature(db,lodge_id,"task_attachments");ctx=_ctx(db,user,lodge_id);task=tenant_get(db,Task,task_id,lodge_id,"Task");_assert_task_visible(db,ctx,task);row=tenant_get(db,TaskAttachment,attachment_id,lodge_id,"Task attachment")
     if row.task_id!=task.id:raise HTTPException(404,"Task attachment not found")
     return {"url":s3_public.generate_presigned_url("get_object",Params={"Bucket":settings.object_storage_bucket,"Key":row.object_key},ExpiresIn=600),"expires_in_seconds":600}
@@ -2359,3 +2396,6 @@ app.include_router(ai_report_router)
 
 from .guest_profiles import router as guest_profile_router
 app.include_router(guest_profile_router)
+
+from .task_history import router as task_history_router
+app.include_router(task_history_router)

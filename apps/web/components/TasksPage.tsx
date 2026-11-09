@@ -4,10 +4,19 @@ import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, useRef } from "react";
+import TaskHistoryPanel from "./TaskHistoryPanel";
+import { taskCopy as copy } from "@/lib/strings/tasks";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
-import { authApi, getActiveLodgeId, lodgeApi, operationsApi } from "@/lib/api";
+import {
+  authApi,
+  getActiveLodgeId,
+  getActiveUserId,
+  ApiError,
+  lodgeApi,
+  operationsApi,
+} from "@/lib/api";
 type Task = {
   id: string;
   title: string;
@@ -19,6 +28,11 @@ type Task = {
   status: string;
   due_at?: string;
   recurrence_interval_days?: number;
+  assigned_staff_id?: string | null;
+  department_id?: string | null;
+  vehicle_id?: string | null;
+  maintenance_ticket_id?: string | null;
+  can_transition?: boolean;
 };
 type Staff = { id: string; full_name: string; employment_status: string };
 type Department = { id: string; name: string; is_active: boolean };
@@ -47,9 +61,51 @@ export default function TasksPage() {
     [canManage, setCanManage] = useState(false),
     [canOwnManage, setCanOwnManage] = useState(false);
   const advanced = access.feature("advanced_tasks");
+  const vehicleLinks =
+    access.feature("fleet") && access.permission("vehicles.view");
+  const maintenanceLinks =
+    access.feature("maintenance") && access.permission("maintenance.view");
+  const staffDirectory =
+    access.feature("staff") && access.permission("staff.view");
+  const departmentDirectory =
+    access.feature("departments") && access.permission("departments.view");
+  const [vehicles, setVehicles] = useState<any[]>([]),
+    [tickets, setTickets] = useState<any[]>([]),
+    [loading, setLoading] = useState(true),
+    [busy, setBusy] = useState(false),
+    [detailVersion, setDetailVersion] = useState(0);
+  const mounted = useRef(false),
+    generation = useRef(0),
+    details = useRef(0),
+    mutation = useRef(false),
+    actor = useRef({ userId: getActiveUserId(), lodgeId: getActiveLodgeId() });
+  const current = () =>
+    mounted.current &&
+    actor.current.userId === getActiveUserId() &&
+    actor.current.lodgeId === getActiveLodgeId();
+  function denied(message: string) {
+    setSelected(null);
+    setRows([]);
+    setChecklist([]);
+    setComments([]);
+    setAttachments([]);
+    setError(message);
+  }
+  function failure(e: any) {
+    if (!current()) return;
+    if (e instanceof ApiError && [401, 403, 404].includes(e.status))
+      denied(e.message);
+    else setError(e.message);
+  }
+  const mayProgress = (task: Task) =>
+    canManage || (canOwnManage && task.can_transition === true);
   const load = async () => {
+    const n = ++generation.current;
+    setLoading(true);
+    setError("");
     try {
       const me = await authApi.me();
+      if (!current() || n !== generation.current) return [];
       const m = me.memberships?.find(
         (x: any) => x.lodge_id === getActiveLodgeId(),
       );
@@ -62,69 +118,165 @@ export default function TasksPage() {
       setCanManage(manage);
       setCanOwnManage(ownManage);
 
-      const [t, s, d, r, g] = await Promise.all([
+      const [t, s, d, r, g, v, mt] = await Promise.all([
         lodgeApi.tasks(),
-        manage && access.feature("staff")
+        manage && staffDirectory
           ? operationsApi.staff.list().catch(() => [])
           : Promise.resolve([]),
-        manage && access.feature("departments")
+        manage && departmentDirectory
           ? operationsApi.departments.list().catch(() => [])
           : Promise.resolve([]),
-        manage && access.feature("units")
+        manage && access.feature("units") && access.permission("units.view")
           ? lodgeApi.rooms().catch(() => [])
           : Promise.resolve([]),
-        manage && access.feature("guests")
+        manage && access.feature("guests") && access.permission("guests.view")
           ? lodgeApi.guests().catch(() => [])
           : Promise.resolve([]),
+        manage && vehicleLinks
+          ? operationsApi.vehicles.list()
+          : Promise.resolve([]),
+        manage && maintenanceLinks
+          ? lodgeApi.maintenance()
+          : Promise.resolve([]),
       ]);
+      if (!current() || n !== generation.current) return [];
+      setVehicles(v);
+      setTickets(mt);
       setRows(t);
       setStaff(s);
       setDeps(d);
       setRooms(r);
       setGuests(g);
+      return t as Task[];
     } catch (e: any) {
-      setError(e.message);
+      if (n === generation.current) failure(e);
+      return [];
+    } finally {
+      if (current() && n === generation.current) setLoading(false);
     }
   };
   useEffect(() => {
-    load();
+    mounted.current = true;
+    void load();
+    const clear = (event: Event) => {
+      if (
+        event instanceof StorageEvent &&
+        event.key &&
+        !["active_user_id", "active_lodge_id"].includes(event.key)
+      )
+        return;
+      generation.current++;
+      details.current++;
+      setSelected(null);
+      setOpen(false);
+      setRows([]);
+      setStaff([]);
+      setDeps([]);
+      setRooms([]);
+      setGuests([]);
+      setVehicles([]);
+      setTickets([]);
+      setChecklist([]);
+      setComments([]);
+      setAttachments([]);
+      setError("");
+    };
+    window.addEventListener("storage", clear);
+    window.addEventListener("safarios-lodge-changed", clear);
+    return () => {
+      mounted.current = false;
+      generation.current++;
+      details.current++;
+      window.removeEventListener("storage", clear);
+      window.removeEventListener("safarios-lodge-changed", clear);
+    };
   }, []);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!current() || mutation.current) return;
+    mutation.current = true;
+    setBusy(true);
     const form = e.currentTarget;
     const f = new FormData(form);
     try {
-      await lodgeApi.createTask({
-        title: String(f.get("title")),
-        description: String(f.get("description") || ""),
-        department_id: String(f.get("department_id") || "") || null,
-        assigned_staff_id: String(f.get("assigned_staff_id") || "") || null,
-        guest_id: String(f.get("guest_id") || "") || null,
-        unit_id: String(f.get("unit_id") || "") || null,
-        priority: String(f.get("priority")),
-        due_at: String(f.get("due_at") || "")
-          ? new Date(String(f.get("due_at"))).toISOString()
-          : null,
-        recurrence_interval_days:
-          Number(f.get("recurrence_interval_days") || 0) || null,
-        recurrence_end_date: String(f.get("recurrence_end_date") || "") || null,
-      });
+      await lodgeApi.createTask(
+        {
+          title: String(f.get("title")),
+          description: String(f.get("description") || ""),
+          department_id: String(f.get("department_id") || "") || null,
+          assigned_staff_id: String(f.get("assigned_staff_id") || "") || null,
+          guest_id: String(f.get("guest_id") || "") || null,
+          unit_id: String(f.get("unit_id") || "") || null,
+          ...(vehicleLinks
+            ? { vehicle_id: String(f.get("vehicle_id") || "") || null }
+            : {}),
+          ...(maintenanceLinks
+            ? {
+                maintenance_ticket_id:
+                  String(f.get("maintenance_ticket_id") || "") || null,
+              }
+            : {}),
+          priority: String(f.get("priority")),
+          due_at: String(f.get("due_at") || "")
+            ? new Date(String(f.get("due_at"))).toISOString()
+            : null,
+          recurrence_interval_days:
+            Number(f.get("recurrence_interval_days") || 0) || null,
+          recurrence_end_date:
+            String(f.get("recurrence_end_date") || "") || null,
+        },
+        actor.current,
+      );
+      if (!current()) return;
       setOpen(false);
       await load();
     } catch (e: any) {
-      setError(e.message);
+      failure(e);
+    } finally {
+      mutation.current = false;
+      if (current()) setBusy(false);
     }
   }
   async function update(id: string, body: any) {
+    if (!current() || mutation.current) return;
+    mutation.current = true;
+    setBusy(true);
     try {
-      await lodgeApi.updateTask(id, body);
-      await load();
-      if (selected?.id === id) await openTask({ ...selected, ...body });
-    } catch (e: any) {
-      setError(e.message);
+      await lodgeApi.updateTask(id, body, actor.current);
+      if (!current()) return;
+      const fresh = await load();
+      const row = fresh?.find((task: Task) => task.id === id);
+      if (current() && selected?.id === id && row) await openTask(row);
+    } catch (e) {
+      failure(e);
+    } finally {
+      mutation.current = false;
+      if (current()) setBusy(false);
     }
   }
+  async function saveDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    const f = new FormData(event.currentTarget),
+      body: any = {};
+    if (f.get("assigned_staff_id"))
+      body.assigned_staff_id = String(f.get("assigned_staff_id"));
+    if (f.get("department_id"))
+      body.department_id = String(f.get("department_id"));
+    if (vehicleLinks)
+      body.vehicle_id = String(f.get("vehicle_id") || "") || null;
+    if (maintenanceLinks)
+      body.maintenance_ticket_id =
+        String(f.get("maintenance_ticket_id") || "") || null;
+    await update(selected.id, body);
+  }
   async function openTask(t: Task) {
+    if (!current()) return;
+    const n = ++details.current;
+    setDetailVersion(n);
+    setChecklist([]);
+    setComments([]);
+    setAttachments([]);
     setSelected(t);
     try {
       const [c, m, a] = await Promise.all([
@@ -134,16 +286,18 @@ export default function TasksPage() {
           ? operationsApi.taskAttachments.list(t.id)
           : Promise.resolve([]),
       ]);
+      if (!current() || details.current !== n) return;
       setChecklist(c);
       setComments(m);
       setAttachments(a);
     } catch (e: any) {
-      setError(e.message);
+      if (details.current === n) failure(e);
     }
   }
   async function addChecklist(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!selected) return;
+    if (!selected || !current()) return;
+    const stamp = details.current;
     const form = e.currentTarget;
     const f = new FormData(form);
     await operationsApi.taskWorkflow.addChecklist(selected.id, {
@@ -151,24 +305,30 @@ export default function TasksPage() {
       position: checklist.length,
       is_required: true,
     });
-    form.reset();
-    openTask(selected);
+    if (current() && stamp === details.current) {
+      form.reset();
+      await openTask(selected);
+    }
   }
   async function addComment(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!selected) return;
+    if (!selected || !current()) return;
+    const stamp = details.current;
     const form = e.currentTarget;
     const f = new FormData(form);
     await operationsApi.taskWorkflow.addComment(
       selected.id,
       String(f.get("body")),
     );
-    form.reset();
-    openTask(selected);
+    if (current() && stamp === details.current) {
+      form.reset();
+      await openTask(selected);
+    }
   }
   async function uploadAttachment(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!selected) return;
+    if (!selected || !current()) return;
+    const stamp = details.current;
     const input = e.currentTarget.elements.namedItem(
       "file",
     ) as HTMLInputElement;
@@ -180,18 +340,21 @@ export default function TasksPage() {
       const sha256 = Array.from(new Uint8Array(digest))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
+      if (!current() || stamp !== details.current) return;
       const prep = await operationsApi.taskAttachments.uploadUrl(selected.id, {
         file_name: file.name,
         content_type: file.type,
         size_bytes: file.size,
         sha256,
       });
+      if (!current() || stamp !== details.current) return;
       const up = await fetch(prep.upload_url, {
         method: "PUT",
         headers: prep.required_headers,
         body: file,
       });
       if (!up.ok) throw new Error(`Upload failed (${up.status})`);
+      if (!current() || stamp !== details.current) return;
       await operationsApi.taskAttachments.register(selected.id, {
         object_key: prep.object_key,
         file_name: file.name,
@@ -199,19 +362,22 @@ export default function TasksPage() {
         size_bytes: file.size,
         sha256,
       });
+      if (!current() || stamp !== details.current) return;
       input.value = "";
       await openTask(selected);
     } catch (e: any) {
-      setError(e.message);
+      failure(e);
     }
   }
   async function downloadAttachment(id: string) {
-    if (!selected) return;
+    if (!selected || !current()) return;
+    const stamp = details.current;
     try {
       const r = await operationsApi.taskAttachments.download(selected.id, id);
+      if (!current() || stamp !== details.current) return;
       window.open(r.url, "_blank", "noopener,noreferrer");
     } catch (e: any) {
-      setError(e.message);
+      failure(e);
     }
   }
 
@@ -232,7 +398,15 @@ export default function TasksPage() {
           </button>
         )}
       </div>
-      {error && <div className="panel dangerText">{error}</div>}
+      {error && !open && !selected && (
+        <div className="panel dangerText" role="alert">
+          {error}{" "}
+          <button className="linkButton" onClick={() => void load()}>
+            {copy.retry}
+          </button>
+        </div>
+      )}
+      {loading && <p role="status">{copy.loadingTasks}</p>}
       <section className="panel tableWrap">
         <table className="dataTable">
           <thead>
@@ -270,10 +444,15 @@ export default function TasksPage() {
                   <StatusPill value={r.status} />
                 </td>
                 <td>
-                  {next[r.status] && (canManage || canOwnManage) && (
+                  {next[r.status] && mayProgress(r) && (
                     <button
                       className="button secondary"
-                      onClick={() => update(r.id, { status: next[r.status] })}
+                      disabled={busy}
+                      onClick={() =>
+                        r.status === "created"
+                          ? openTask(r)
+                          : update(r.id, { status: next[r.status] })
+                      }
                     >
                       {readableLabel(next[r.status]!)}
                     </button>
@@ -283,7 +462,7 @@ export default function TasksPage() {
             ))}
           </tbody>
         </table>
-        {!rows.length && (
+        {!loading && !error && !rows.length && (
           <div className="empty">No tasks have been created.</div>
         )}
       </section>
@@ -305,6 +484,11 @@ export default function TasksPage() {
               ×
             </button>
           </div>
+          {error && (
+            <p className="dangerText" role="alert">
+              {error}
+            </p>
+          )}
           <Form onSubmit={create}>
             <Field label="Title">
               <input className="field" name="title" required />
@@ -312,54 +496,84 @@ export default function TasksPage() {
             <Field label="Description">
               <textarea className="textarea" name="description" />
             </Field>
-            <Field label="Department">
-              <select className="select" name="department_id">
-                <option value="">No department</option>
-                {deps.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Assign staff">
-              <select className="select" name="assigned_staff_id">
-                <option value="">Unassigned</option>
-                {staff
-                  .filter((s) => s.employment_status === "active")
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.full_name}
+            {departmentDirectory && (
+              <Field label="Department">
+                <select className="select" name="department_id">
+                  <option value="">No department</option>
+                  {deps.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
                     </option>
                   ))}
-              </select>
-            </Field>
-            <Field label="Guest">
-              <select className="select" name="guest_id">
-                <option value="">None</option>
-                {guests.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Room / unit">
-              <select className="select" name="unit_id">
-                <option value="">None</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                </select>
+              </Field>
+            )}
+            {staffDirectory && (
+              <Field label="Assign staff">
+                <select className="select" name="assigned_staff_id">
+                  <option value="">Unassigned</option>
+                  {staff
+                    .filter((s) => s.employment_status === "active")
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            )}
+            {access.feature("guests") && access.permission("guests.view") && (
+              <Field label="Guest">
+                <select className="select" name="guest_id">
+                  <option value="">None</option>
+                  {guests.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {access.feature("units") && access.permission("units.view") && (
+              <Field label="Room / unit">
+                <select className="select" name="unit_id">
+                  <option value="">None</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {vehicleLinks && (
+              <Field label={copy.vehicle}>
+                <select className="select" name="vehicle_id">
+                  <option value="">{copy.none}</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name || v.registration}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {maintenanceLinks && (
+              <Field label={copy.maintenance}>
+                <select className="select" name="maintenance_ticket_id">
+                  <option value="">{copy.none}</option>
+                  {tickets.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="Priority">
-              <select className="select" name="priority">
+              <select className="select" name="priority" defaultValue="normal">
                 <option value="low">{readableLabel("low")}</option>
-                <option selected value="normal">
-                  {readableLabel("normal")}
-                </option>
+                <option value="normal">{readableLabel("normal")}</option>
                 <option value="high">{readableLabel("high")}</option>
                 <option value="critical">{readableLabel("critical")}</option>
               </select>
@@ -386,7 +600,11 @@ export default function TasksPage() {
                 </Field>
               </>
             )}
-            <button className="button primary">Create task</button>
+            <div className="drawerActions">
+              <button className="button primary" disabled={busy}>
+                {busy ? copy.saving : "Create task"}
+              </button>
+            </div>
           </Form>
         </Drawer>
       )}
@@ -406,6 +624,103 @@ export default function TasksPage() {
               ×
             </button>
           </div>
+          {error && (
+            <p className="dangerText" role="alert">
+              {error}
+            </p>
+          )}
+          <TaskHistoryPanel
+            key={selected.id + ":" + detailVersion}
+            taskId={selected.id}
+            onDenied={denied}
+          />
+          {canManage &&
+            (staffDirectory ||
+              departmentDirectory ||
+              vehicleLinks ||
+              maintenanceLinks) && (
+              <section className="taskManagement">
+                <h2>{copy.manage}</h2>
+                <Form
+                  key={selected.id + ":" + detailVersion}
+                  onSubmit={saveDetails}
+                >
+                  {staffDirectory && (
+                    <Field label={copy.assignment}>
+                      <select
+                        className="select"
+                        name="assigned_staff_id"
+                        defaultValue={selected.assigned_staff_id || ""}
+                      >
+                        <option value="">{copy.noChange}</option>
+                        {staff
+                          .filter((s) => s.employment_status === "active")
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.full_name}
+                            </option>
+                          ))}
+                      </select>
+                    </Field>
+                  )}
+                  {departmentDirectory && (
+                    <Field label={copy.department}>
+                      <select
+                        className="select"
+                        name="department_id"
+                        defaultValue={selected.department_id || ""}
+                      >
+                        <option value="">{copy.noChange}</option>
+                        {deps
+                          .filter((d) => d.is_active)
+                          .map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                      </select>
+                    </Field>
+                  )}
+                  {vehicleLinks && (
+                    <Field label={copy.vehicle}>
+                      <select
+                        className="select"
+                        name="vehicle_id"
+                        defaultValue={selected.vehicle_id || ""}
+                      >
+                        <option value="">{copy.none}</option>
+                        {vehicles.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name || v.registration}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  {maintenanceLinks && (
+                    <Field label={copy.maintenance}>
+                      <select
+                        className="select"
+                        name="maintenance_ticket_id"
+                        defaultValue={selected.maintenance_ticket_id || ""}
+                      >
+                        <option value="">{copy.none}</option>
+                        {tickets.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.title}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  <div className="drawerActions">
+                    <button className="button primary" disabled={busy}>
+                      {busy ? copy.saving : copy.save}
+                    </button>
+                  </div>
+                </Form>
+              </section>
+            )}
           <h2>Checklist</h2>
           {checklist.map((i) => (
             <label className="checkRow" key={i.id}>
@@ -416,14 +731,21 @@ export default function TasksPage() {
               <input
                 type="checkbox"
                 checked={i.completed}
-                disabled={!(canManage || canOwnManage)}
+                disabled={!mayProgress(selected)}
                 onChange={async (e) => {
-                  await operationsApi.taskWorkflow.updateChecklist(
-                    selected.id,
-                    i.id,
-                    e.target.checked,
-                  );
-                  openTask(selected);
+                  const stamp = details.current;
+                  if (!current()) return;
+                  try {
+                    await operationsApi.taskWorkflow.updateChecklist(
+                      selected.id,
+                      i.id,
+                      e.target.checked,
+                    );
+                    if (current() && stamp === details.current)
+                      await openTask(selected);
+                  } catch (e) {
+                    failure(e);
+                  }
                 }}
               />
             </label>
@@ -451,7 +773,7 @@ export default function TasksPage() {
               </div>
             </div>
           ))}
-          {advanced && (canManage || canOwnManage) && (
+          {advanced && mayProgress(selected) && (
             <Form onSubmit={addComment}>
               <Field label="Add operational note or comment">
                 <textarea
@@ -481,7 +803,7 @@ export default function TasksPage() {
                 </button>
               </div>
             ))}
-          {attachmentsEnabled && (canManage || canOwnManage) && (
+          {attachmentsEnabled && mayProgress(selected) && (
             <Form onSubmit={uploadAttachment}>
               <Field label="Attachment">
                 <input

@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 import uuid
-from sqlalchemy import LargeBinary, Boolean, CheckConstraint, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint, Index, Numeric
+from sqlalchemy import BigInteger, Identity, FetchedValue, text, LargeBinary, Boolean, CheckConstraint, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint, Index, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
@@ -222,7 +222,9 @@ class Stay(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
-    __table_args__ = (Index("ix_tasks_lodge_status_due", "lodge_id", "status", "due_at"),)
+    __table_args__ = (Index("ix_tasks_lodge_status_due", "lodge_id", "status", "due_at"),
+        ForeignKeyConstraint(["vehicle_id","lodge_id"],["vehicles.id","vehicles.lodge_id"], name="fk_task_vehicle_tenant", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["maintenance_ticket_id","lodge_id"],["maintenance_tickets.id","maintenance_tickets.lodge_id"], name="fk_task_maintenance_tenant", ondelete="RESTRICT"))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(240))
@@ -231,6 +233,9 @@ class Task(Base):
     assigned_staff_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("staff_profiles.id", ondelete="SET NULL"), nullable=True, index=True)
     guest_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("guests.id", ondelete="SET NULL"), nullable=True)
     unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("units.id", ondelete="SET NULL"), nullable=True)
+    vehicle_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    maintenance_ticket_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, server_default=FetchedValue(), server_onupdate=FetchedValue())
     priority: Mapped[str] = mapped_column(String(20), default="normal")
     status: Mapped[str] = mapped_column(String(30), default="created")
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -268,7 +273,7 @@ class GuestRequest(Base):
 
 class MaintenanceTicket(Base):
     __tablename__ = "maintenance_tickets"
-    __table_args__ = (Index("ix_maintenance_lodge_status", "lodge_id", "status"),)
+    __table_args__ = (Index("ix_maintenance_lodge_status", "lodge_id", "status"), UniqueConstraint("id","lodge_id",name="uq_maintenance_tenant"))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(240))
@@ -309,7 +314,7 @@ class OperationalEvent(Base):
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
-    __table_args__ = (UniqueConstraint("lodge_id","registration",name="uq_vehicle_lodge_registration"), Index("ix_vehicles_lodge_status","lodge_id","status"))
+    __table_args__ = (UniqueConstraint("lodge_id","registration",name="uq_vehicle_lodge_registration"), Index("ix_vehicles_lodge_status","lodge_id","status"), UniqueConstraint("id","lodge_id",name="uq_vehicles_tenant"))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
     registration: Mapped[str] = mapped_column(String(80))
@@ -1020,3 +1025,21 @@ class GuestCommunication(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     redacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TaskHistory(Base):
+    __tablename__ = "task_history"
+    __table_args__ = (
+        Index("ix_task_history_scope", "lodge_id", "task_id", "sequence"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    sequence: Mapped[int] = mapped_column(BigInteger, Identity(always=True))
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="RESTRICT"))
+    task_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    actor_name: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    changed_fields: Mapped[list] = mapped_column(JSONB)
+    before: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    after: Mapped[dict] = mapped_column(JSONB)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

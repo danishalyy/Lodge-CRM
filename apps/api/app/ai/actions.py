@@ -18,6 +18,8 @@ from ..models import (
     Guest,
     Vehicle,
     MaintenanceAsset,
+    MaintenanceTicket,
+    GuestRequest,
 )
 from ..schemas import TaskCreate, TaskUpdate, MaintenanceCreate, HousekeepingCreate
 from ..security import (
@@ -78,6 +80,7 @@ REFERENCES = {
     "guest_id": Guest,
     "vehicle_id": Vehicle,
     "asset_id": MaintenanceAsset,
+    "maintenance_ticket_id": MaintenanceTicket,
 }
 
 
@@ -128,7 +131,7 @@ def available(db, ctx, lodge_id, scope):
                 "function": {
                     "name": name,
                     "description": kind.replace("_", " ").capitalize()
-                    + ". Prepare a proposal only. Nothing is executed until the account owner reviews and explicitly confirms it in the app. Never invent IDs, dates or assignment details. Ask for clarification if uncertain.",
+                    + ". Propose only; in-app review and confirmation required. Use verified details; ask when uncertain.",
                     "parameters": compact_schema(schema.model_json_schema()),
                 },
             }
@@ -158,8 +161,12 @@ def authorize(db, user, lodge_id, request, kind):
 def parse(kind, payload):
     try:
         model = BY_KIND[kind][1].model_validate_json(json.dumps(payload))
-        if kind == "update_task" and not model.changes.model_dump(
-            exclude_none=True, exclude_unset=True
+        if (
+            kind == "update_task"
+            and not model.changes.model_dump(exclude_none=True, exclude_unset=True)
+            and not {"vehicle_id", "maintenance_ticket_id"}.intersection(
+                model.changes.model_fields_set
+            )
         ):
             raise ValueError("empty changes")
         data = model.changes if kind == "update_task" else model
@@ -196,6 +203,12 @@ def inspect(db, ctx, lodge_id, kind, model, request):
     values = data.model_dump(
         mode="json", exclude_none=True, exclude_unset=kind == "update_task"
     )
+    if kind == "update_task":
+        for key in ("vehicle_id", "maintenance_ticket_id"):
+            if key in data.model_fields_set:
+                values[key] = getattr(data, key)
+                if values[key] is not None:
+                    values[key] = str(values[key])
     old = {}
     snapshot = {}
     fields = []
@@ -216,6 +229,14 @@ def inspect(db, ctx, lodge_id, kind, model, request):
         fields.append({"key": "task", "value": redact(task.title)})
     for key, value in values.items():
         if value in (None, ""):
+            if kind == "update_task" and key in {"vehicle_id", "maintenance_ticket_id"}:
+                fields.append(
+                    {
+                        "key": key,
+                        "value": None,
+                        "previous": str(old[key]) if old.get(key) else None,
+                    }
+                )
             continue
         display = value
         if key in REFERENCES:
@@ -237,6 +258,7 @@ def inspect(db, ctx, lodge_id, kind, model, request):
                 Vehicle: ("vehicles.view", "fleet"),
                 Department: ("departments.view", "departments"),
                 MaintenanceAsset: ("maintenance.view", "maintenance_workshop"),
+                MaintenanceTicket: ("maintenance.view", "maintenance"),
             }
             permission, feature = access[type(row)]
             can_name = has_permission(
@@ -255,6 +277,7 @@ def inspect(db, ctx, lodge_id, kind, model, request):
                     getattr(row, "name", None)
                     or getattr(row, "full_name", None)
                     or getattr(row, "registration", None)
+                    or getattr(row, "title", None)
                 )
                 if can_name
                 else None
@@ -371,7 +394,7 @@ def prepare(db, ctx, lodge_id, conversation, request_id, name, arguments, reques
         conversation_id=conversation.id,
         request_id=request_id,
         action=kind,
-        payload=model.model_dump(mode="json", exclude_none=True, exclude_unset=True),
+        payload=model.model_dump(mode="json", exclude_unset=True),
         preview=preview,
         snapshot=snapshot,
         access_fingerprint=fingerprint(db, ctx, lodge_id),
@@ -474,6 +497,15 @@ def confirm(db, ctx, row, lodge_id, token, request):
     ]
     if row.action == "update_task":
         refs.append((Task, str(model.task_id)))
+        refs += [
+            (GuestRequest, str(rid))
+            for rid in db.scalars(
+                select(GuestRequest.id).where(
+                    GuestRequest.lodge_id == lodge_id,
+                    GuestRequest.task_id == model.task_id,
+                )
+            )
+        ]
     for cls, record_id in sorted(
         refs, key=lambda pair: (pair[0].__tablename__, str(pair[1]))
     ):
@@ -481,6 +513,7 @@ def confirm(db, ctx, row, lodge_id, token, request):
             select(cls)
             .where(cls.id == record_id, cls.lodge_id == lodge_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         ).scalar_one_or_none()
     db.expire_all()
     preview, snapshot = inspect(db, ctx, lodge_id, row.action, model, request)

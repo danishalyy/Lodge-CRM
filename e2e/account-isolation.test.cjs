@@ -894,3 +894,55 @@ test('guest profile occasions and private communication log use guarded forms',a
   await page.evaluate(()=>{localStorage.setItem('active_lodge_id','different-lodge');window.dispatchEvent(new StorageEvent('storage',{key:'active_lodge_id',newValue:'different-lodge'}))});await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(await page.getByRole('button',{name:'Maya Laurent',exact:true}).count(),0);
  }finally{await context.close()}
 });
+
+test('task assignment, linked work and lifecycle history use guarded accessible drawers',async()=>{
+ const lodge='task-lodge',user={id:'task-manager',full_name:'Task manager',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:lodge,role_key:'lodge_admin',permissions:['tasks.view','tasks.manage','staff.view','departments.view','units.view','guests.view','vehicles.view','maintenance.view'],entitlements:['tasks','staff','departments','units','guests','fleet','maintenance','advanced_tasks']}]};
+ const {context,page}=await accountPage(user);let record,created,updated,events=[];
+ const after=()=>({...record,assigned_staff_name:record.assigned_staff_id==='staff-2'?'Sipho':'Lerato',vehicle_name:record.vehicle_id?'Cruiser 02':null,maintenance_title:record.maintenance_ticket_id?'Brake inspection':null});
+ try{
+  await page.route('**/api/v1/lodges/task-lodge/**',async route=>{
+   const req=route.request(),url=new URL(req.url()),p=url.pathname;
+   if(p.endsWith('/tasks')){
+    if(req.method()==='POST'){created=req.postDataJSON();record={id:'task-1',...created,assigned_staff_name:'Lerato',department_name:'Operations',status:'assigned',can_transition:true,created_at:'2026-11-09T06:00:00Z',assigned_at:'2026-11-09T06:00:00Z'};events=[{id:'event-1',kind:'created',actor:'Task manager',occurred_at:record.created_at,changed_fields:[],before:null,after:after()}];return route.fulfill({json:{id:record.id,status:record.status}})}
+    return route.fulfill({json:record?[record]:[]});
+   }
+   if(p.endsWith('/tasks/task-1')&&req.method()==='PATCH'){
+    assert.equal(req.headers()['x-expected-user-id'],'task-manager');updated=req.postDataJSON();const before=after();record={...record,...updated,assigned_staff_name:updated.assigned_staff_id==='staff-2'?'Sipho':record.assigned_staff_name,assigned_at:'2026-11-09T06:10:00Z'};
+    events.push({id:'event-'+(events.length+1),kind:'updated',actor:'Task manager',occurred_at:record.assigned_at,changed_fields:Object.keys(updated).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after()[key])),before,after:after()});return route.fulfill({json:{id:record.id,status:record.status}});
+   }
+   if(p.endsWith('/history'))return route.fulfill({json:{items:events,has_more:false,timing:{...after(),completion_seconds:null,overdue_seconds:3600}}});
+   if(p.endsWith('/staff'))return route.fulfill({json:[{id:'staff-1',full_name:'Lerato',employment_status:'active'},{id:'staff-2',full_name:'Sipho',employment_status:'active'}]});
+   if(p.endsWith('/departments'))return route.fulfill({json:[{id:'dep-1',name:'Operations',is_active:true}]});
+   if(p.endsWith('/vehicles'))return route.fulfill({json:[{id:'vehicle-1',name:'Cruiser 02',registration:'NDL 202'}]});
+   if(p.endsWith('/maintenance'))return route.fulfill({json:[{id:'ticket-1',title:'Brake inspection'}]});
+   return route.fulfill({json:[]});
+  });
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'+ Task',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Inspect Cruiser');await page.getByLabel('Assign staff',{exact:true}).selectOption('staff-1');await page.getByLabel('Department',{exact:true}).selectOption('dep-1');await page.getByLabel('Vehicle',{exact:true}).selectOption('vehicle-1');await page.getByLabel('Maintenance ticket',{exact:true}).selectOption('ticket-1');
+  await page.getByRole('button',{name:'Create task',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(created.vehicle_id,'vehicle-1');assert.equal(created.maintenance_ticket_id,'ticket-1');assert.equal(created.priority,'normal');
+  await page.getByRole('button',{name:'Inspect Cruiser',exact:true}).click();await page.getByRole('heading',{name:'Task history',exact:true}).waitFor();await page.getByRole('heading',{name:'Lifecycle timing',exact:true}).waitFor();await page.getByText('Cruiser 02',{exact:true}).first().waitFor();
+  await page.getByLabel('Assign staff',{exact:true}).selectOption('staff-2');await page.getByRole('button',{name:'Save task details',exact:true}).click();await page.getByText('Assigned to: Lerato → Sipho',{exact:true}).waitFor();assert.equal(updated.assigned_staff_id,'staff-2');
+  await page.getByLabel('Vehicle',{exact:true}).selectOption('');await page.getByLabel('Maintenance ticket',{exact:true}).selectOption('');await page.getByRole('button',{name:'Save task details',exact:true}).click();await page.getByText('Task updated',{exact:true}).first().waitFor();assert.equal(updated.vehicle_id,null);assert.equal(updated.maintenance_ticket_id,null);
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+   await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);await page.getByRole('heading',{name:'Task history',exact:true}).scrollIntoViewIfNeeded();
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`task overflow ${width}/${theme}`);
+   const issues=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(issues.map(i=>({id:i.id,nodes:i.nodes.map(n=>n.target)})),[],`task accessibility ${width}/${theme}`);
+   if(width===375||width===1440)await page.screenshot({path:`/tmp/safarios-task-history-${width}-${theme}.png`,fullPage:true});
+  }
+  await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
+ }finally{await context.close()}
+});
+
+test('task read-only views avoid forbidden lookups and discard late history after a lodge change',async()=>{
+ const {context,page}=await accountPage({id:'task-reader',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'task-readonly',permissions:['tasks.view'],entitlements:['tasks','staff','departments','fleet','maintenance','units','guests']}]});const forbidden=[];let release;
+ try{
+  await page.route('**/api/v1/lodges/task-readonly/**',async route=>{
+   const p=new URL(route.request().url()).pathname;
+   if(/\/(staff|departments|vehicles|maintenance|rooms|guests)$/.test(p))forbidden.push(p);
+   if(p.endsWith('/tasks'))return route.fulfill({json:[{id:'read-task',title:'Read-only task',description:'',status:'assigned',priority:'normal',can_transition:false}]});
+   if(p.endsWith('/history')){await new Promise(resolve=>release=resolve);return route.fulfill({json:{items:[{id:'late-history',kind:'created',actor:'Private former context',occurred_at:'2026-11-09T06:00:00Z',changed_fields:[],after:{status:'assigned'}}],has_more:false,timing:{}}})}
+   return route.fulfill({json:[]});
+  });
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Read-only task',exact:true}).click();await page.getByText('Loading task history…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'+ Task',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Accepted',exact:true}).count(),0);assert.deepEqual(forbidden,[]);
+  await page.evaluate(()=>{localStorage.setItem('active_lodge_id','other-property');window.dispatchEvent(new StorageEvent('storage',{key:'active_lodge_id',newValue:'other-property'}))});release();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(await page.getByText('Private former context',{exact:false}).count(),0);
+ }finally{release?.();await context.close()}
+});

@@ -1,0 +1,66 @@
+export const taskCopy = {
+  history: "Task history",
+  created: "Task created",
+  updated: "Task updated",
+  by: "Recorded by",
+  unknownActor: "Actor not recorded",
+  empty:
+    "No lifecycle events recorded yet. This task may predate history tracking.",
+  coverage:
+    "History starts with the first recorded event. Earlier assignment times are left unknown.",
+  loading: "Loading task history…",
+  loadingTasks: "Loading tasks…",
+  retry: "Try again",
+  more: "Load more events",
+  unknown: "Not recorded",
+  none: "None",
+  unassigned: "Unassigned",
+  yes: "Yes",
+  no: "No",
+  timing: "Lifecycle timing",
+  completion: "Total time to completion",
+  overdue: "Time overdue",
+  inProgress: "Not completed",
+  vehicle: "Vehicle",
+  maintenance: "Maintenance ticket",
+  manage: "Assignment and linked work",
+  save: "Save task details",
+  saving: "Saving…",
+  noChange: "Keep current assignment",
+  noDepartment: "No department",
+  assignment: "Assign staff",
+  department: "Department",
+  minute: (n: number) => `${n} min`,
+  hour: (n: number) => `${n} hr`,
+  day: (n: number) => `${n} days`,
+  lessMinute: "Less than a minute",
+  fields: {
+    status: "Status",
+    priority: "Priority",
+    due_at: "Due",
+    assigned_staff_id: "Assigned to",
+    department_id: "Department",
+    unit_id: "Room",
+    vehicle_id: "Vehicle",
+    maintenance_ticket_id: "Maintenance ticket",
+    created_at: "Created",
+    assigned_at: "Assigned",
+    accepted_at: "Accepted",
+    started_at: "Started",
+    completed_at: "Completed",
+    proof_required: "Proof required",
+    recurrence_interval_days: "Repeat every (days)",
+    recurrence_end_date: "Repeat until",
+    title: "Title",
+    description: "Description",
+    guest_id: "Guest",
+  } as Record<string, string>,
+  changed: (field: string) => `${field} changed`,
+};
+export function taskDuration(seconds: number | null | undefined): string {
+  if (seconds == null) return taskCopy.inProgress;
+  if (seconds < 60) return taskCopy.lessMinute;
+  if (seconds < 3600) return taskCopy.minute(Math.floor(seconds / 60));
+  if (seconds < 86400) return taskCopy.hour(Math.floor(seconds / 3600));
+  return taskCopy.day(Math.floor(seconds / 86400));
+}

@@ -75,8 +75,8 @@
       "title": "Task management",
       "package_reference": "§3.7",
       "workflow_reference": "§12, §26",
-      "status": "partial",
-      "acceptance_gap": "Add assignment timing/history and direct vehicle/maintenance relationships; accept the whole lifecycle."
+      "status": "implemented_core",
+      "acceptance_gap": "Core assignment timing, append-only reassignment/status history, vehicle/maintenance links and all three creation paths implemented in 0024. Complete connected-role/operational acceptance; advanced templates/escalation tracked in S03."
     },
     {
       "id": "B08",
@@ -202,7 +202,7 @@
       "package_reference": "§4.3",
       "workflow_reference": "§12",
       "status": "partial",
-      "acceptance_gap": "Finish configurable escalation/templates, timing, relationship coverage and lifecycle reporting."
+      "acceptance_gap": "Assignment history/timing and relationships are implemented. Finish configurable escalation/templates, wider lifecycle reporting/export and full connected-role acceptance."
     },
     {
       "id": "S04",
@@ -589,7 +589,8 @@
       "title": "Permanent operational memory, separate from administrative audit",
       "source": "Operating-system p3; workflow §22",
       "status": "partial",
-      "acceptance": "Reconstruct linked responsibility, assignment, status, service and downtime events months later without replacing historical facts with current labels."
+      "acceptance": "Reconstruct linked responsibility, assignment, status, service and downtime events months later without replacing historical facts with current labels.",
+      "acceptance_gap": "Task assignment/lifecycle evidence is now persisted in immutable snapshots. Complete the other modules, linked historical reconstruction and an approved scoped AI reader for these task snapshots."
     },
     {
       "id": "C02",

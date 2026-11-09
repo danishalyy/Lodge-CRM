@@ -49,6 +49,7 @@ export const actionCopy = {
     proof_required: "Proof required",
     category: "Category",
     vehicle_id: "Vehicle",
+    maintenance_ticket_id: "Maintenance ticket",
     asset_id: "Asset",
     scheduled_for: "Scheduled for",
     job_type: "Job type",

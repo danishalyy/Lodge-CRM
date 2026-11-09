@@ -189,6 +189,8 @@ class TaskCreate(StrictModel):
     assigned_staff_id: UUID | None = None
     guest_id: UUID | None = None
     unit_id: UUID | None = None
+    vehicle_id: UUID | None = None
+    maintenance_ticket_id: UUID | None = None
     priority: str = Field(default="normal", pattern="^(low|normal|high|critical)$")
     due_at: datetime | None = None
     recurrence_interval_days: int | None = Field(default=None, ge=1, le=3650)
@@ -202,6 +204,8 @@ class TaskUpdate(StrictModel):
     status: str | None = Field(default=None, pattern="^(created|assigned|accepted|started|completed|cancelled)$")
     assigned_staff_id: UUID | None = None
     department_id: UUID | None = None
+    vehicle_id: UUID | None = None
+    maintenance_ticket_id: UUID | None = None
     priority: str | None = Field(default=None, pattern="^(low|normal|high|critical)$")
     due_at: datetime | None = None
     description: str | None = Field(default=None, max_length=8000)

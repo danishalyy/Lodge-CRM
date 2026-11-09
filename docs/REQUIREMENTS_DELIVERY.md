@@ -32,7 +32,7 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | B04 / §3.4 | Operational stay records | implemented core | Verify the complete guest/stay history and concurrent room-assignment journey; a booking engine is not required. |
 | B05 / §3.5 | Staff profiles | implemented core | Verify all role-confidentiality, supervisor, employment and operational-availability journeys. |
 | B06 / §3.6 | Basic roles and permissions | implemented core | Complete the default/custom-role matrix for every contextual field, export, worker and offline action. |
-| B07 / §3.7 | Task management | partial | Add assignment timing/history and direct vehicle/maintenance relationships; accept the whole lifecycle. |
+| B07 / §3.7 | Task management | implemented core | Assignment timing/history, direct vehicle/maintenance links and all three creation paths are implemented in 0024. Complete connected-role and operational acceptance. |
 | B08 / §3.8 | Guest requests | implemented core | Accept request → assigned task → proof/checklist → resolution → guest/history/notification journey. |
 | B09 / §3.9 | Basic housekeeping | implemented core | Accept room preparation, defect hand-off and readiness under assigned-role constraints. |
 | B10 / §3.10 | Basic maintenance tickets | partial | Complete maintenance media and the linked repair/inspection/history experience. |
@@ -51,7 +51,7 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | --- | --- | --- | --- |
 | S01 / §4.1 | Department management | implemented core | Accept own-department staffing, work, approvals and contextual access together. |
 | S02 / §4.2 | Custom roles and permissions | implemented core | Retain exact administrator delegation and accept every custom base-scope combination. |
-| S03 / §4.3 | Advanced task management | partial | Finish configurable escalation/templates, timing, relationship coverage and lifecycle reporting. |
+| S03 / §4.3 | Advanced task management | partial | Assignment timing/history and vehicle/maintenance relationships are implemented. Finish configurable escalation/templates, wider lifecycle reporting/export and connected-role acceptance. |
 | S04 / §4.4 | Full housekeeping workflow | implemented core | Accept cleaning, inspections, turndown, linen, overdue preparation and defect hand-off end to end. |
 | S05 / §4.5 | Room/unit management | implemented core | Verify all documented states with occupancy and maintenance precedence and custom unit names. |
 | S06 / §4.6 | Full maintenance/workshop | partial | Complete attachments/photos, inspection/service history, recurrence and repeated-issue evidence. |
@@ -148,7 +148,7 @@ Optional presentation or infrastructure refinements must not displace these docu
 
 | ID / source | Requirement | State / acceptance |
 | --- | --- | --- |
-| C01 / Operating-system p3; workflow §22 | Permanent operational memory, separate from administrative audit | partial: Reconstruct linked responsibility, assignment, status, service and downtime events months later without replacing historical facts with current labels. |
+| C01 / Operating-system p3; workflow §22 | Permanent operational memory, separate from administrative audit | partial: Task assignment/lifecycle snapshots are implemented. Complete historical reconstruction for the other modules and an approved scoped AI reader for the new task snapshots. |
 | C02 / Workflow §§4–5, 7, 27 | Complete default/custom role and contextual-field matrix | partial: Test each named role, department/own-record scope, contextual field, export, worker, notification and offline replay boundary. |
 | C03 / Workflow §§12, 26 | Cross-module relationships and responsibility/timing | partial: Guest/stay/unit/staff/department/task/vehicle/activity/maintenance/notification links support the complete event chain. |
 | C04 / Workflow §§20.2, 23, 27 | Distinct guest identity and guest-approved knowledge | missing: A guest receives only their own stay/itinerary/requests and approved guest information, with no staff/internal knowledge or other guest data. |
@@ -156,3 +156,5 @@ Optional presentation or infrastructure refinements must not displace these docu
 | C06 / Owner branding decisions; package §§4.23, 5.21 | SafariOS identity alongside Super Admin-managed lodge identity | implemented core: The authorised lodge logo/name never removes SafariOS identity or grants platform access. |
 | C07 / Workflow §§19–20.3, 27 | Selected offline work with authorised idempotent reconnect | partial: Persist the documented subset, protect account/lodge boundaries, validate current access on sync, and do not replay duplicates. |
 | C08 / Owner launch-market decision; production requirements | South African commercial web launch acceptance | partial: Keep ZAR defaults and external payments; verify actual SMTP/storage/workers/model, backups/restore, migrations, monitoring and measured capacity before launch. |
+
+Task responsibility/history checkpoint: [scope, migration and validation](TASK_WORKFLOW_DELIVERY.md). This implements the core B07 gaps while S03 and the cross-module memory/relationship requirements remain partial.

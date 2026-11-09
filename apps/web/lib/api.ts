@@ -318,6 +318,7 @@ export const lodgeApi: any = {
   tasks: tenantCollection("tasks").list,
   createTask: tenantCollection("tasks").create,
   updateTask: tenantCollection("tasks").update,
+  taskHistory: (id:string, offset=0, scope?:AccountScope)=>request<any>(scopedPath(`tasks/${id}/history?limit=25&offset=${offset}`,scope),{headers:scopedHeaders(scope)}),
   rooms: tenantCollection("rooms").list,
   createRoom: tenantCollection("rooms").create,
   updateRoom: tenantCollection("rooms").update,

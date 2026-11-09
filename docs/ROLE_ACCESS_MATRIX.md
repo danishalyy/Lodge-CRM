@@ -4,7 +4,7 @@ This file describes the enforced server-side access model. UI hiding is not trea
 
 | Role | Production access rule |
 |---|---|
-| Super Admin | Platform-wide administration. Can register lodges, control subscriptions and package overrides, inspect tenants for support, and review platform audit/users. Operational writes still respect subscription write state. |
+| Super Admin | Platform administration only: register lodges, control subscriptions/package overrides and branding, manage platform invitations and review platform audit/users. Cannot enter lodge/group operations or use lodge read/write endpoints. A separate assigned lodge or Group Admin identity is required. |
 | Group Admin / Owner | Full authorized operations in explicitly assigned group lodges, subject to each lodge’s package and subscription. Group overview and lodge switching; no platform administration. |
 | Lodge Admin / General Manager | Full authorized access inside one lodge, subject to package entitlements and subscription state. Can manage HR records and Standard/Premium custom roles where entitled. |
 | Department Manager / Supervisor | Department-scoped staff, HR records, tasks, requests, housekeeping/maintenance, activities, transfers, reports and command-centre metrics. No lodge-wide operational memory or guest CRM by default. |

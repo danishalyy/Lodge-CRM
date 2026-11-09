@@ -41,7 +41,7 @@ Workflow sections 4–5 and 27 require backend enforcement, not only hidden navi
 
 | Role | Intended access |
 | --- | --- |
-| Super Admin | Platform lodge registration, subscriptions, platform users/settings, and auditable platform-level support access. Opening a lodge must not change identity into a staff account. |
+| Super Admin | Platform lodge registration, subscriptions, branding and platform users/settings only. The owner's strict separation requirement removes platform operational support access; a separate lodge or Group Admin account is required. |
 | Group Admin / Owner | Administrative operational access only to explicitly assigned group lodges; each lodge retains its own subscription and features. No platform administration. |
 | Lodge Admin / General Manager | Operational control of their one lodge, including local staff, roles, configuration, reports, and permitted AI. |
 | Department Manager / Supervisor | Own department's staff, work, reports, and justified operational context. |

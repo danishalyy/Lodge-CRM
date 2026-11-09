@@ -11,11 +11,7 @@ import WorkspaceCommand from "./WorkspaceCommand";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { modules, moduleFeature } from "@/lib/modules";
-import {
-  authApi,
-  getActiveLodgeId,
-  setActiveLodgeId,
-} from "@/lib/api";
+import { authApi, getActiveLodgeId, setActiveLodgeId } from "@/lib/api";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import NavigationEnhancements from "./NavigationEnhancements";
 import { accessCopy } from "@/lib/strings/access";
@@ -175,16 +171,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <section className="panel statePanel">
           <h1>{accessCopy.platformOnlyTitle}</h1>
           <p>{accessCopy.platformOnlyDescription}</p>
-          <Link className="button primary" href={me.mfa_enabled ? "/super-admin" : "/settings"}>
-            {me.mfa_enabled ? accessCopy.platformConsole : accessCopy.accountSecurity}
+          <Link
+            className="button primary"
+            href={me.mfa_enabled ? "/super-admin" : "/settings"}
+          >
+            {me.mfa_enabled
+              ? accessCopy.platformConsole
+              : accessCopy.accountSecurity}
           </Link>
           <SignOutButton />
         </section>
       </main>
     );
   const active = getActiveLodgeId();
-  const realMembership = me.is_super_admin ? null :
-    me.memberships?.find((m: any) => m.lodge_id === active) || me.memberships?.[0];
+  const realMembership = me.is_super_admin
+    ? null
+    : me.memberships?.find((m: any) => m.lodge_id === active) ||
+      me.memberships?.[0];
   const membership = realMembership;
   const roleAllowed = (key: string) => {
     if (!migrated.has(key)) return false;
@@ -477,6 +480,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             value={{
               features: membership?.entitlements || [],
               permissions: membership?.permissions || [],
+              contextId: `${me.id}:${membership?.lodge_id || ""}`,
               platform: !!me.is_super_admin,
             }}
           >

@@ -24,3 +24,5 @@ Apply the shared warm-neutral, translucent design system to every new or edited 
 - Wrap operational tables with `components/ui/table-scroll.tsx` so horizontal overflow remains keyboard accessible without adding unnecessary tab stops.
 
 - Super Admin is strictly platform-only. Never offer an Open lodge action, synthesize a lodge membership, grant operational permissions from is_super_admin/platform, or fetch tenant data from blocked operational screens. Platform branding previews use the explicitly guarded platform logo endpoint. Separate lodge and Group Admin identities retain their existing membership scopes.
+
+- Use workspace permissions for every operational action and both feature/read permission for reference lookups. Use server-provided per-record workflow capabilities for owned work; these never replace API guards. When authority changes, close editors, clear reference choices and reject late results with the current workspace scope.

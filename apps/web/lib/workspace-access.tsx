@@ -1,6 +1,7 @@
 "use client";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useRef, useEffect } from "react";
 export type WorkspaceAccess = {
+  contextId?: string;
   features: readonly string[];
   permissions: readonly string[];
   platform: boolean;
@@ -12,8 +13,25 @@ export const WorkspaceAccessContext = createContext<WorkspaceAccess>({
 });
 export function useWorkspaceAccess() {
   const value = useContext(WorkspaceAccessContext);
+  const scopeKey = JSON.stringify([
+    value.contextId,
+    value.platform,
+    value.features,
+    value.permissions,
+  ]);
+  const currentScope = useRef(scopeKey),
+    mounted = useRef(true);
+  currentScope.current = scopeKey;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   return {
-    feature: (key: string) => value.features.includes(key),
+    scopeKey,
+    isCurrent: () => mounted.current && currentScope.current === scopeKey,
+    feature: (key: string) => !value.platform && value.features.includes(key),
     permission: (key: string) =>
       !value.platform && value.permissions.includes(key),
   };

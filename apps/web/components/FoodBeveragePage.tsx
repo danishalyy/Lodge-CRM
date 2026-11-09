@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -10,20 +11,31 @@ import { authApi, lodgeApi, operationsApi } from "@/lib/api";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
 export default function FoodBeveragePage() {
+  const access = useWorkspaceAccess();
   const [rows, setRows] = useState<any[]>([]),
     [guests, setGuests] = useState<any[]>([]),
     [open, setOpen] = useState(false),
     [error, setError] = useState(""),
     [canManage, setCanManage] = useState(false);
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
       const me = await authApi.me(),
         active = localStorage.getItem("active_lodge_id"),
         m = me.memberships?.find((x: any) => x.lodge_id === active);
-      setCanManage(me.is_super_admin || m?.permissions?.includes("fb.manage"));
-      setRows(await operationsApi.foodBeverage.list());
+      setCanManage(m?.permissions?.includes("fb.manage"));
+      const resolvedChoices = await operationsApi.foodBeverage.list();
+      if (!access.isCurrent()) return;
+      setRows(resolvedChoices);
       try {
-        setGuests(await lodgeApi.guests());
+        const resolvedChoices =
+          access.permission("fb.manage") &&
+          access.feature("guests") &&
+          access.permission("guests.view")
+            ? await lodgeApi.guests()
+            : [];
+        if (!access.isCurrent()) return;
+        setGuests(resolvedChoices);
       } catch {
         setGuests([]);
       }
@@ -32,10 +44,13 @@ export default function FoodBeveragePage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
+    setGuests([]);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!access.permission("fb.manage")) return;
     const f = new FormData(e.currentTarget);
     await operationsApi.foodBeverage.create({
       name: String(f.get("name")),
@@ -59,7 +74,7 @@ export default function FoodBeveragePage() {
             Meal services, guest counts and live dietary/allergy requirements.
           </p>
         </div>
-        {canManage && (
+        {canManage && access.permission("fb.manage") && (
           <button className="button primary" onClick={() => setOpen(true)}>
             + Meal service
           </button>
@@ -112,7 +127,7 @@ export default function FoodBeveragePage() {
           <div className="empty">No meal services scheduled.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && access.permission("fb.manage") && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <h1>Schedule meal service</h1>

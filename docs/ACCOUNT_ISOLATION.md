@@ -1,11 +1,11 @@
 # Account isolation and verification
 
-Users authenticate as themselves. Opening a lodge workspace does not change a Super Admin's identity. Lodge staff must use separate accounts; role-authorized shared operational records remain accessible to the appropriate managers. Private account security information and sessions are not shared.
+Users authenticate as themselves. Super Admin is platform-only and cannot enter lodge or Group Admin operations, even with a legacy membership or completed MFA. Lodge staff must use separate accounts; role-authorized shared operational records remain accessible to the appropriate managers. Private account security information and sessions are not shared.
 
 ## Enforced boundaries
 
-- Platform APIs require Super Admin and completed MFA. Super Admin requests to lodge APIs now also require completed MFA; account-security endpoints remain available for enrollment.
-- Lodge APIs authenticate the session, verify the membership, apply role permissions and use transaction-local PostgreSQL row-level security. The database enforces one lodge membership per user.
+- Platform APIs require Super Admin and completed MFA. Super Admin requests to lodge/group operational APIs are denied; account-security endpoints remain available for enrollment.
+- Lodge APIs authenticate the session, verify the membership, apply role permissions and use transaction-local PostgreSQL row-level security. Ordinary users have one lodge; Group Admins retain explicitly assigned properties under the separate group checks.
 - Invitations explicitly reject an existing login from another lodge, including inactive users, and reject linking a login to a second staff profile. They cannot change a platform account into a staff account.
 - Session lists and revocation target only the authenticated user. CSRF checks include session expiration. Logout revokes the server session; password changes revoke other sessions for that user, preserving unrelated users' sessions.
 - Activation and recovery tokens are consumed under row locks. Activation cannot reset an already active account.

@@ -71,10 +71,8 @@ export default function StaffPage() {
       const member = me.memberships?.find(
         (m: any) => m.lodge_id === getActiveLodgeId(),
       );
-      setCanManage(
-        !!me.is_super_admin || !!member?.permissions?.includes("staff.manage"),
-      );
-      if (me.is_super_admin || member?.permissions?.includes("staff.manage"))
+      setCanManage(!!member?.permissions?.includes("staff.manage"));
+      if (member?.permissions?.includes("staff.manage"))
         setCatalog(await operationsApi.roles.catalog());
       setRows(s);
       setDeps(d);

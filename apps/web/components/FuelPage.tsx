@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { formatMoney, formatting } from "@/lib/formatting";
@@ -27,18 +28,29 @@ type Fuel = {
   recorded_at: string;
 };
 export default function FuelPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("fuel.manage");
+
   const [rows, setRows] = useState<Fuel[]>([]),
     [vehicles, setVehicles] = useState<Vehicle[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
       const [r, v, s] = await Promise.all([
         operationsApi.fuel.list<Fuel[]>(),
-        operationsApi.vehicles.list<Vehicle[]>(),
-        operationsApi.staff.list<Staff[]>(),
+        canManage &&
+        access.feature("fleet") &&
+        access.permission("vehicles.view")
+          ? operationsApi.vehicles.list<Vehicle[]>()
+          : Promise.resolve([]),
+        canManage && access.feature("staff") && access.permission("staff.view")
+          ? operationsApi.staff.list<Staff[]>()
+          : Promise.resolve([]),
       ]);
+      if (!access.isCurrent()) return;
       setRows(r);
       setVehicles(v);
       setStaff(s);
@@ -47,10 +59,14 @@ export default function FuelPage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
+    setStaff([]);
+    setVehicles([]);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     const f = new FormData(e.currentTarget);
     try {
       await operationsApi.fuel.create({
@@ -83,9 +99,11 @@ export default function FuelPage() {
           <h1>Fuel</h1>
           <p>Track refuelling, mileage and costs across your fleet.</p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Fuel record
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Fuel record
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <TableScroll as="section" className="panel tableWrap">
@@ -119,7 +137,7 @@ export default function FuelPage() {
           <div className="empty">No fuel records have been entered.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <h1>Record fuel</h1>

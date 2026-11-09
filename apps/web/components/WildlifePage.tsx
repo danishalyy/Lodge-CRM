@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { formatDateTime } from "@/lib/formatting";
@@ -69,6 +70,9 @@ async function uploadPhoto(
   );
 }
 export default function WildlifePage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("wildlife.manage");
+
   const [rows, setRows] = useState<Sighting[]>([]),
     [open, setOpen] = useState(false),
     [error, setError] = useState(""),
@@ -79,19 +83,23 @@ export default function WildlifePage() {
       acc: number;
     } | null>(null);
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
-      setRows(await operationsApi.wildlife.list<Sighting[]>());
+      const nextRows = await operationsApi.wildlife.list<Sighting[]>();
+      if (!access.isCurrent()) return;
+      setRows(nextRows);
       setQueued((await queuedSightings(queueScope())).length);
     } catch (e: any) {
       setError(e.message);
     }
   };
   useEffect(() => {
+    setOpen(false);
     load();
     const fn = () => syncQueue();
     window.addEventListener("online", fn);
     return () => window.removeEventListener("online", fn);
-  }, []);
+  }, [access.scopeKey]);
   function captureLocation() {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by this device");
@@ -120,7 +128,7 @@ export default function WildlifePage() {
     await removeQueuedSighting(scope, q.id);
   }
   async function syncQueue() {
-    if (!navigator.onLine) return;
+    if (!canManage || !navigator.onLine) return;
     try {
       await authApi.me();
       const scope = queueScope();
@@ -132,6 +140,7 @@ export default function WildlifePage() {
   }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     const f = new FormData(e.currentTarget);
     const file = f.get("photo") as File;
     const id = crypto.randomUUID();
@@ -184,14 +193,16 @@ export default function WildlifePage() {
           </p>
         </div>
         <div className="headerActions">
-          {queued > 0 && (
+          {queued > 0 && canManage && (
             <button className="button secondary" onClick={syncQueue}>
               Sync {queued} queued
             </button>
           )}
-          <button className="button primary" onClick={() => setOpen(true)}>
-            + Sighting
-          </button>
+          {canManage && (
+            <button className="button primary" onClick={() => setOpen(true)}>
+              + Sighting
+            </button>
+          )}
         </div>
       </div>
       {error && <div className="panel dangerText">{error}</div>}
@@ -238,7 +249,7 @@ export default function WildlifePage() {
           <div className="empty">No wildlife sightings have been recorded.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <div>

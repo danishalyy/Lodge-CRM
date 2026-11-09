@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { Field } from "@/components/ui/field";
@@ -15,15 +16,21 @@ type Department = {
   is_active: boolean;
 };
 export default function DepartmentsPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("departments.manage");
+
   const [rows, setRows] = useState<Department[]>([]),
     [loading, setLoading] = useState(true),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    if (!access.isCurrent()) return;
     setLoading(true);
     setError("");
     try {
-      setRows(await operationsApi.departments.list<Department[]>());
+      const nextRows = await operationsApi.departments.list<Department[]>();
+      if (!access.isCurrent()) return;
+      setRows(nextRows);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -31,10 +38,12 @@ export default function DepartmentsPage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     const f = new FormData(e.currentTarget);
     try {
       await operationsApi.departments.create({
@@ -48,6 +57,7 @@ export default function DepartmentsPage() {
     }
   }
   async function toggle(row: Department) {
+    if (!canManage) return;
     try {
       await operationsApi.departments.update(row.id, {
         is_active: !row.is_active,
@@ -65,9 +75,11 @@ export default function DepartmentsPage() {
           <h1>Departments</h1>
           <p>Give every team a clear place in your lodge’s daily operations.</p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Department
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Department
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <section className="panel">
@@ -102,12 +114,14 @@ export default function DepartmentsPage() {
                       <StatusPill value={r.is_active ? "Active" : "Inactive"} />
                     </td>
                     <td>
-                      <button
-                        className="button secondary"
-                        onClick={() => toggle(r)}
-                      >
-                        {r.is_active ? "Deactivate" : "Activate"}
-                      </button>
+                      {canManage && (
+                        <button
+                          className="button secondary"
+                          onClick={() => toggle(r)}
+                        >
+                          {r.is_active ? "Deactivate" : "Activate"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -119,7 +133,7 @@ export default function DepartmentsPage() {
           </TableScroll>
         )}
       </section>
-      {open && (
+      {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <div>

@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -22,6 +23,7 @@ type Transfer = {
   flight_number: string;
   passenger_count: number;
   status: string;
+  can_transition?: boolean;
 };
 type Staff = { id: string; full_name: string; employment_status: string };
 type Vehicle = {
@@ -44,6 +46,10 @@ const next: Record<string, string | undefined> = {
   arrived: "completed",
 };
 export default function TransfersPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("transfers.manage");
+  const canTransition = canManage || access.permission("transfers.own.manage");
+
   const [rows, setRows] = useState<Transfer[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
     [vehicles, setVehicles] = useState<Vehicle[]>([]),
@@ -52,14 +58,28 @@ export default function TransfersPage() {
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
       const [t, s, v, g, st] = await Promise.all([
         operationsApi.transfers.list<Transfer[]>(),
-        operationsApi.staff.list<Staff[]>(),
-        operationsApi.vehicles.list<Vehicle[]>(),
-        lodgeApi.guests(),
-        operationsApi.stays.list<Stay[]>(),
+        canManage && access.feature("staff") && access.permission("staff.view")
+          ? operationsApi.staff.list<Staff[]>()
+          : Promise.resolve([]),
+        canManage &&
+        access.feature("fleet") &&
+        access.permission("vehicles.view")
+          ? operationsApi.vehicles.list<Vehicle[]>()
+          : Promise.resolve([]),
+        canManage &&
+        access.feature("guests") &&
+        access.permission("guests.view")
+          ? lodgeApi.guests()
+          : Promise.resolve([]),
+        canManage && access.feature("stays") && access.permission("stays.view")
+          ? operationsApi.stays.list<Stay[]>()
+          : Promise.resolve([]),
       ]);
+      if (!access.isCurrent()) return;
       setRows(t);
       setStaff(s);
       setVehicles(v);
@@ -70,10 +90,16 @@ export default function TransfersPage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
+    setStaff([]);
+    setVehicles([]);
+    setGuests([]);
+    setStays([]);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     const f = new FormData(e.currentTarget);
     try {
       await operationsApi.transfers.create({
@@ -120,9 +146,11 @@ export default function TransfersPage() {
             assignments.
           </p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Transfer
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Transfer
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <TableScroll as="section" className="panel tableWrap">
@@ -159,7 +187,9 @@ export default function TransfersPage() {
                   <StatusPill value={t.status} />
                 </td>
                 <td>
-                  {next[t.status] ? (
+                  {canTransition &&
+                  t.can_transition === true &&
+                  next[t.status] ? (
                     <button
                       className="button secondary"
                       onClick={() => update(t.id, next[t.status]!)}
@@ -178,7 +208,7 @@ export default function TransfersPage() {
           <div className="empty">No transfers have been scheduled.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <h1>Schedule transfer</h1>

@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { readableLabel } from "@/lib/strings/content";
 import { formatTime, formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
@@ -45,16 +46,27 @@ const checks = [
   ["recovery", "Recovery equipment"],
 ];
 export default function RangerPage() {
+  const access = useWorkspaceAccess();
+  const canManage =
+    access.permission("vehicle_checklists.manage") &&
+    access.feature("vehicle_checklists");
+
   const [data, setData] = useState<Day | null>(null),
     [vehicles, setVehicles] = useState<Vehicle[]>([]),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
       const [d, v] = await Promise.all([
         operationsApi.rangerToday(),
-        operationsApi.vehicles.list<Vehicle[]>(),
+        canManage &&
+        access.feature("fleet") &&
+        access.permission("vehicles.view")
+          ? operationsApi.vehicles.list<Vehicle[]>()
+          : Promise.resolve([]),
       ]);
+      if (!access.isCurrent()) return;
       setData(d);
       setVehicles(v);
     } catch (e: any) {
@@ -62,10 +74,13 @@ export default function RangerPage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
+    setVehicles([]);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     if (!data) return;
     const f = new FormData(e.currentTarget);
     const items = checks.map(([key, label]) => ({
@@ -100,13 +115,15 @@ export default function RangerPage() {
             workflow.
           </p>
         </div>
-        <button
-          className="button primary"
-          onClick={() => setOpen(true)}
-          disabled={!data}
-        >
-          Pre-drive checklist
-        </button>
+        {canManage && (
+          <button
+            className="button primary"
+            onClick={() => setOpen(true)}
+            disabled={!data}
+          >
+            Pre-drive checklist
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       {data && (

@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { Field } from "@/components/ui/field";
@@ -21,21 +22,29 @@ type Vehicle = {
   notes: string;
 };
 export default function FleetPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("vehicles.manage");
+
   const [rows, setRows] = useState<Vehicle[]>([]),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
-      setRows(await operationsApi.vehicles.list<Vehicle[]>());
+      const nextRows = await operationsApi.vehicles.list<Vehicle[]>();
+      if (!access.isCurrent()) return;
+      setRows(nextRows);
     } catch (e: any) {
       setError(e.message);
     }
   };
   useEffect(() => {
+    setOpen(false);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     const f = new FormData(e.currentTarget);
     try {
       await operationsApi.vehicles.create({
@@ -60,6 +69,7 @@ export default function FleetPage() {
     }
   }
   async function upd(id: string, body: any) {
+    if (!canManage) return;
     try {
       await operationsApi.vehicles.update(id, body);
       await load();
@@ -78,9 +88,11 @@ export default function FleetPage() {
             journey.
           </p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Vehicle
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Vehicle
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <TableScroll as="section" className="panel tableWrap">
@@ -118,17 +130,21 @@ export default function FleetPage() {
                   )}
                 </td>
                 <td>
-                  <select
-                    className="select"
-                    value={v.status}
-                    onChange={(e) => upd(v.id, { status: e.target.value })}
-                    aria-label="Status"
-                  >
-                    <option value="ready">Ready</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="out_of_service">Out of service</option>
-                  </select>
+                  {canManage ? (
+                    <select
+                      className="select"
+                      value={v.status}
+                      onChange={(e) => upd(v.id, { status: e.target.value })}
+                      aria-label="Status"
+                    >
+                      <option value="ready">Ready</option>
+                      <option value="assigned">Assigned</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="out_of_service">Out of service</option>
+                    </select>
+                  ) : (
+                    <StatusPill value={v.status} />
+                  )}
                 </td>
               </tr>
             ))}
@@ -138,7 +154,7 @@ export default function FleetPage() {
           <div className="empty">No vehicles have been added.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <h1>Add vehicle</h1>

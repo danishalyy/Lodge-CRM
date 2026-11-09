@@ -1567,9 +1567,10 @@ def list_activities(lodge_id:str,user:User=Depends(require_permission("activitie
     if ctx.role_key=="department_manager":q=q.where(Activity.department_id==ctx.department_id)
     elif ctx.role_key=="ranger":q=q.where(Activity.guide_staff_id==_require_own_staff(ctx).id)
     rows=db.scalars(q.order_by(Activity.starts_at.desc()).limit(500)).all();out=[];show_guests=ctx.role_key not in {"general_staff","fb"}
+    can_manage=_may(db,ctx,"activities.manage");can_update_own=_may(db,ctx,"activities.own.manage")
     for a in rows:
         ag=db.scalars(select(ActivityGuest).where(ActivityGuest.activity_id==a.id)).all();guest_ids=[x.guest_id for x in ag];guests={g.id:f"{g.first_name} {g.last_name}" for g in db.scalars(select(Guest).where(Guest.id.in_(guest_ids))).all()} if guest_ids else {}
-        out.append({"id":str(a.id),"activity_type":a.activity_type,"title":a.title,"starts_at":a.starts_at.isoformat(),"ends_at":a.ends_at.isoformat(),"guide_staff_id":str(a.guide_staff_id) if a.guide_staff_id else None,"guide_name":_name_staff(db,a.guide_staff_id),"vehicle_id":str(a.vehicle_id) if a.vehicle_id else None,"vehicle_name":_name_vehicle(db,a.vehicle_id),"requires_vehicle":a.requires_vehicle,"status":a.status,"meeting_point":a.meeting_point,"notes":a.notes,"guests":[{"id":str(x.guest_id),"name":guests.get(x.guest_id,"")} for x in ag] if show_guests else []})
+        out.append({"id":str(a.id),"activity_type":a.activity_type,"title":a.title,"starts_at":a.starts_at.isoformat(),"ends_at":a.ends_at.isoformat(),"guide_staff_id":str(a.guide_staff_id) if a.guide_staff_id else None,"guide_name":_name_staff(db,a.guide_staff_id),"vehicle_id":str(a.vehicle_id) if a.vehicle_id else None,"vehicle_name":_name_vehicle(db,a.vehicle_id),"requires_vehicle":a.requires_vehicle,"status":a.status,"can_transition":bool(can_manage or (can_update_own and ctx.staff and a.guide_staff_id==ctx.staff.id)),"meeting_point":a.meeting_point,"notes":a.notes,"guests":[{"id":str(x.guest_id),"name":guests.get(x.guest_id,"")} for x in ag] if show_guests else []})
     return out
 
 @app.post("/api/v1/lodges/{lodge_id}/activities",dependencies=[Depends(require_csrf)])
@@ -1633,9 +1634,10 @@ def list_transfers(lodge_id:str,user:User=Depends(require_permission("transfers.
     if ctx.role_key=="department_manager":q=q.where(Transfer.department_id==ctx.department_id)
     elif ctx.role_key=="driver":q=q.where(Transfer.driver_staff_id==_require_own_staff(ctx).id)
     rows=db.scalars(q.order_by(Transfer.scheduled_at.desc()).limit(500)).all();out=[]
+    can_manage=_may(db,ctx,"transfers.manage");can_update_own=_may(db,ctx,"transfers.own.manage")
     for t in rows:
         g=db.get(Guest,t.guest_id)
-        out.append({"id":str(t.id),"transfer_type":t.transfer_type,"guest_id":str(t.guest_id),"guest_name":f"{g.first_name} {g.last_name}" if g else "","stay_id":str(t.stay_id) if t.stay_id else None,"driver_staff_id":str(t.driver_staff_id) if t.driver_staff_id else None,"driver_name":_name_staff(db,t.driver_staff_id),"vehicle_id":str(t.vehicle_id) if t.vehicle_id else None,"vehicle_name":_name_vehicle(db,t.vehicle_id),"scheduled_at":t.scheduled_at.isoformat(),"expected_end_at":t.expected_end_at.isoformat(),"pickup_location":t.pickup_location,"dropoff_location":t.dropoff_location,"flight_number":t.flight_number,"flight_time":t.flight_time.isoformat() if t.flight_time else None,"passenger_count":t.passenger_count,"delay_minutes":t.delay_minutes,"delay_reason":t.delay_reason,"status":t.status,"notes":t.notes})
+        out.append({"id":str(t.id),"transfer_type":t.transfer_type,"guest_id":str(t.guest_id),"guest_name":f"{g.first_name} {g.last_name}" if g else "","stay_id":str(t.stay_id) if t.stay_id else None,"driver_staff_id":str(t.driver_staff_id) if t.driver_staff_id else None,"driver_name":_name_staff(db,t.driver_staff_id),"vehicle_id":str(t.vehicle_id) if t.vehicle_id else None,"vehicle_name":_name_vehicle(db,t.vehicle_id),"scheduled_at":t.scheduled_at.isoformat(),"expected_end_at":t.expected_end_at.isoformat(),"pickup_location":t.pickup_location,"dropoff_location":t.dropoff_location,"flight_number":t.flight_number,"flight_time":t.flight_time.isoformat() if t.flight_time else None,"passenger_count":t.passenger_count,"delay_minutes":t.delay_minutes,"delay_reason":t.delay_reason,"status":t.status,"can_transition":bool(can_manage or (can_update_own and ctx.staff and t.driver_staff_id==ctx.staff.id)),"notes":t.notes})
     return out
 
 @app.post("/api/v1/lodges/{lodge_id}/transfers",dependencies=[Depends(require_csrf)])

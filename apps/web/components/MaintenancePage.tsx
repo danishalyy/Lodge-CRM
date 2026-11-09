@@ -58,11 +58,8 @@ export default function MaintenancePage() {
       const m = me.memberships?.find(
         (x: any) => x.lodge_id === getActiveLodgeId(),
       );
-      const manage = Boolean(
-        me.is_super_admin || m?.permissions?.includes("maintenance.manage"),
-      );
+      const manage = Boolean(m?.permissions?.includes("maintenance.manage"));
       const assetManage = Boolean(
-        me.is_super_admin ||
         m?.permissions?.includes("maintenance.assets.manage"),
       );
       setCanManage(manage);

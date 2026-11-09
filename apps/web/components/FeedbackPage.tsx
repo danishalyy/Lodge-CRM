@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -9,6 +10,7 @@ import { authApi, operationsApi } from "@/lib/api";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
 export default function FeedbackPage() {
+  const access = useWorkspaceAccess();
   const [rows, setRows] = useState<any[]>([]),
     [guests, setGuests] = useState<any[]>([]),
     [deps, setDeps] = useState<any[]>([]),
@@ -17,24 +19,38 @@ export default function FeedbackPage() {
     [error, setError] = useState(""),
     [canManage, setCanManage] = useState(false);
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
       const me = await authApi.me();
       const active = localStorage.getItem("active_lodge_id");
       const m = me.memberships?.find((x: any) => x.lodge_id === active);
-      setCanManage(
-        me.is_super_admin || m?.permissions?.includes("feedback.manage"),
-      );
-      const [r, g, d, s] = await Promise.all([
+      setCanManage(m?.permissions?.includes("feedback.manage"));
+      const [r, d, s] = await Promise.all([
         operationsApi.feedback.list(),
-        operationsApi.requests ? operationsApi.departments.list() : [],
-        operationsApi.departments.list(),
-        operationsApi.staff.list(),
+        access.permission("feedback.manage") &&
+        access.feature("departments") &&
+        access.permission("departments.view")
+          ? operationsApi.departments.list()
+          : Promise.resolve([]),
+        access.permission("feedback.manage") &&
+        access.feature("staff") &&
+        access.permission("staff.view")
+          ? operationsApi.staff.list()
+          : Promise.resolve([]),
       ]);
+      if (!access.isCurrent()) return;
       setRows(r);
       setDeps(d);
       setStaff(s);
       try {
-        setGuests(await (await import("@/lib/api")).lodgeApi.guests());
+        const resolvedChoices =
+          access.permission("feedback.manage") &&
+          access.feature("guests") &&
+          access.permission("guests.view")
+            ? await (await import("@/lib/api")).lodgeApi.guests()
+            : [];
+        if (!access.isCurrent()) return;
+        setGuests(resolvedChoices);
       } catch {
         setGuests([]);
       }
@@ -43,10 +59,15 @@ export default function FeedbackPage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
+    setStaff([]);
+    setGuests([]);
+    setDeps([]);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!access.permission("feedback.manage")) return;
     const f = new FormData(e.currentTarget);
     await operationsApi.feedback.create({
       guest_id: String(f.get("guest_id")),
@@ -72,7 +93,7 @@ export default function FeedbackPage() {
             resolution.
           </p>
         </div>
-        {canManage && (
+        {canManage && access.permission("feedback.manage") && (
           <button className="button primary" onClick={() => setOpen(true)}>
             + Feedback
           </button>
@@ -116,7 +137,7 @@ export default function FeedbackPage() {
           <div className="empty">No guest feedback has been recorded.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && access.permission("feedback.manage") && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <h1>Record feedback</h1>

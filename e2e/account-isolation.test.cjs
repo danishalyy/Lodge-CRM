@@ -30,7 +30,7 @@ async function accountPage(user){
   await page.route('**/api/**',async route=>{
     const url=route.request().url();
     if(url.endsWith('/platform/plans')) return route.fulfill({json:['Basic','Standard','Premium'].map((key,i)=>({key,name:key,description:key==='Standard'?'Expanded lodge workflows, departments, staff HR, feedback and operational coordination.':'Daily lodge operations.',features:[],planned_features:[],feature_catalog:[],revision:1,lodge_count:i+1}))});
-    if(url.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',assignable:true}],permissions:[],scopes:[],can_manage_custom_roles:false}});
+    if(url.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',description:'Own assigned work',assignable:true,permission_keys:[],copy_base_role_key:'general_staff',copy_permission_keys:[]}],permissions:[],scopes:[],can_manage_custom_roles:false}});
     if(url.endsWith('/api/v1/auth/me'))await route.fulfill({json:user});
     else{requests.push(url);await route.fulfill({json:[]})}
   });
@@ -333,7 +333,7 @@ test('staff creation queues an invitation without choosing an owner password and
  try{
   await page.route('**/api/v1/lodges/**',async route=>{const url=new URL(route.request().url()),p=url.pathname;
    if(p.endsWith('/invitation/resend')){resends++;return route.fulfill({json:{delivery_status:'pending'}})}
-   if(p.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',assignable:true}],can_manage_custom_roles:false}});
+   if(p.endsWith('/role-catalog'))return route.fulfill({json:{default_staff_role_key:'general_staff',presets:[{key:'general_staff',name:'General Staff',description:'Own assigned work',assignable:true,permission_keys:[],copy_base_role_key:'general_staff',copy_permission_keys:[]}],can_manage_custom_roles:false}});
    if(p.endsWith('/staff')){if(route.request().method()==='POST'){created=route.request().postDataJSON();return route.fulfill({json:{id:'new-staff',delivery_status:'pending'}})}return route.fulfill({json:created?[{id:'new-staff',full_name:created.full_name,email:created.email,job_title:'',phone:'',employment_status:'active',operational_status:'available',has_login:true,account_status:'pending_activation',delivery_status:'pending'}]:[]})}
    if(p.endsWith('/branding'))return route.fulfill({json:{display_name:'Acacia Lodge',logo_url:null}});
    return route.fulfill({json:[]});
@@ -1039,4 +1039,58 @@ test('Super Admin cannot enter lodge workspaces through stale selection or forge
   await page.goto(base+'/settings');await page.getByRole('heading',{name:'Security settings',exact:true}).waitFor();
   assert.equal(requests.filter(url=>/\/api\/v1\/lodges\//.test(url)).length,0);
  }finally{await context.close()}
+});
+
+test('read-only module screens hide write controls and avoid forbidden reference lookups',async()=>{
+ const user=premiumTestAccount();user.memberships[0].permissions=['activities.view','transfers.view','fuel.view','vehicles.view','departments.view','wildlife.view','feedback.view','fb.view','ranger.view'];
+ const {context,page,requests}=await accountPage(user);
+ try{
+  await premiumFixtures(page);
+  for(const [route,button] of [['activities','+ Activity'],['transfers','+ Transfer'],['fuel','+ Fuel record'],['fleet','+ Vehicle'],['departments','+ Department'],['wildlife','+ Sighting'],['feedback','+ Feedback'],['food-beverage','+ Meal service'],['ranger','Pre-drive checklist']]){
+   requests.length=0;const forbidden=[];
+   const monitor=request=>{const path=new URL(request.url()).pathname;if(path.startsWith('/api/v1/lodges/')&&/\/(staff|guests|stays|departments|vehicles)$/.test(path)&&!((route==='departments'&&path.endsWith('/departments'))||(route==='fleet'&&path.endsWith('/vehicles'))))forbidden.push(path)};
+   page.on('request',monitor);
+   await page.goto(base+'/'+route);await page.locator('.content h1').first().waitFor();await page.waitForTimeout(150);
+   assert.equal(await page.getByRole('button',{name:button,exact:true}).count(),0,route+' showed unauthorized create action');
+   assert.equal(await page.locator('.pageHeader .button.primary').count(),0,route+' exposed a write control');assert.deepEqual(forbidden,[],route+' fetched unauthorized reference data');page.off('request',monitor);
+  }
+ }finally{await context.close()}
+});
+
+test('assigned guide and driver see only server-authorized workflow actions without scheduling controls',async()=>{
+ for(const module of ['activities','transfers']){
+  const user=premiumTestAccount();user.memberships[0].permissions=[module+'.view',module+'.own.manage'];
+  const {context,page}=await accountPage(user);const mutations=[],lookups=[];
+  try{
+   await premiumFixtures(page);
+   const common={status:'scheduled',vehicle_name:'Vehicle 02',can_transition:true};
+   const record=module==='activities'?{...common,id:'own',title:'Morning drive',activity_type:'drive',starts_at:'2026-11-09T06:00:00Z',ends_at:'2026-11-09T08:00:00Z',meeting_point:'Reception',guests:[]}:{...common,id:'own',guest_name:'Assigned guest',scheduled_at:'2026-11-09T06:00:00Z',pickup_location:'Airport',dropoff_location:'Lodge'};
+   await page.route('**/api/v1/lodges/premium-lodge/'+module+'**',route=>{
+    if(route.request().method()==='PATCH'){mutations.push({path:new URL(route.request().url()).pathname,body:route.request().postDataJSON()});return route.fulfill({json:{id:'own',status:'confirmed'}})}
+    return route.fulfill({json:[record,{...record,id:'other',can_transition:false}]});
+   });
+   page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/v1/lodges/')&&/\/(staff|guests|stays|vehicles)$/.test(new URL(r.url()).pathname))lookups.push(r.url())});
+   await page.goto(base+'/'+module);await page.locator('.content h1').first().waitFor();
+   await page.getByRole('button',{name:'Confirmed',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Confirmed',exact:true}).count(),1);
+   assert.equal(await page.getByRole('button',{name:module==='activities'?'+ Activity':'+ Transfer',exact:true}).count(),0);
+   await page.getByRole('button',{name:'Confirmed',exact:true}).click();await page.waitForTimeout(150);
+   assert.deepEqual(mutations,[{path:'/api/v1/lodges/premium-lodge/'+module+'/own',body:{status:'confirmed'}}]);assert.deepEqual(lookups,[]);
+  }finally{await context.close()}
+ }
+});
+
+test('revoking lookup access closes the editor and discards a late staff response',async()=>{
+ const user=premiumTestAccount();user.memberships[0].permissions=['activities.view','activities.manage','staff.view'];
+ const {context,page}=await accountPage(user);let release,staffRequests=0;
+ try{
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/staff',async route=>{staffRequests++;await new Promise(resolve=>release=resolve);return route.fulfill({json:[{id:'old-staff',full_name:'Private staff from previous access',employment_status:'active'}]})});
+  await page.goto(base+'/activities');await page.getByRole('button',{name:'+ Activity',exact:true}).click();await page.getByRole('dialog').waitFor();
+  await page.waitForFunction(()=>document.querySelector('select[name="guide_staff_id"]'));
+  assert.equal(staffRequests,1);
+  user.memberships[0].permissions=['activities.view','activities.manage'];await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByRole('button',{name:'+ Activity',exact:true}).click();await page.getByRole('dialog').waitFor();
+  release();await page.waitForTimeout(200);
+  assert.equal(await page.getByText('Private staff from previous access',{exact:true}).count(),0);assert.equal(staffRequests,1);
+ }finally{release?.();await context.close()}
 });

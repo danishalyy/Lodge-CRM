@@ -12,6 +12,7 @@ Reviewed 9 November 2026 against the three original attachments and the current 
 6. Account invitations cover Gmail and business addresses; owners set their own passwords through expiring links. Each person retains their own identity/session. Shared operational access is permission based, not access to another person's private account.
 
 7. Super Admin is platform-only: no lodge workspace, operational API or group-owner access, including legacy assignments. Platform branding previews use a separate platform endpoint. Lodge access requires a separate lodge or Group Admin identity.
+8. No external booking, accounting, GPS or messaging systems have been selected by the owner. Provider-dependent connections stay pending; core work continues independently.
 
 The original-file SHA-256 identifiers are recorded in the JSON register. Attached documents are requirements sources; owner instructions govern execution and later overrides.
 
@@ -162,3 +163,5 @@ Optional presentation or infrastructure refinements must not displace these docu
 Task responsibility/history checkpoint: [scope, migration and validation](TASK_WORKFLOW_DELIVERY.md). This implements the core B07 gaps while S03 and the cross-module memory/relationship requirements remain partial.
 
 Platform/lodge isolation checkpoint: [scope and verification](PLATFORM_ISOLATION_DELIVERY.md). This removes the former platform support bypass; it does not declare the wider role/field acceptance matrix or remaining functional requirements complete.
+
+Role-control checkpoint: [scope and verification](ROLE_CONTROLS_DELIVERY.md). Remaining operational action controls now follow permissions, with server-provided assignment capabilities and guarded reference data. The wider connected-role, worker and offline acceptance register remains open.

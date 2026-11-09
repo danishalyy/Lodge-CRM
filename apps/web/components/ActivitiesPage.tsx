@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 import { readableLabel } from "@/lib/strings/content";
@@ -18,6 +19,7 @@ type Activity = {
   guide_name?: string;
   vehicle_name?: string;
   status: string;
+  can_transition?: boolean;
   meeting_point: string;
   guests: { id: string; name: string }[];
 };
@@ -35,6 +37,10 @@ const next: Record<string, string | undefined> = {
   in_progress: "completed",
 };
 export default function ActivitiesPage() {
+  const access = useWorkspaceAccess();
+  const canManage = access.permission("activities.manage");
+  const canTransition = canManage || access.permission("activities.own.manage");
+
   const [rows, setRows] = useState<Activity[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
     [vehicles, setVehicles] = useState<Vehicle[]>([]),
@@ -42,13 +48,25 @@ export default function ActivitiesPage() {
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const load = async () => {
+    if (!access.isCurrent()) return;
     try {
       const [a, s, v, g] = await Promise.all([
         operationsApi.activities.list<Activity[]>(),
-        operationsApi.staff.list<Staff[]>(),
-        operationsApi.vehicles.list<Vehicle[]>(),
-        lodgeApi.guests(),
+        canManage && access.feature("staff") && access.permission("staff.view")
+          ? operationsApi.staff.list<Staff[]>()
+          : Promise.resolve([]),
+        canManage &&
+        access.feature("fleet") &&
+        access.permission("vehicles.view")
+          ? operationsApi.vehicles.list<Vehicle[]>()
+          : Promise.resolve([]),
+        canManage &&
+        access.feature("guests") &&
+        access.permission("guests.view")
+          ? lodgeApi.guests()
+          : Promise.resolve([]),
       ]);
+      if (!access.isCurrent()) return;
       setRows(a);
       setStaff(s);
       setVehicles(v);
@@ -58,10 +76,15 @@ export default function ActivitiesPage() {
     }
   };
   useEffect(() => {
+    setOpen(false);
+    setStaff([]);
+    setVehicles([]);
+    setGuests([]);
     load();
-  }, []);
+  }, [access.scopeKey]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManage) return;
     const f = new FormData(e.currentTarget);
     try {
       await operationsApi.activities.create({
@@ -100,9 +123,11 @@ export default function ActivitiesPage() {
             without scheduling conflicts.
           </p>
         </div>
-        <button className="button primary" onClick={() => setOpen(true)}>
-          + Activity
-        </button>
+        {canManage && (
+          <button className="button primary" onClick={() => setOpen(true)}>
+            + Activity
+          </button>
+        )}
       </div>
       {error && <div className="panel dangerText">{error}</div>}
       <TableScroll as="section" className="panel tableWrap">
@@ -141,7 +166,9 @@ export default function ActivitiesPage() {
                   <StatusPill value={a.status} />
                 </td>
                 <td>
-                  {next[a.status] ? (
+                  {canTransition &&
+                  a.can_transition === true &&
+                  next[a.status] ? (
                     <button
                       className="button secondary"
                       onClick={() => update(a.id, next[a.status]!)}
@@ -160,7 +187,7 @@ export default function ActivitiesPage() {
           <div className="empty">No activities have been scheduled.</div>
         )}
       </TableScroll>
-      {open && (
+      {open && canManage && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">
             <h1>Schedule activity</h1>

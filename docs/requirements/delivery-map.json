@@ -618,7 +618,7 @@
       "title": "Account activation and private identity/session protection",
       "source": "Owner invitation/security decisions; workflow §§6–7",
       "status": "implemented_core",
-      "acceptance": "Each person uses their own activated email/password; invitations expire; no account impersonation or cross-account private history."
+      "acceptance": "Each person uses their own activated email/password; invitations expire; no account impersonation or cross-account private history. Super Admin is platform-only; all lodge/group operational endpoints reject platform identities even with legacy lodge membership."
     },
     {
       "id": "C06",

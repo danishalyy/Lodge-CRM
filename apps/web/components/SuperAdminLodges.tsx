@@ -6,7 +6,7 @@ import { dateInputValue, formatDate } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
-import { API_URL, setActiveLodgeId, superApi } from "@/lib/api";
+import { API_URL, superApi } from "@/lib/api";
 import Drawer from "./Drawer";
 import PackageComparison from "./PackageComparison";
 import { accessCopy } from "@/lib/strings/access";
@@ -59,7 +59,7 @@ function LodgeLogo({ lodge }: { lodge: Lodge }) {
     <div className="propertyLogo">
       {lodge.branding?.logo_url && !failed ? (
         <img
-          src={`${API_URL}${lodge.branding.logo_url}`}
+          src={`${API_URL}${lodge.branding.logo_url.replace("/api/v1/lodges/", "/api/v1/platform/lodges/")}`}
           alt={`${lodge.branding.display_name} logo`}
           onError={() => setFailed(true)}
         />
@@ -429,16 +429,7 @@ export default function SuperAdminLodges() {
                 >
                   Manage branding
                 </button>
-                <button
-                  className="button"
-                  onClick={() => {
-                    setActiveLodgeId(lodge.id);
-                    localStorage.setItem("active_lodge_name", lodge.name);
-                    location.href = "/dashboard";
-                  }}
-                >
-                  Open lodge <UiIcon name="arrow" />
-                </button>
+
               </div>
             </article>
           ))}
@@ -661,7 +652,7 @@ export default function SuperAdminLodges() {
                 preview={
                   preview ||
                   (!removeLogo && branding.branding?.logo_url
-                    ? `${API_URL}${branding.branding.logo_url}`
+                    ? `${API_URL}${branding.branding.logo_url.replace("/api/v1/lodges/", "/api/v1/platform/lodges/")}`
                     : "")
                 }
                 onChange={choose}

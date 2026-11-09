@@ -15,11 +15,10 @@ import {
   authApi,
   getActiveLodgeId,
   setActiveLodgeId,
-  superApi,
-  lodgePreferencesApi,
 } from "@/lib/api";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import NavigationEnhancements from "./NavigationEnhancements";
+import { accessCopy } from "@/lib/strings/access";
 import { designCopy } from "@/lib/strings/design";
 import SafariBrand, { SafariMark } from "./SafariBrand";
 import LodgeIdentity from "./LodgeIdentity";
@@ -117,14 +116,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     authApi
       .me()
       .then(async (v) => {
-        if (v.is_super_admin && v.mfa_enabled && getActiveLodgeId())
-          v.support_entitlements =
-            (await superApi.lodgeEntitlements(getActiveLodgeId())).effective ||
-            [];
-        if (v.is_super_admin && v.mfa_enabled && getActiveLodgeId())
-          await lodgePreferencesApi.get();
         setMe(v);
-        if (!getActiveLodgeId() && v.memberships?.[0])
+        if (!v.is_super_admin && !getActiveLodgeId() && v.memberships?.[0])
           setActiveLodgeId(v.memberships[0].lodge_id);
       })
       .catch(() => router.replace("/login"))
@@ -140,12 +133,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const refresh = async () => {
       try {
         const user = await authApi.me();
-        if (user.is_super_admin && user.mfa_enabled && getActiveLodgeId())
-          user.support_entitlements =
-            (await superApi.lodgeEntitlements(getActiveLodgeId())).effective ||
-            [];
-        if (user.is_super_admin && user.mfa_enabled && getActiveLodgeId())
-          await lodgePreferencesApi.get();
         if (alive) setMe(user);
       } catch {}
     };
@@ -181,29 +168,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   if (!me) return null;
+  if (me.is_super_admin && path !== "/settings")
+    return (
+      <main className="content">
+        <AccountChangeGuard />
+        <section className="panel statePanel">
+          <h1>{accessCopy.platformOnlyTitle}</h1>
+          <p>{accessCopy.platformOnlyDescription}</p>
+          <Link className="button primary" href={me.mfa_enabled ? "/super-admin" : "/settings"}>
+            {me.mfa_enabled ? accessCopy.platformConsole : accessCopy.accountSecurity}
+          </Link>
+          <SignOutButton />
+        </section>
+      </main>
+    );
   const active = getActiveLodgeId();
-  const realMembership =
-    me.memberships?.find((m: any) => m.lodge_id === active) ||
-    (!me.is_super_admin ? me.memberships?.[0] : null);
-  const membership =
-    realMembership ||
-    (me.is_super_admin && active
-      ? {
-          lodge_id: active,
-          lodge_name:
-            typeof window !== "undefined"
-              ? localStorage.getItem("active_lodge_name") || "Selected lodge"
-              : "Selected lodge",
-          role: "Super Admin",
-          permissions: [],
-          entitlements: me.support_entitlements || [],
-          subscription_status: "Platform access",
-        }
-      : null);
+  const realMembership = me.is_super_admin ? null :
+    me.memberships?.find((m: any) => m.lodge_id === active) || me.memberships?.[0];
+  const membership = realMembership;
   const roleAllowed = (key: string) => {
     if (!migrated.has(key)) return false;
     if (key === "settings") return true;
-    if (me.is_super_admin) return true;
+    if (me.is_super_admin) return false;
     const p = required[key];
     return !p || membership?.permissions?.includes(p);
   };

@@ -1020,3 +1020,23 @@ test('premium dashboard uses the acacia brand and accurate task health without u
   await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.safariBrand').evaluate(el=>getComputedStyle(el).animationName),'none');
  }finally{await context.close()}
 });
+
+
+test('Super Admin cannot enter lodge workspaces through stale selection or forged membership',async()=>{
+ const user={...premiumTestAccount(true),memberships:[{lodge_id:'premium-lodge',lodge_name:'Legacy selection',permissions:['dashboard.view','guests.view'],entitlements:['dashboard','guests']} ]};
+ const {context,page,requests}=await accountPage(user);
+ await context.addInitScript(()=>{localStorage.setItem('active_user_id','premium-design-owner');localStorage.setItem('active_lodge_id','premium-lodge');localStorage.setItem('active_lodge_name','Legacy selection')});
+ try{
+  for(const path of ['/dashboard','/guests','/tasks','/rooms','/lodge-ai','/reports','/memory','/hr']){
+   await page.goto(base+path);await page.getByRole('heading',{name:'Platform account only',exact:true}).waitFor();
+   assert.equal(await page.evaluate(()=>localStorage.getItem('active_lodge_id')),null);
+   assert.equal(await page.locator('.sidebar .navItem[href="/guests"]').count(),0);
+   assert.equal(requests.filter(url=>/\/api\/v1\/lodges\//.test(url)).length,0,'blocked children must not fetch lodge data');
+  }
+  await page.getByRole('link',{name:'Return to Super Admin',exact:true}).click();await page.waitForURL('**/super-admin');
+  await page.goto(base+'/super-admin/lodges');await page.getByRole('heading',{name:'Lodges',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Open lodge',exact:true}).count(),0);
+  await page.goto(base+'/settings');await page.getByRole('heading',{name:'Security settings',exact:true}).waitFor();
+  assert.equal(requests.filter(url=>/\/api\/v1\/lodges\//.test(url)).length,0);
+ }finally{await context.close()}
+});

@@ -513,7 +513,7 @@ def logout(response: Response, request: Request, user: User = Depends(current_us
 @app.get("/api/v1/auth/me")
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     memberships = []
-    member_rows = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
+    member_rows = [] if user.is_super_admin else db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
     for m in member_rows:
         if not user.is_super_admin and not membership_for(db,user,str(m.lodge_id)):continue
         lodge = db.get(Lodge, m.lodge_id)
@@ -547,7 +547,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
                 "package": sub.package if sub else None, "entitlements":plan_features,
             })
-    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "groups": [{"id":str(g.id),"name":g.name} for g in db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()], "memberships": memberships}
+    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "groups": [] if user.is_super_admin else [{"id":str(g.id),"name":g.name} for g in db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()], "memberships": memberships}
 
 
 @app.get("/api/v1/lodges/{lodge_id}/dashboard")
@@ -664,6 +664,12 @@ def get_lodge_logo(lodge_id:uuid.UUID,user:User=Depends(require_lodge_access),db
     lodge=db.get(Lodge,lodge_id)
     if not lodge or not lodge.logo_png:raise HTTPException(404,"Logo not found")
     return Response(content=lodge.logo_png,media_type="image/png",headers={"X-Content-Type-Options":"nosniff"})
+
+
+@app.get("/api/v1/platform/lodges/{lodge_id}/branding/logo")
+def platform_lodge_logo(lodge_id:uuid.UUID,user:User=Depends(require_super_admin),db:Session=Depends(get_db)):
+    # Platform branding preview does not grant access to the operational workspace.
+    return get_lodge_logo(lodge_id,user,db)
 
 
 @app.patch("/api/v1/platform/lodges/{lodge_id}/branding",dependencies=[Depends(require_csrf)])

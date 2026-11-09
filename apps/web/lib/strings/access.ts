@@ -1,4 +1,8 @@
 export const accessCopy = {
+  platformOnlyTitle: "Platform account only",
+  platformOnlyDescription: "Super Admin manages the platform. Lodge operations require a separate, explicitly assigned lodge account.",
+  platformConsole: "Return to Super Admin",
+  accountSecurity: "Account security",
   close: "Close dialog",
   noLodges: "Register a lodge to manage its exceptions.",
   lodge: "Lodge",

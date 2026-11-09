@@ -60,7 +60,7 @@ def test_unusable_account_session_cannot_access_profile(account,state):
     assert account['client'].get('/api/v1/auth/sessions').status_code==401
 
 
-def test_mfa_required_for_platform_users_on_lodge_routes(account):
+def test_platform_users_are_denied_lodge_routes_even_before_mfa(account):
     from app.main import app
     user,session,raw,csrf=other_account(account,platform=True)
     client=TestClient(app)
@@ -69,7 +69,7 @@ def test_mfa_required_for_platform_users_on_lodge_routes(account):
         path=f"/api/v1/lodges/{account['lodge'].id}/guests"
         response=client.get(path)
         assert response.status_code==403
-        assert response.json()['detail']=='Super Admin MFA setup is required'
+        assert 'Platform accounts cannot access lodge operations' in response.json()['detail']
     finally:client.close()
 
 
@@ -236,3 +236,55 @@ def test_activation_token_is_consumed_once_during_concurrent_requests(account):
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures=[pool.submit(activate) for _ in range(2)]
         assert sorted(f.result(timeout=30) for f in futures)==[200,400]
+
+
+@pytest.mark.parametrize("legacy_membership", [False, True])
+def test_platform_account_cannot_call_any_lodge_or_group_endpoint(account, legacy_membership):
+    """Exercise the running route registry, including AI and future registered routers."""
+    from app.main import app
+    from app.models import User, AuditLog
+    user, _, raw, csrf = other_account(account, platform=True, lodge_id=account['lodge'].id if legacy_membership else None)
+    with account['owner']() as db:
+        db.get(User,user.id).mfa_enabled_at=datetime.now(timezone.utc)
+        db.commit()
+    client=TestClient(app)
+    try:
+        client.cookies.set('lodge_session',raw)
+        me=client.get('/api/v1/auth/me').json()
+        assert me['is_super_admin'] and me['mfa_enabled']
+        assert me['memberships']==[] and me['groups']==[]
+        assert client.get('/api/v1/platform/lodges').status_code==200
+        checked=[]
+        for route in app.routes:
+            if not getattr(route,'path','').startswith(('/api/v1/lodges/', '/api/v1/groups/')):continue
+            path=route.path.replace('{lodge_id}',str(account['lodge'].id))
+            path=re.sub(r'\{[^}]+\}',str(uuid4()),path)
+            for method in sorted(route.methods - {'HEAD','OPTIONS'}):
+                response=client.request(method,path,json={},headers={'X-CSRF-Token':csrf,'X-Lodge-Context':str(account['lodge'].id)})
+                assert response.status_code==403,(method,path,response.status_code,response.text)
+                assert 'Platform accounts cannot access lodge operations' in response.text
+                checked.append((method,path))
+        assert len(checked)>100
+        # Own account security still works, but grants no lodge access.
+        assert client.get('/api/v1/auth/sessions').status_code==200
+    finally:
+        client.close()
+    with account['owner']() as db:
+        assert not db.scalar(select(AuditLog.id).where(AuditLog.actor_user_id==user.id,AuditLog.action.in_(['support.read','support.write'])))
+
+
+def test_platform_authentication_does_not_establish_operational_rls_bypass(account):
+    from app.security import _current_user,access_context,require_permission,require_lodge_access,membership_for
+    from sqlalchemy import text
+    from fastapi import HTTPException
+    from starlette.requests import Request
+    user,_,raw,_=other_account(account,platform=True,lodge_id=account['lodge'].id)
+    with account['application']() as db:
+        actor=_current_user(raw,db)
+        assert db.scalar(text("select current_setting('app.is_super_admin')"))=='false'
+        assert db.scalar(text("select current_setting('app.current_lodge_id')"))==''
+        assert membership_for(db,actor,str(account['lodge'].id)) is None
+        request=Request({'type':'http','method':'GET','path':'/internal-test','headers':[]})
+        for check in [lambda: access_context(db,actor,str(account['lodge'].id)),lambda: require_lodge_access(str(account['lodge'].id),actor,db),lambda: require_permission('guests.view')(str(account['lodge'].id),request,actor,db)]:
+            with pytest.raises(HTTPException) as error:check()
+            assert error.value.status_code==403

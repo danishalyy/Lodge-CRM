@@ -262,7 +262,7 @@ def test_ai_explicitly_denies_automatic_super_admin_tenant_inference(ai):
         user.mfa_enabled_at = datetime.now(timezone.utc)
         db.commit()
     response = ai["client"].get(ai["base"] + "/status")
-    assert response.status_code == 403 and "support access" in response.text
+    assert response.status_code == 403 and "Platform accounts cannot access lodge operations" in response.text
 
 
 def test_ai_history_is_private_between_users_in_the_same_lodge(ai):

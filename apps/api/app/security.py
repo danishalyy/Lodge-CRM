@@ -66,8 +66,11 @@ def create_session(db: Session, user: User, response: Response):
     response.set_cookie("lodge_csrf", csrf, httponly=False, secure=settings.cookie_secure, samesite="lax", max_age=settings.session_ttl_hours*3600, path="/")
 
 
-def current_user(lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None), x_lodge_context: str | None = Header(None)) -> User:
-    return _current_user(lodge_session,db,x_expected_user_id,x_lodge_context,persist_activity=True)
+def current_user(request: Request, lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None), x_lodge_context: str | None = Header(None)) -> User:
+    user = _current_user(lodge_session,db,x_expected_user_id,x_lodge_context,persist_activity=True)
+    if user.is_super_admin and request.url.path.startswith(("/api/v1/lodges/", "/api/v1/groups/")):
+        raise HTTPException(403, "Platform accounts cannot access lodge operations. Sign in with a separate lodge account.")
+    return user
 
 
 def _current_user(lodge_session,db,x_expected_user_id=None,x_lodge_context=None,*,persist_activity=False):
@@ -91,7 +94,7 @@ def _current_user(lodge_session,db,x_expected_user_id=None,x_lodge_context=None,
         db.commit()
     else:
         db.flush()  # AI callers own their transaction and any record locks.
-    set_rls_context(db, None, user.is_super_admin, str(user.id))
+    set_rls_context(db, None, False, str(user.id))
     if not user.is_super_admin:
         memberships = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
         groups=db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()
@@ -125,15 +128,18 @@ def require_csrf(request: Request, x_csrf_token: str | None = Header(None), lodg
         raise HTTPException(403, "Invalid CSRF token")
 
 
-def require_super_admin(user: User = Depends(current_user)) -> User:
+def require_super_admin(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
     if not user.is_super_admin:
         raise HTTPException(403, "Super Admin access required")
     if not user.mfa_enabled_at:
         raise HTTPException(403, "Super Admin MFA setup is required")
+    set_rls_context(db, None, True, str(user.id))
     return user
 
 
 def membership_for(db: Session, user: User, lodge_id: str):
+    if user.is_super_admin:
+        return None
     member=db.scalar(select(Membership).where(Membership.user_id==user.id,Membership.lodge_id==lodge_id,Membership.is_active.is_(True)))
     if member and db.get(Role,member.role_id).key=='group_admin':
         lodge=db.get(Lodge,lodge_id)
@@ -154,7 +160,7 @@ class AccessContext:
 
 def access_context(db: Session, user: User, lodge_id: str) -> AccessContext:
     if user.is_super_admin:
-        return AccessContext(user, None, "super_admin", None, None, True)
+        raise HTTPException(403, "Platform accounts cannot access lodge operations. Sign in with a separate lodge account.")
     m = membership_for(db, user, lodge_id)
     if not m:
         raise HTTPException(403, "You do not have access to this lodge")
@@ -223,9 +229,7 @@ def ensure_feature(db: Session, lodge_id: str, feature_key: str):
 
 def require_lodge_access(lodge_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.is_super_admin:
-        require_super_admin(user)
-        set_rls_context(db, lodge_id, True, str(user.id))
-        return user
+        raise HTTPException(403, "Platform accounts cannot access lodge operations. Sign in with a separate lodge account.")
     if not membership_for(db, user, lodge_id):
         raise HTTPException(403, "You do not have access to this lodge")
     set_rls_context(db, lodge_id, False, str(user.id))
@@ -248,13 +252,7 @@ def has_permission(db: Session, membership: Membership, permission_key: str) -> 
 def require_permission(permission_key: str, write: bool = False):
     def dependency(lodge_id: str, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
         if user.is_super_admin:
-            require_super_admin(user)
-            set_rls_context(db, lodge_id, True, str(user.id))
-            if write:
-                ensure_subscription_write_allowed(db, lodge_id)
-            db.add(AuditLog(lodge_id=lodge_id,actor_user_id=user.id,action="support.write" if write else "support.read",resource_type="endpoint",resource_id=request.url.path,request_id=request.headers.get("x-request-id",""),ip_address=request.client.host if request.client else ""))
-            db.commit();set_rls_context(db,lodge_id,True,str(user.id))
-            return user
+            raise HTTPException(403, "Platform accounts cannot access lodge operations. Sign in with a separate lodge account.")
         m = membership_for(db, user, lodge_id)
         if not m:
             raise HTTPException(403, "You do not have access to this lodge")

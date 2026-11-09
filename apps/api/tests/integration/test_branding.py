@@ -101,3 +101,14 @@ def test_normalized_logo_discards_exif_metadata(account,platform):
     assert response.status_code==200,response.text
     asset=account['client'].get(response.json()['logo_url'])
     with Image.open(BytesIO(asset.content)) as sanitized:assert not sanitized.getexif()
+
+
+def test_platform_logo_preview_is_separate_and_does_not_grant_lodge_access(account,platform):
+    client,csrf=platform;lid=account['lodge'].id
+    response=client.patch(f'/api/v1/platform/lodges/{lid}/branding',headers=csrf,json={'display_name':'Acacia Lodge','logo_base64':png_logo()})
+    assert response.status_code==200
+    assert client.get(response.json()['logo_url']).status_code==403
+    path=f'/api/v1/platform/lodges/{lid}/branding/logo'
+    preview=client.get(path)
+    assert preview.status_code==200 and preview.headers['content-type']=='image/png'
+    assert account['client'].get(path).status_code==403

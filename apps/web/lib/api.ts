@@ -36,6 +36,10 @@ function bindAccount(user: any) {
     previousLodge = getActiveLodgeId();
   if (getActiveUserId() !== user.id) clearAccountContext();
   localStorage.setItem("active_user_id", user.id);
+  if (user.is_super_admin) {
+    localStorage.removeItem("active_lodge_id");
+    localStorage.removeItem("active_lodge_name");
+  }
   if (
     !user.is_super_admin &&
     !user.memberships?.some((m: any) => m.lodge_id === getActiveLodgeId())

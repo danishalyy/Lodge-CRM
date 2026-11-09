@@ -22,3 +22,5 @@ Apply the shared warm-neutral, translucent design system to every new or edited 
 - The owner’s latest acacia/savannah SafariOS logo and matte gold/ivory palette supersede the earlier olive accent. Reuse `SafariBrand` and the bundled mark; never replace a lodge’s own logo. `design-system/safarios/MASTER.md` records the accepted UI/UX Pro Max synthesis. Consult the installed project skill at `.agents/skills/ui-ux-pro-max/SKILL.md` for future design work.
 
 - Wrap operational tables with `components/ui/table-scroll.tsx` so horizontal overflow remains keyboard accessible without adding unnecessary tab stops.
+
+- Super Admin is strictly platform-only. Never offer an Open lodge action, synthesize a lodge membership, grant operational permissions from is_super_admin/platform, or fetch tenant data from blocked operational screens. Platform branding previews use the explicitly guarded platform logo endpoint. Separate lodge and Group Admin identities retain their existing membership scopes.

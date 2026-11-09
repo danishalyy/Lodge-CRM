@@ -15,6 +15,6 @@ export function useWorkspaceAccess() {
   return {
     feature: (key: string) => value.features.includes(key),
     permission: (key: string) =>
-      value.platform || value.permissions.includes(key),
+      !value.platform && value.permissions.includes(key),
   };
 }

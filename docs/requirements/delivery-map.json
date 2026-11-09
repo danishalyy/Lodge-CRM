@@ -1,0 +1,737 @@
+{
+  "reviewed": "2026-11-09",
+  "sources": [
+    {
+      "file": "Lodge_CRM_Packages_and_Features.docx",
+      "sha256": "76108edc59ff6357872e356dba80ffa862ff5b76af79f89eebeb9fd1b276e9fb"
+    },
+    {
+      "file": "AI_Lodge_CRM_Complete_Workflow_and_Role_Access.pdf",
+      "sha256": "d72898e6e11371299f1330eb424dfe916b304be27f5fd326243ca31d2b6fc4c5"
+    },
+    {
+      "file": "AI-LODGE-CRM-OPERATING-SYSTEM.pdf",
+      "sha256": "cf0158cf82cd33c7a968bedf29b0e516072b7b85edad379198327c3c96d77b28"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "B01",
+      "tier": "Basic",
+      "title": "Lodge dashboard",
+      "package_reference": "§3.1",
+      "workflow_reference": "§8",
+      "status": "partial",
+      "acceptance_gap": "Finish the complete command-centre journey, scoped AI brief/recommendations where enabled, and connected readiness/alert acceptance."
+    },
+    {
+      "id": "B02",
+      "tier": "Basic",
+      "title": "Guest CRM",
+      "package_reference": "§3.2",
+      "workflow_reference": "§9.1",
+      "status": "partial",
+      "acceptance_gap": "Dedicated birthday/anniversary, repeat/safari preferences and structured communication/history remain to be completed."
+    },
+    {
+      "id": "B03",
+      "tier": "Basic",
+      "title": "Arrivals and departures",
+      "package_reference": "§3.3",
+      "workflow_reference": "§9.2",
+      "status": "implemented_core",
+      "acceptance_gap": "Run the connected front-office, kitchen, transfer and room-preparation acceptance journey."
+    },
+    {
+      "id": "B04",
+      "tier": "Basic",
+      "title": "Operational stay records",
+      "package_reference": "§3.4",
+      "workflow_reference": "§9.2",
+      "status": "implemented_core",
+      "acceptance_gap": "Verify the complete guest/stay history and concurrent room-assignment journey; a booking engine is not required."
+    },
+    {
+      "id": "B05",
+      "tier": "Basic",
+      "title": "Staff profiles",
+      "package_reference": "§3.5",
+      "workflow_reference": "§11",
+      "status": "implemented_core",
+      "acceptance_gap": "Verify all role-confidentiality, supervisor, employment and operational-availability journeys."
+    },
+    {
+      "id": "B06",
+      "tier": "Basic",
+      "title": "Basic roles and permissions",
+      "package_reference": "§3.6",
+      "workflow_reference": "§4–5, §7, §27",
+      "status": "implemented_core",
+      "acceptance_gap": "Complete the default/custom-role matrix for every contextual field, export, worker and offline action."
+    },
+    {
+      "id": "B07",
+      "tier": "Basic",
+      "title": "Task management",
+      "package_reference": "§3.7",
+      "workflow_reference": "§12, §26",
+      "status": "partial",
+      "acceptance_gap": "Add assignment timing/history and direct vehicle/maintenance relationships; accept the whole lifecycle."
+    },
+    {
+      "id": "B08",
+      "tier": "Basic",
+      "title": "Guest requests",
+      "package_reference": "§3.8",
+      "workflow_reference": "§10",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept request → assigned task → proof/checklist → resolution → guest/history/notification journey."
+    },
+    {
+      "id": "B09",
+      "tier": "Basic",
+      "title": "Basic housekeeping",
+      "package_reference": "§3.9",
+      "workflow_reference": "§13",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept room preparation, defect hand-off and readiness under assigned-role constraints."
+    },
+    {
+      "id": "B10",
+      "tier": "Basic",
+      "title": "Basic maintenance tickets",
+      "package_reference": "§3.10",
+      "workflow_reference": "§14",
+      "status": "partial",
+      "acceptance_gap": "Complete maintenance media and the linked repair/inspection/history experience."
+    },
+    {
+      "id": "B11",
+      "tier": "Basic",
+      "title": "Activities and safari schedule",
+      "package_reference": "§3.11",
+      "workflow_reference": "§15–16",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept guide/guest/vehicle scheduling, checklist, departure, return and issue reporting together."
+    },
+    {
+      "id": "B12",
+      "tier": "Basic",
+      "title": "Basic fleet records",
+      "package_reference": "§3.12",
+      "workflow_reference": "§14, §16–17, §26",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept availability, linked activity/transfer and maintenance state consistently."
+    },
+    {
+      "id": "B13",
+      "tier": "Basic",
+      "title": "Basic notifications",
+      "package_reference": "§3.13",
+      "workflow_reference": "§21",
+      "status": "implemented_core",
+      "acceptance_gap": "Verify live delivery/retry and every specified recipient, priority and status path."
+    },
+    {
+      "id": "B14",
+      "tier": "Basic",
+      "title": "Guest mobile experience",
+      "package_reference": "§3.14",
+      "workflow_reference": "§20.2",
+      "status": "missing",
+      "acceptance_gap": "Deliver the restricted guest web/QR equivalent now; native applications remain deferred by the owner."
+    },
+    {
+      "id": "B15",
+      "tier": "Basic",
+      "title": "Staff mobile companion",
+      "package_reference": "§3.15",
+      "workflow_reference": "§20.1, §20.3",
+      "status": "partial",
+      "acceptance_gap": "Responsive staff screens exist; complete the focused companion and documented offline subset."
+    },
+    {
+      "id": "B16",
+      "tier": "Basic",
+      "title": "Basic reports",
+      "package_reference": "§3.16",
+      "workflow_reference": "§24",
+      "status": "partial",
+      "acceptance_gap": "Expand the dedicated report/export journeys beyond the existing summary surface."
+    },
+    {
+      "id": "B17",
+      "tier": "Basic",
+      "title": "Audit logs",
+      "package_reference": "§3.17",
+      "workflow_reference": "§22.1, §27",
+      "status": "implemented_core",
+      "acceptance_gap": "Retain append-only administrative audit and verify support/export paths; audit is distinct from operational memory."
+    },
+    {
+      "id": "B18",
+      "tier": "Basic",
+      "title": "Subscription access control",
+      "package_reference": "§3.18",
+      "workflow_reference": "§6–7",
+      "status": "implemented_core",
+      "acceptance_gap": "Verify live expiry/reminder delivery and launch date boundaries; retain external payment collection."
+    },
+    {
+      "id": "S01",
+      "tier": "Standard",
+      "title": "Department management",
+      "package_reference": "§4.1",
+      "workflow_reference": "§4–5, §11",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept own-department staffing, work, approvals and contextual access together."
+    },
+    {
+      "id": "S02",
+      "tier": "Standard",
+      "title": "Custom roles and permissions",
+      "package_reference": "§4.2",
+      "workflow_reference": "§4–5, §27",
+      "status": "implemented_core",
+      "acceptance_gap": "Retain exact administrator delegation and accept every custom base-scope combination."
+    },
+    {
+      "id": "S03",
+      "tier": "Standard",
+      "title": "Advanced task management",
+      "package_reference": "§4.3",
+      "workflow_reference": "§12",
+      "status": "partial",
+      "acceptance_gap": "Finish configurable escalation/templates, timing, relationship coverage and lifecycle reporting."
+    },
+    {
+      "id": "S04",
+      "tier": "Standard",
+      "title": "Full housekeeping workflow",
+      "package_reference": "§4.4",
+      "workflow_reference": "§13",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept cleaning, inspections, turndown, linen, overdue preparation and defect hand-off end to end."
+    },
+    {
+      "id": "S05",
+      "tier": "Standard",
+      "title": "Room/unit management",
+      "package_reference": "§4.5",
+      "workflow_reference": "§13",
+      "status": "implemented_core",
+      "acceptance_gap": "Verify all documented states with occupancy and maintenance precedence and custom unit names."
+    },
+    {
+      "id": "S06",
+      "tier": "Standard",
+      "title": "Full maintenance/workshop",
+      "package_reference": "§4.6",
+      "workflow_reference": "§14",
+      "status": "partial",
+      "acceptance_gap": "Complete attachments/photos, inspection/service history, recurrence and repeated-issue evidence."
+    },
+    {
+      "id": "S07",
+      "tier": "Standard",
+      "title": "Transport/driver management",
+      "package_reference": "§4.7",
+      "workflow_reference": "§17",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept stay need → confirmed transfer → assigned driver/vehicle → delay/completion and history."
+    },
+    {
+      "id": "S08",
+      "tier": "Standard",
+      "title": "F&B/dietary management",
+      "package_reference": "§4.8",
+      "workflow_reference": "§18",
+      "status": "partial",
+      "acceptance_gap": "Accept single-entry dietary data, meal counts and only the relevant kitchen/guest-service alerts."
+    },
+    {
+      "id": "S09",
+      "tier": "Standard",
+      "title": "Ranger/guide module",
+      "package_reference": "§4.9",
+      "workflow_reference": "§16",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept the assigned-drive journey with permitted requirements, checks, fuel/issues and return."
+    },
+    {
+      "id": "S10",
+      "tier": "Standard",
+      "title": "Advanced fleet management",
+      "package_reference": "§4.10",
+      "workflow_reference": "§14, §16–17",
+      "status": "partial",
+      "acceptance_gap": "Reconcile tyre, licence/insurance, inspection and detailed service history requirements with the current fields and UI."
+    },
+    {
+      "id": "S11",
+      "tier": "Standard",
+      "title": "Fuel management",
+      "package_reference": "§4.11",
+      "workflow_reference": "§16, §24",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept accurate per-vehicle consumption/cost review and field confidentiality across roles."
+    },
+    {
+      "id": "S12",
+      "tier": "Standard",
+      "title": "Vehicle maintenance reminders",
+      "package_reference": "§4.12",
+      "workflow_reference": "§14, §21",
+      "status": "partial",
+      "acceptance_gap": "Reconcile and accept all date/mileage, tyre/brake/battery service rules; existing fixed reminders are a subset."
+    },
+    {
+      "id": "S13",
+      "tier": "Standard",
+      "title": "Wildlife sightings",
+      "package_reference": "§4.13",
+      "workflow_reference": "§19",
+      "status": "implemented_core",
+      "acceptance_gap": "Accept authorised species/photo/GPS capture, protected-species visibility, storage and history."
+    },
+    {
+      "id": "S14",
+      "tier": "Standard",
+      "title": "Offline photo/GPS capture",
+      "package_reference": "§4.14",
+      "workflow_reference": "§19–20.3",
+      "status": "partial",
+      "acceptance_gap": "Wildlife queue exists; verify real-device persistence, photos, reconnect, duplicate replay and account isolation."
+    },
+    {
+      "id": "S15",
+      "tier": "Standard",
+      "title": "Offline mobile mode",
+      "package_reference": "§4.15",
+      "workflow_reference": "§20.3",
+      "status": "partial",
+      "acceptance_gap": "Assigned tasks, essential lodge/emergency information, notes and inspections are not delivered by the wildlife queue alone."
+    },
+    {
+      "id": "S16",
+      "tier": "Standard",
+      "title": "Push notifications",
+      "package_reference": "§4.16",
+      "workflow_reference": "§21",
+      "status": "missing",
+      "acceptance_gap": "Deliver browser push for the web release where supported; native delivery stays deferred."
+    },
+    {
+      "id": "S17",
+      "tier": "Standard",
+      "title": "Lodge AI chatbot",
+      "package_reference": "§4.17",
+      "workflow_reference": "§23",
+      "status": "partial",
+      "acceptance_gap": "Management chat/tools exist; complete default staff access, guest access and the documented operational question set."
+    },
+    {
+      "id": "S18",
+      "tier": "Standard",
+      "title": "AI knowledge base",
+      "package_reference": "§4.18",
+      "workflow_reference": "§23",
+      "status": "implemented_core",
+      "acceptance_gap": "Private scoped retrieval exists; real-model grounding and complete live ingestion acceptance remain."
+    },
+    {
+      "id": "S19",
+      "tier": "Standard",
+      "title": "Document knowledge uploads",
+      "package_reference": "§4.19",
+      "workflow_reference": "§23",
+      "status": "implemented_core",
+      "acceptance_gap": "Extraction/vector/ACL boundaries are tested; verify the full real storage/worker/embedding pipeline."
+    },
+    {
+      "id": "S20",
+      "tier": "Standard",
+      "title": "AI for guest questions",
+      "package_reference": "§4.20",
+      "workflow_reference": "§20.2, §23",
+      "status": "missing",
+      "acceptance_gap": "Add a separate guest principal and explicitly guest-approved knowledge; internal lodge SOP access is not guest access."
+    },
+    {
+      "id": "S21",
+      "tier": "Standard",
+      "title": "AI for staff questions",
+      "package_reference": "§4.21",
+      "workflow_reference": "§4–5, §16, §20.1, §23",
+      "status": "partial",
+      "acceptance_gap": "Complete the default staff role grants and contextual questions without broadening assigned/department scopes."
+    },
+    {
+      "id": "S22",
+      "tier": "Standard",
+      "title": "Advanced operational reports",
+      "package_reference": "§4.22",
+      "workflow_reference": "§24",
+      "status": "partial",
+      "acceptance_gap": "Dedicated department, housekeeping, maintenance, activities, fleet/fuel, staff and wildlife report/export coverage remains."
+    },
+    {
+      "id": "S23",
+      "tier": "Standard",
+      "title": "Enhanced branding",
+      "package_reference": "§4.23",
+      "workflow_reference": "§6, §20.2",
+      "status": "partial",
+      "acceptance_gap": "Co-branding exists; guest welcome content/selected colours remain. Preserve Super Admin logo control and SafariOS identity."
+    },
+    {
+      "id": "P01",
+      "tier": "Premium",
+      "title": "Multi-lodge/group management",
+      "package_reference": "§5.1",
+      "workflow_reference": "owner override; §26–27",
+      "status": "partial",
+      "acceptance_gap": "Explicit assignments/switching exist; reconcile Premium availability and per-property overrides with the package guide."
+    },
+    {
+      "id": "P02",
+      "tier": "Premium",
+      "title": "Group dashboard",
+      "package_reference": "§5.2",
+      "workflow_reference": "operating-system p24",
+      "status": "partial",
+      "acceptance_gap": "Current scoped totals exist; finish package and documented guest/staff/fleet/alert coverage acceptance."
+    },
+    {
+      "id": "P03",
+      "tier": "Premium",
+      "title": "Cross-property reporting",
+      "package_reference": "§5.3",
+      "workflow_reference": "operating-system p24; §24",
+      "status": "partial",
+      "acceptance_gap": "Read-only comparisons exist; finish the complete selected report set and acceptance."
+    },
+    {
+      "id": "P04",
+      "tier": "Premium",
+      "title": "Live vehicle GPS tracking",
+      "package_reference": "§5.4",
+      "workflow_reference": "package §5.4",
+      "status": "provider_dependent",
+      "acceptance_gap": "Select compatible devices/provider API and implement/accept actual ingestion and live status."
+    },
+    {
+      "id": "P05",
+      "tier": "Premium",
+      "title": "Trip history/route playback",
+      "package_reference": "§5.5",
+      "workflow_reference": "package §5.5",
+      "status": "provider_dependent",
+      "acceptance_gap": "Needs real tracking ingestion, scoped route storage and playback; entitlement flags are not an implementation."
+    },
+    {
+      "id": "P06",
+      "tier": "Premium",
+      "title": "Geofencing",
+      "package_reference": "§5.6",
+      "workflow_reference": "package §5.6",
+      "status": "provider_dependent",
+      "acceptance_gap": "Needs actual location events, zone rules, scoped alerts and tests."
+    },
+    {
+      "id": "P07",
+      "tier": "Premium",
+      "title": "Advanced telemetry",
+      "package_reference": "§5.7",
+      "workflow_reference": "package §5.7",
+      "status": "provider_dependent",
+      "acceptance_gap": "Needs supported device/provider events and the dedicated ingestion/processing path."
+    },
+    {
+      "id": "P08",
+      "tier": "Premium",
+      "title": "GPS device health",
+      "package_reference": "§5.8",
+      "workflow_reference": "package §5.8",
+      "status": "provider_dependent",
+      "acceptance_gap": "Needs actual last-contact/stale-device signals and operational acceptance."
+    },
+    {
+      "id": "P09",
+      "tier": "Premium",
+      "title": "Advanced fuel alerts",
+      "package_reference": "§5.9",
+      "workflow_reference": "package §5.9",
+      "status": "partial",
+      "acceptance_gap": "Existing low-fuel rules do not establish abnormal-consumption/drop detection; add evidence-based rules and any required sensor adapter."
+    },
+    {
+      "id": "P10",
+      "tier": "Premium",
+      "title": "Satellite tracking",
+      "package_reference": "§5.10",
+      "workflow_reference": "package §5.10",
+      "status": "provider_dependent",
+      "acceptance_gap": "Requires compatible hardware, subscriptions and a selected supported provider."
+    },
+    {
+      "id": "P11",
+      "tier": "Premium",
+      "title": "Advanced lodge AI",
+      "package_reference": "§5.11",
+      "workflow_reference": "§23",
+      "status": "partial",
+      "acceptance_gap": "Scoped reads, memory, documents, comparisons and confirmed proposals exist; complete all source question/scenario coverage."
+    },
+    {
+      "id": "P12",
+      "tier": "Premium",
+      "title": "AI daily lodge summary",
+      "package_reference": "§5.12",
+      "workflow_reference": "§8, §23–24",
+      "status": "implemented_core",
+      "acceptance_gap": "Scheduled private daily/weekly reports and bounded advisory findings pass 706 API tests, production build and 43 browser checks. Real-model grounding, live worker/email delivery and production load acceptance remain."
+    },
+    {
+      "id": "P13",
+      "tier": "Premium",
+      "title": "AI weekly management report",
+      "package_reference": "§5.13",
+      "workflow_reference": "§23–24",
+      "status": "implemented_core",
+      "acceptance_gap": "Scheduled private daily/weekly reports and bounded advisory findings pass 706 API tests, production build and 43 browser checks. Real-model grounding, live worker/email delivery and production load acceptance remain."
+    },
+    {
+      "id": "P14",
+      "tier": "Premium",
+      "title": "AI operational insights",
+      "package_reference": "§5.14",
+      "workflow_reference": "§23–24",
+      "status": "partial",
+      "acceptance_gap": "Current advisory count rules are a subset; repeated maintenance, downtime and recurring service issues need complete authoritative data."
+    },
+    {
+      "id": "P15",
+      "tier": "Premium",
+      "title": "Advanced wildlife analytics",
+      "package_reference": "§5.15",
+      "workflow_reference": "§19, §24",
+      "status": "missing",
+      "acceptance_gap": "Add authorised species frequency, periods, location trends/maps and comparative views."
+    },
+    {
+      "id": "P16",
+      "tier": "Premium",
+      "title": "Workflow automation",
+      "package_reference": "§5.16",
+      "workflow_reference": "§21",
+      "status": "partial",
+      "acceptance_gap": "Fixed background alerts exist; configurable rules, acknowledgement and source-event history remain."
+    },
+    {
+      "id": "P17",
+      "tier": "Premium",
+      "title": "PMS/booking integrations",
+      "package_reference": "§5.17",
+      "workflow_reference": "§25",
+      "status": "provider_dependent",
+      "acceptance_gap": "Select the system and supported API; implement per-lodge mapping, idempotency, conflicts and retry acceptance."
+    },
+    {
+      "id": "P18",
+      "tier": "Premium",
+      "title": "Accounting/business integrations",
+      "package_reference": "§5.18",
+      "workflow_reference": "§25",
+      "status": "provider_dependent",
+      "acceptance_gap": "Select the system and supported API; implement only authorised business exchange."
+    },
+    {
+      "id": "P19",
+      "tier": "Premium",
+      "title": "WhatsApp/SMS integrations",
+      "package_reference": "§5.19",
+      "workflow_reference": "§21, §25",
+      "status": "provider_dependent",
+      "acceptance_gap": "Select the supported messaging channel/provider and configure consent, delivery and retries."
+    },
+    {
+      "id": "P20",
+      "tier": "Premium",
+      "title": "Controlled external API access",
+      "package_reference": "§5.20",
+      "workflow_reference": "§25, §27",
+      "status": "missing",
+      "acceptance_gap": "Implement separately scoped/revocable integration credentials, limits, audit and cross-lodge denial tests."
+    },
+    {
+      "id": "P21",
+      "tier": "Premium",
+      "title": "Advanced custom branding",
+      "package_reference": "§5.21",
+      "workflow_reference": "package §5.21",
+      "status": "partial",
+      "acceptance_gap": "Core co-branding exists; assistant naming, stronger guest branding and domain options remain separate work."
+    },
+    {
+      "id": "P22",
+      "tier": "Premium",
+      "title": "Priority support/assisted integrations",
+      "package_reference": "§5.22",
+      "workflow_reference": "package §5.22",
+      "status": "operational_requirement",
+      "acceptance_gap": "Define and configure the actual support service, destination and assistance process; no service level is invented."
+    }
+  ],
+  "cross_cutting_requirements": [
+    {
+      "id": "C01",
+      "title": "Permanent operational memory, separate from administrative audit",
+      "source": "Operating-system p3; workflow §22",
+      "status": "partial",
+      "acceptance": "Reconstruct linked responsibility, assignment, status, service and downtime events months later without replacing historical facts with current labels."
+    },
+    {
+      "id": "C02",
+      "title": "Complete default/custom role and contextual-field matrix",
+      "source": "Workflow §§4–5, 7, 27",
+      "status": "partial",
+      "acceptance": "Test each named role, department/own-record scope, contextual field, export, worker, notification and offline replay boundary."
+    },
+    {
+      "id": "C03",
+      "title": "Cross-module relationships and responsibility/timing",
+      "source": "Workflow §§12, 26",
+      "status": "partial",
+      "acceptance": "Guest/stay/unit/staff/department/task/vehicle/activity/maintenance/notification links support the complete event chain."
+    },
+    {
+      "id": "C04",
+      "title": "Distinct guest identity and guest-approved knowledge",
+      "source": "Workflow §§20.2, 23, 27",
+      "status": "missing",
+      "acceptance": "A guest receives only their own stay/itinerary/requests and approved guest information, with no staff/internal knowledge or other guest data."
+    },
+    {
+      "id": "C05",
+      "title": "Account activation and private identity/session protection",
+      "source": "Owner invitation/security decisions; workflow §§6–7",
+      "status": "implemented_core",
+      "acceptance": "Each person uses their own activated email/password; invitations expire; no account impersonation or cross-account private history."
+    },
+    {
+      "id": "C06",
+      "title": "SafariOS identity alongside Super Admin-managed lodge identity",
+      "source": "Owner branding decisions; package §§4.23, 5.21",
+      "status": "implemented_core",
+      "acceptance": "The authorised lodge logo/name never removes SafariOS identity or grants platform access."
+    },
+    {
+      "id": "C07",
+      "title": "Selected offline work with authorised idempotent reconnect",
+      "source": "Workflow §§19–20.3, 27",
+      "status": "partial",
+      "acceptance": "Persist the documented subset, protect account/lodge boundaries, validate current access on sync, and do not replay duplicates."
+    },
+    {
+      "id": "C08",
+      "title": "South African commercial web launch acceptance",
+      "source": "Owner launch-market decision; production requirements",
+      "status": "partial",
+      "acceptance": "Keep ZAR defaults and external payments; verify actual SMTP/storage/workers/model, backups/restore, migrations, monitoring and measured capacity before launch."
+    }
+  ],
+  "manager_question_acceptance": [
+    {
+      "id": "AI01",
+      "question": "What is happening in the lodge today?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "implemented_core",
+      "acceptance": "Current dashboard facts/tools exist; validate real-model grounding and permitted-source completeness."
+    },
+    {
+      "id": "AI02",
+      "question": "What needs my attention?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Current overdue/count sources exist; accept the complete prioritisation/alert context without invented causes."
+    },
+    {
+      "id": "AI03",
+      "question": "Give me today's full operational report.",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Scoped daily sources/scheduling are under verification; distinguish bounded details from complete totals."
+    },
+    {
+      "id": "AI04",
+      "question": "What happened yesterday?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Scoped historical retrieval exists; complete event coverage, immutable snapshots and connected reconstruction."
+    },
+    {
+      "id": "AI05",
+      "question": "Which tasks are overdue?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "The reader exists; accept old/large datasets and apply overdue filtering before pagination."
+    },
+    {
+      "id": "AI06",
+      "question": "Which department is having the most problems?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Add complete scoped, deterministic department comparisons and define the counted issue types."
+    },
+    {
+      "id": "AI07",
+      "question": "Which rooms have recurring maintenance problems?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Add authoritative repeated-issue/room history analysis with ticket evidence, period and coverage."
+    },
+    {
+      "id": "AI08",
+      "question": "Which vehicle has used the most fuel this month?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Add complete per-vehicle period aggregates/ranking; a truncated fuel-record page is insufficient."
+    },
+    {
+      "id": "AI09",
+      "question": "Which guests arriving tomorrow have dietary requirements?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Add the permitted arrival/need context with explicit sensitive-field checks; generic stay DTOs intentionally omit medical/dietary data."
+    },
+    {
+      "id": "AI10",
+      "question": "Which staff members still have outstanding tasks?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Complete assignment context and authoritative scoped staff/workload aggregation."
+    },
+    {
+      "id": "AI11",
+      "question": "Give me a maintenance report for this month.",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Date-bounded summary metrics exist; complete the requested maintenance detail, scope and real-model acceptance."
+    },
+    {
+      "id": "AI12",
+      "question": "Compare this month with last month.",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Date-bounded metrics exist; add complete deterministic comparisons and clearly disclose period length/time basis."
+    },
+    {
+      "id": "AI13",
+      "question": "What problems occurred during yesterday's game drives?",
+      "source": "Workflow §23.1; operating-system p2",
+      "status": "partial",
+      "acceptance": "Complete activity/vehicle issue links and immutable event detail before claiming historical issue coverage."
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # SafariOS application requirements review
 
+**Historical source snapshot:** use [the current document-led delivery map](REQUIREMENTS_DELIVERY.md) for the 9 November 2026 status and all 63 package items. The source findings below were recorded against the older revision named here; later AI/UI milestones supersede several of them.
+
 Reviewed 20 October 2026 against source revision `2e75970`. This is a document review and targeted source comparison, not a new runtime acceptance test or a declaration of production readiness. No application behavior was changed for this review.
 
 ## Documents reviewed and precedence
@@ -16,7 +18,7 @@ The current UI direction is separately defined in [UI_UX_DESIGN_SYSTEM.md](UI_UX
 
 ## What the product actually is
 
-SafariOS is a commercial, multi-tenant lodge operating system. One platform Super Admin manages many independent lodge customers. Each lodge has its own administrator, employees, operational records, roles, subscription, and brand identity. A customer does not receive group-level management across lodges.
+SafariOS is a commercial, multi-tenant lodge operating system. One platform Super Admin manages many independent lodge customers. Each lodge has its own administrator, employees, operational records, roles, subscription, and brand identity. The restored Group Admin can manage explicitly assigned properties; each lodge retains its own subscription and feature limits.
 
 Its central loop is:
 
@@ -62,7 +64,7 @@ The matrix's `C` means limited contextual access, not full access to a module. V
 | --- | --- |
 | Basic | Dashboard; guest CRM and stay records; staff/basic permissions; tasks and requests; basic housekeeping, maintenance, rooms, activities, and fleet; notifications, reports, audit; guest/staff mobile experience requirements; subscription access. |
 | Standard | Everything in Basic plus departments/custom roles, advanced task/housekeeping/maintenance workflows, transport, F&B, ranger operations, fleet checks/fuel/reminders, sightings, selected offline workflows, richer reports/branding, lodge AI and knowledge/document support. |
-| Premium | Everything in Standard plus advanced AI and scheduled reports, operational insights/automation, wildlife analytics, live tracking/route history/geofencing/device health, advanced fuel/satellite options, approved integrations/API access, advanced branding, and support. **Excluded group-management items must not reappear.** |
+| Premium | Everything in Standard plus advanced AI and scheduled reports, operational insights/automation, wildlife analytics, live tracking/route history/geofencing/device health, advanced fuel/satellite options, approved integrations/API access, advanced branding, and support. **Group management is restored by the later owner decision; provider-dependent capabilities require real implementations.** |
 
 Standard includes Basic; Premium includes Standard. Super Admin entitlement overrides remain required. Prices, final user/vehicle limits, and specific external providers are not fixed by these documents. Mobile features appearing in the Basic guide are not already delivered by making staff CRM pages responsive.
 

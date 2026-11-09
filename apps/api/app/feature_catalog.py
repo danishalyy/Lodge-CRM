@@ -1,6 +1,9 @@
 """Code-defined feature capabilities and translatable presentation, not plan grants."""
 # (display name, description, area). Only implemented capabilities are usable.
 BUILT={
+ 'ai_daily_summary':('AI daily summaries','Automatically summarise the operational day.','Reports and AI'),
+ 'ai_weekly_report':('AI weekly reports','Automatically summarise weekly activity.','Reports and AI'),
+ 'ai_insights':('AI insights','Suggested operational follow-up.','Reports and AI'),
  'ai_actions':('Confirmed AI actions','Review and explicitly confirm permitted task, housekeeping and maintenance proposals.','Reports and AI'),
  'advanced_ai':('Group Owner AI','Read-only comparisons and operational reports for explicitly assigned lodges.','Reports and AI'),
  'ai_knowledge':('AI knowledge','Approved knowledge for lodge questions.','Reports and AI'),
@@ -45,9 +48,6 @@ FUTURE={
  'guest_mobile':('Guest mobile app','A dedicated guest application.','Integrations'),
  'staff_mobile':('Staff mobile app','A dedicated staff application.','Integrations'),
  'advanced_reports':('Advanced analytics','Additional configurable analysis and reports.','Reports and AI'),
- 'ai_daily_summary':('AI daily summaries','Automatically summarise the operational day.','Reports and AI'),
- 'ai_weekly_report':('AI weekly reports','Automatically summarise weekly activity.','Reports and AI'),
- 'ai_insights':('AI insights','Suggested operational follow-up.','Reports and AI'),
  'advanced_wildlife_analytics':('Wildlife analytics','Additional wildlife trend analysis.','Reports and AI'),
  'workflow_automation':('Workflow automation','Automatically coordinate configured workflows.','Reports and AI'),
  'live_gps':('Live vehicle tracking','Live location from connected tracking devices.','Safari and fleet'),

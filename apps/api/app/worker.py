@@ -132,3 +132,5 @@ def generate_hr_expiry_alerts():
 
 # Register actor-scoped knowledge tasks alongside existing operational jobs.
 from .ai.knowledge_jobs import ingest as ingest_knowledge
+
+from .ai.report_jobs import dispatch_reports as dispatch_ai_reports, generate_report as generate_ai_report

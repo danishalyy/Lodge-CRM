@@ -28,6 +28,10 @@ class Arguments(BaseModel):
     status: (
         Literal[
             "open",
+            "created",
+            "on_drive",
+            "arriving",
+            "departing",
             "assigned",
             "accepted",
             "started",
@@ -316,7 +320,7 @@ REGISTRY = {
         (),
         "Operational report metrics",
         "Give me the operational report metrics.",
-        (),
+        ("start_date", "end_date"),
     ),
 }
 
@@ -535,9 +539,12 @@ def execute(name, arguments, db, ctx, lodge_id, request, scope_type="lodge"):
             raise HTTPException(
                 403, "This report is unavailable for your operational scope"
             )
-        raw = handler(
-            lodge_id=str(lodge_id), start=None, end=None, user=ctx.user, db=db
-        )
+        end = date.fromisoformat(args.end_date) if args.end_date else date.today()
+        from datetime import timedelta
+        start = date.fromisoformat(args.start_date) if args.start_date else end-timedelta(days=29)
+        if end < start or (end-start).days>365:
+            raise HTTPException(422,"Report periods must contain at most 366 days")
+        raw = handler(lodge_id=str(lodge_id),start=start,end=end,user=ctx.user,db=db)
         access = {
             "tasks": ("tasks.view", "tasks"),
             "maintenance": ("maintenance.view", "maintenance"),

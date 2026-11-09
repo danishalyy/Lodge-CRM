@@ -2347,3 +2347,6 @@ app.add_middleware(KnowledgeUploadLimit)
 
 from .ai.action_routes import router as ai_action_router
 app.include_router(ai_action_router)
+
+from .ai.report_routes import router as ai_report_router
+app.include_router(ai_report_router)

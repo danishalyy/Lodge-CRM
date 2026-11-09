@@ -95,6 +95,21 @@ def resolve(db, user, anchor, request, expected_group=None):
                     lodge_id=str(lid), request=request, user=pctx.user, db=db
                 )
                 ensure_feature(db, str(lid), "advanced_ai")
+                report_feature = getattr(request.state, "ai_report_feature", None)
+                if report_feature in {"ai_daily_summary", "ai_weekly_report"}:
+                    ensure_feature(db, str(lid), report_feature)
+                    ensure_feature(db, str(lid), "reports")
+                    for key in ("ai.reports.manage", "reports.view"):
+                        require_permission(key)(
+                            lodge_id=str(lid), request=request, user=pctx.user, db=db
+                        )
+                    from .reports import available as report_kinds
+
+                    kind = "daily" if report_feature == "ai_daily_summary" else "weekly"
+                    if kind not in report_kinds(db, pctx, lid):
+                        raise HTTPException(
+                            403, "No authorised report sources for this property"
+                        )
                 if pctx.staff and pctx.staff.employment_status != "active":
                     raise HTTPException(403, "Staff access is inactive")
             except HTTPException as error:

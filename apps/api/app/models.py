@@ -843,9 +843,10 @@ class AIPrivate:
 
 class AIConversation(AIPrivate,Base):
     __tablename__='ai_conversations'
-    __table_args__=(UniqueConstraint('id','lodge_id','user_id',name='uq_ai_conversation_scope'),CheckConstraint("(scope_type='lodge' AND group_id IS NULL) OR (scope_type='group' AND group_id IS NOT NULL)",name='ck_ai_conversation_scope'),Index('ix_ai_conversation_owner','lodge_id','user_id','created_at'))
+    __table_args__=(UniqueConstraint('id','lodge_id','user_id',name='uq_ai_conversation_scope'),CheckConstraint("(scope_type='lodge' AND group_id IS NULL) OR (scope_type='group' AND group_id IS NOT NULL)",name='ck_ai_conversation_scope'),CheckConstraint("origin IN ('chat','report')",name='ck_ai_conversation_origin'),Index('ix_ai_conversation_owner','lodge_id','user_id','created_at'))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     access_fingerprint: Mapped[str] = mapped_column(String(64))
+    origin: Mapped[str] = mapped_column(String(10),default="chat",server_default="chat")
     scope_type: Mapped[str] = mapped_column(String(10),default='lodge',server_default='lodge')
     group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True),ForeignKey('lodge_groups.id',ondelete='CASCADE'),nullable=True)
 
@@ -947,3 +948,47 @@ class AIAction(AIPrivate, Base):
     token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     result: Mapped[dict] = mapped_column(JSONB, default=dict, server_default='{}')
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AIReportSchedule(AIPrivate,Base):
+    __tablename__='ai_report_schedules'
+    __table_args__=(UniqueConstraint('id','lodge_id','user_id',name='uq_ai_schedule_scope'),
+        UniqueConstraint('lodge_id','user_id','scope_type','kind',name='uq_ai_schedule_owner_kind'),
+        CheckConstraint("kind IN ('daily','weekly')",name='ck_ai_schedule_kind'),
+        CheckConstraint("(scope_type='lodge' AND group_id IS NULL) OR (scope_type='group' AND group_id IS NOT NULL)",name='ck_ai_schedule_scope'),
+        CheckConstraint('hour>=0 AND hour<=23 AND minute>=0 AND minute<=59 AND weekday>=0 AND weekday<=6',name='ck_ai_schedule_clock'))
+    id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    kind: Mapped[str]=mapped_column(String(10))
+    scope_type: Mapped[str]=mapped_column(String(10),default='lodge')
+    group_id: Mapped[uuid.UUID|None]=mapped_column(UUID(as_uuid=True),ForeignKey('lodge_groups.id',ondelete='CASCADE'),nullable=True)
+    hour: Mapped[int]=mapped_column(Integer,default=6)
+    minute: Mapped[int]=mapped_column(Integer,default=0)
+    weekday: Mapped[int]=mapped_column(Integer,default=0)
+    timezone: Mapped[str]=mapped_column(String(80))
+    enabled: Mapped[bool]=mapped_column(Boolean,default=True)
+    access_fingerprint: Mapped[str]=mapped_column(String(64))
+    next_run_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+
+
+class AIReportRun(AIPrivate,Base):
+    __tablename__='ai_report_runs'
+    __table_args__=(ForeignKeyConstraint(['schedule_id','lodge_id','user_id'],['ai_report_schedules.id','ai_report_schedules.lodge_id','ai_report_schedules.user_id'],ondelete='CASCADE'),
+        ForeignKeyConstraint(['conversation_id','lodge_id','user_id'],['ai_conversations.id','ai_conversations.lodge_id','ai_conversations.user_id'],ondelete='CASCADE'),
+        UniqueConstraint('schedule_id','slot_key',name='uq_ai_report_slot'),
+        CheckConstraint("status IN ('queued','running','complete','failed','cancelled')",name='ck_ai_report_status'),
+        Index('ix_ai_report_due','status','next_attempt_at'),Index('ix_ai_report_owner','lodge_id','user_id','created_at'))
+    id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    schedule_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True))
+    conversation_id: Mapped[uuid.UUID|None]=mapped_column(UUID(as_uuid=True),nullable=True)
+    slot_key: Mapped[str]=mapped_column(String(80))
+    scheduled_for: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    access_fingerprint: Mapped[str]=mapped_column(String(64))
+    status: Mapped[str]=mapped_column(String(16),default='queued')
+    attempts: Mapped[int]=mapped_column(Integer,default=0)
+    lease_token: Mapped[uuid.UUID|None]=mapped_column(UUID(as_uuid=True),nullable=True)
+    lease_expires_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    next_attempt_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow)
+    error_code: Mapped[str]=mapped_column(String(80),default='')
+    generated_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    period: Mapped[dict]=mapped_column(JSONB,default=dict,server_default='{}')
+    insights: Mapped[list]=mapped_column(JSONB,default=list,server_default='[]')

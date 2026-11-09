@@ -77,6 +77,13 @@ def process_account_emails(session_factory, limit=50):
 
 
 def notification_still_authorized(db, notification, user):
+    if notification.resource_type in {"ai_report","ai_group_report"}:
+        from .ai.reports import notification_authorized
+        from .security import access_context,has_permission
+        try:
+            ctx=access_context(db,user,str(notification.lodge_id))
+            return not user.is_super_admin and has_permission(db,ctx.membership,"notifications.view") and notification_authorized(db,notification,user)
+        except Exception:return False
     from .security import access_context, has_permission
     if notification.notification_type == "subscription.expiry":
         return user.is_super_admin

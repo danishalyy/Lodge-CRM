@@ -29,7 +29,8 @@ from .configuration import configuration_state, get_provider, health_ready
 from .providers.base import ProviderUnavailable
 from .limits import admission
 from .safety import SYSTEM, redact
-from . import tools, actions
+from . import tools, actions, reports
+from .provenance import source_for
 from .groups import (
     resolve as resolve_group,
     conversation_fingerprint as fingerprint_for,
@@ -75,7 +76,7 @@ def conversation(db, lodge_id, user, conversation_id, ctx, request):
             AIConversation.user_id == user.id,
         )
     )
-    if not row:
+    if not row or row.origin != "chat":
         raise HTTPException(404, "Conversation not found")
     if row.access_fingerprint != fingerprint_for(
         db, ctx, lodge_id, request, row.scope_type, row.group_id
@@ -167,6 +168,7 @@ def status(
             and entitlement_enabled(db, str(lodge_id), "ai_knowledge")
             and entitlement_enabled(db, str(lodge_id), "document_knowledge")
         ),
+        "report_kinds": reports.available(db, ctx, lodge_id),
         "provider": settings.ai_provider,
         "tools": [
             {
@@ -215,6 +217,7 @@ def conversations(
             AIConversation.user_id == user.id,
             AIConversation.access_fingerprint == signature,
             AIConversation.scope_type == scope,
+            AIConversation.origin == "chat",
         )
         .order_by(AIConversation.created_at.desc())
         .limit(30)
@@ -551,71 +554,7 @@ def send_message(
                 )
                 db.commit()
                 rejected_tool = None
-                source = {
-                    "kind": tools.REGISTRY[call.name].source_kind,
-                    "label": tools.REGISTRY[call.name].label,
-                    "lodge_id": str(lodge_id),
-                    "partial": bool(result.get("partial")),
-                    "record_ids": [
-                        r["id"] for r in result.get("items", []) if r.get("id")
-                    ],
-                    "tool": call.name,
-                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
-                }
-                if source["kind"] == "memory":
-                    source["period"] = result["period"]
-                    source["references"] = [
-                        {
-                            key: row[key]
-                            for key in (
-                                "id",
-                                "resource_type",
-                                "resource_id",
-                                "recorded_at",
-                            )
-                        }
-                        for row in result.get("items", [])
-                    ]
-                if source["kind"] == "document":
-                    source["references"] = [
-                        {
-                            key: row[key]
-                            for key in (
-                                "id",
-                                "document_id",
-                                "title",
-                                "locator",
-                                "sha256",
-                            )
-                        }
-                        for row in result.get("items", [])
-                    ]
-                if source["kind"] == "group":
-                    source["group_id"] = result["scope"]["group_id"]
-                    source["group_name"] = result["scope"]["group_name"]
-                    source["excluded_count"] = result["excluded_count"]
-                    source["references"] = [
-                        {
-                            **{
-                                key: row[key]
-                                for key in (
-                                    "lodge_id",
-                                    "lodge_name",
-                                    "timezone",
-                                    "period",
-                                    "current_date",
-                                    "retrieved_at",
-                                )
-                                if key in row
-                            },
-                            "metric_keys": list(row["metrics"]),
-                        }
-                        for row in result["items"]
-                    ]
-                    source["contributors"] = {
-                        key: value["contributor_lodge_ids"]
-                        for key, value in result["comparisons"].items()
-                    }
+                source = source_for(call.name, result, lodge_id)
                 sources.append(source)
                 prompt.extend(
                     [

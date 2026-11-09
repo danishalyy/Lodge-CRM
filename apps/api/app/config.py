@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     mfa_encryption_key: str = ""
     password_reset_ttl_minutes: int = 30
     ai_configuration_invalid: bool = False
+    ai_summaries_enabled: bool = False
     ai_actions_enabled: bool = False
     ai_enabled: bool = False
     ai_provider: str = "vllm"

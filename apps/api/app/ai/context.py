@@ -20,6 +20,12 @@ from ..security import _current_user, require_permission, access_context, ensure
 
 
 def guard(db, user, lodge_id, request, write=False):
+    from .principals import ReportRequest
+
+    if isinstance(request, ReportRequest):
+        from .reports import report_guard
+
+        return report_guard(db, user, lodge_id, request)
     db.expire_all()
     # Recheck the session, account and employment at every boundary, including after inference.
     user = _current_user(

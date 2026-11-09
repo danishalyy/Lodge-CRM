@@ -1,5 +1,7 @@
 # Remaining delivery after the conversational workspace
 
+The owner reaffirmed the original documents as the acceptance criteria. [The current 63-item source map](REQUIREMENTS_DELIVERY.md) governs priorities; optional additions do not replace documented workflows.
+
 The owner requested completion of the remaining work on 9 November 2026. Deliver in tested phases, preserving the current stack, permissions, RLS, MFA, subscription gates and charcoal UI. The owner has not selected external booking/accounting/messaging services; these provider-specific connections remain pending that choice. Hosting was previously deferred to a future Hostinger VPS. Do not purchase infrastructure or claim a production deployment.
 
 ## 1. Confirmed actions
@@ -8,7 +10,7 @@ Implemented in migration 0021 and the shared chat review drawer: task create/upd
 
 ## 2. Scheduled briefs, reports and insights
 
-Next: private opt-in daily/weekly schedules, using the lodge timezone, bounded deterministic facts, a configured real model, current actor permissions at execution and delivery, durable leases/retries, deduplicated owner notifications and accessible report views. Jobs must not store/reuse browser session tokens, manufacture a login session or acquire tenant-global AI privileges. Keep source provenance and ACL fingerprints for saved reports. No write tools in background reports. Deterministic findings must name coverage and never invent causes or performance scores.
+Implemented in migration 0022: private opt-in daily/weekly schedules, local lodge times, bounded deterministic facts, configured-provider generation, current actor permissions at execution and delivery, durable leases/retries, deduplicated owner notifications and accessible report views/downloads. Server-only report principals do not store browser sessions or grant tenant-global access. Group reports recheck each property. Deterministic findings describe counts and coverage, not causes. Validated: 706 API tests, production build, 43 browser checks and migration roundtrip. Actual model quality and the live worker/email pipeline remain operational acceptance work.
 
 ## 3. Product completion review and implementation
 

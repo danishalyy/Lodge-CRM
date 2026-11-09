@@ -823,3 +823,28 @@ test('AI actions require an explicit review and confirmation and cannot submit t
   await page.getByRole('button',{name:'Review change',exact:true}).click();const apply=page.getByRole('dialog').getByRole('button',{name:'Confirm and apply',exact:true});await apply.click();await page.getByRole('button',{name:'Applying change…',exact:true}).waitFor();assert.equal(confirmed,1);await page.getByRole('button',{name:'Applying change…',exact:true}).dispatchEvent('click');assert.equal(confirmed,1);release();await page.getByText('Task created',{exact:true}).waitFor();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Change applied',{exact:true}).waitFor();assert.equal(discarded,0);assert.equal(await page.getByRole('button',{name:'Review change',exact:true}).count(),0);
  }finally{release();await context.close()}
 });
+
+test('private AI reports schedule, queue, read, download and clear revoked content',async()=>{
+ const {context,page}=await accountPage({id:'report-user',full_name:'Maya',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'report-lodge',permissions:['ai.use','ai.reports.manage'],entitlements:['ai','ai_daily_summary','ai_weekly_report','ai_insights']}]});
+ let schedules=[],runs=[],saved,queued=0,denied=false;
+ const rid='6a6d7b84-8d40-4c0d-93a9-d8a43a798661';
+ const detail={id:rid,kind:'daily',scope:'lodge',generated_at:'2026-11-09T04:20:00Z',period:{timezone:'Africa/Johannesburg',local_date:'2026-11-09'},insights_enabled:true,insights:[{key:'overdue_tasks',count:3}],message:{id:'report-answer',role:'assistant',content:'Test fixture: three overdue tasks need review.\n\n### Priorities\n\n- Review overdue work.\n- Check room readiness.',sources:[{kind:'live',label:'Operational overview',tool:'get_dashboard_summary',retrieved_at:'2026-11-09T04:20:00Z'}]}};
+ try{
+  await page.route('**/api/v1/lodges/report-lodge/ai/**',async r=>{
+   const p=new URL(r.request().url()).pathname,m=r.request().method();
+   if(p.endsWith('/status'))return r.fulfill({json:{state:'ready',knowledge_enabled:true,report_kinds:['daily','weekly'],scope:{lodge_name:'Ndlovu House'},tools:[{name:'get_tasks',suggestion:'Check tasks'}]}});
+   if(p.endsWith('/conversations'))return r.fulfill({json:[]});
+   if(p.endsWith('/reports'))return r.fulfill({json:{kinds:['daily','weekly'],timezone:'Africa/Johannesburg',schedules,runs}});
+   if(p.endsWith('/schedules')){saved=r.request().postDataJSON();assert.deepEqual(Object.keys(saved).sort(),['enabled','hour','kind','minute','scope','weekday']);schedules=[{id:'schedule-1',...saved,timezone:'Africa/Johannesburg',next_run_at:'2026-11-10T04:15:00Z'}];return r.fulfill({json:schedules[0]})}
+   if(p.endsWith('/run')){queued++;runs=[{id:rid,schedule_id:'schedule-1',kind:'daily',status:'queued',scheduled_for:'2026-11-09T04:15:00Z',generated_at:null}];return r.fulfill({json:{id:rid,status:'queued'}})}
+   if(p.endsWith('/'+rid))return denied?r.fulfill({status:409,json:{detail:'Your access changed. This saved report is no longer available'}}):r.fulfill({json:detail});
+   throw Error('Unexpected report URL '+p);
+  });
+  await page.goto(base+'/lodge-ai');await page.getByRole('button',{name:'Reports',exact:true}).click();await page.getByText('Choose when your first report should arrive.',{exact:true}).waitFor();await page.getByRole('button',{name:'Add schedule',exact:true}).click();await page.getByRole('dialog').getByLabel('Lodge time',{exact:true}).fill('06:15');await page.getByRole('button',{name:'Save schedule',exact:true}).click();await page.getByText('Report schedule saved',{exact:true}).waitFor();assert.equal(saved.hour,6);assert.equal(saved.minute,15);assert.equal(saved.scope,'lodge');
+  await page.getByRole('button',{name:'Generate now',exact:true}).click();await page.getByText('Report queued',{exact:true}).waitFor();await page.getByRole('status').filter({hasText:'Queued'}).waitFor();assert.equal(queued,1);
+  runs=[{...runs[0],status:'complete',generated_at:detail.generated_at}];await page.getByRole('button',{name:'Refresh reports',exact:true}).click();await page.getByRole('button',{name:'Open report',exact:true}).click();await page.getByRole('heading',{name:'Priorities',exact:true}).waitFor();await page.getByText('Sources checked',{exact:true}).click();await page.getByText(/Operational overview/).waitFor();
+  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download report',exact:true}).click();assert.match((await download).suggestedFilename(),/^SafariOS-daily-/);
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);await page.screenshot({path:`/tmp/safarios-report-${width}-${theme}.png`,fullPage:true});}
+  denied=true;await page.getByRole('button',{name:'Download report',exact:true}).click();await page.getByRole('alert').filter({hasText:/Your access changed/}).waitFor();assert.equal(await page.getByText('Test fixture: three overdue tasks need review.',{exact:true}).count(),0);
+ }finally{await context.close()}
+});

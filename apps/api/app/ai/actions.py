@@ -137,6 +137,10 @@ def available(db, ctx, lodge_id, scope):
 
 
 def authorize(db, user, lodge_id, request, kind):
+    from .principals import ReportRequest
+
+    if isinstance(request, ReportRequest):
+        raise HTTPException(403, "Background reports cannot prepare or execute actions")
     ctx = guard(db, user, lodge_id, request, write=True)
     require_permission("ai.actions", write=True)(
         lodge_id=str(lodge_id), request=request, user=ctx.user, db=db

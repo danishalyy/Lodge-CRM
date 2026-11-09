@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUpRight,
   BookOpen,
+  ChartNoAxesCombined,
   Compass,
   History,
   MessageSquare,
@@ -25,10 +26,14 @@ import Drawer from "./Drawer";
 import KnowledgeLibrary from "./KnowledgeLibrary";
 import ChatMessage, { Message } from "./ai/ChatMessage";
 import ChatComposer from "./ai/ChatComposer";
+import ReportLibrary from "./ai/ReportLibrary";
+import { reportCopy } from "@/lib/strings/ai-reports";
 
 export default function LodgeAIPage({
   scopeType = "lodge",
+  initialReportId,
 }: {
+  initialReportId?: string;
   scopeType?: "lodge" | "group";
 }) {
   const [status, setStatus] = useState<any>(null),
@@ -42,6 +47,7 @@ export default function LodgeAIPage({
     [historyCollapsed, setHistoryCollapsed] = useState(false),
     [historySearch, setHistorySearch] = useState(""),
     [knowledgeOpen, setKnowledgeOpen] = useState(false),
+    [reportsOpen, setReportsOpen] = useState(Boolean(initialReportId)),
     [showLatest, setShowLatest] = useState(false);
   const generation = useRef(0),
     viewport = useRef<HTMLDivElement>(null),
@@ -59,6 +65,7 @@ export default function LodgeAIPage({
     setStatus(null);
     setHistoryOpen(false);
     setKnowledgeOpen(false);
+    setReportsOpen(false);
   }
   function latest() {
     if (viewport.current)
@@ -89,7 +96,11 @@ export default function LodgeAIPage({
       if (token !== generation.current || origin !== scope()) return;
       setStatus(s);
       setConversations(c);
-      if (s.knowledge_enabled && !(s.state === "ready" && s.tools?.length))
+      if (
+        !initialReportId &&
+        s.knowledge_enabled &&
+        !(s.state === "ready" && s.tools?.length)
+      )
         setKnowledgeOpen(true);
       if (conversation && !c.some((row: any) => row.id === conversation)) {
         setConversation("");
@@ -290,7 +301,7 @@ export default function LodgeAIPage({
           </div>
         </div>
         <div className="aiChatHeaderActions">
-          {ready && !knowledgeOpen && (
+          {ready && !knowledgeOpen && !reportsOpen && (
             <>
               <Button
                 variant="ghost"
@@ -340,15 +351,43 @@ export default function LodgeAIPage({
               aria-label={knowledgeOpen ? copy.backToChat : copy.knowledge}
               title={knowledgeOpen ? copy.backToChat : copy.knowledge}
               aria-pressed={knowledgeOpen}
-              onClick={() => setKnowledgeOpen((v) => !v)}
+              onClick={() => {
+                setKnowledgeOpen((v) => !v);
+                setReportsOpen(false);
+              }}
             >
               <BookOpen size={17} />
               <span>{knowledgeOpen ? copy.backToChat : copy.knowledge}</span>
             </Button>
           )}
+          {status?.report_kinds?.length > 0 && (
+            <Button
+              variant="secondary"
+              className="aiReportsToggle"
+              aria-label={reportsOpen ? reportCopy.back : reportCopy.header}
+              title={reportsOpen ? reportCopy.back : reportCopy.header}
+              aria-pressed={reportsOpen}
+              onClick={() => {
+                setReportsOpen((v) => !v);
+                setKnowledgeOpen(false);
+              }}
+            >
+              <ChartNoAxesCombined size={17} />
+              <span>{reportsOpen ? reportCopy.back : reportCopy.header}</span>
+            </Button>
+          )}
         </div>
       </header>
-      {knowledgeOpen && status?.knowledge_enabled ? (
+      {reportsOpen && status?.report_kinds?.length > 0 ? (
+        <ReportLibrary
+          scopeType={scopeType}
+          initialReportId={initialReportId}
+          onDenied={(reason) => {
+            clearAccess();
+            setError(reason);
+          }}
+        />
+      ) : knowledgeOpen && status?.knowledge_enabled ? (
         <KnowledgeLibrary />
       ) : (
         <>

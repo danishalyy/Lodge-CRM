@@ -791,3 +791,20 @@ export const knowledgeApi = {
   download: (id: string) =>
     request<any>(lodgePath(`ai/knowledge/${encodeURIComponent(id)}/download`)),
 };
+
+export const aiReportApi = {
+  list: (scope: "lodge" | "group" = "lodge") =>
+    request<any>(lodgePath(`ai/reports?scope=${scope}`)),
+  save: (payload: any) =>
+    request<any>(lodgePath("ai/reports/schedules"), {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  run: (id: string) =>
+    request<any>(
+      lodgePath(`ai/reports/schedules/${encodeURIComponent(id)}/run`),
+      { method: "POST" },
+    ),
+  read: (id: string) =>
+    request<any>(lodgePath(`ai/reports/${encodeURIComponent(id)}`)),
+};

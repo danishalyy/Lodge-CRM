@@ -5,9 +5,13 @@ import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { useCallback, useEffect, useState } from "react";
 import { Bell, Archive, CheckCheck, RefreshCw } from "lucide-react";
-import { accountNotificationsApi } from "@/lib/api";
+import { reportCopy } from "@/lib/strings/ai-reports";
+import { accountNotificationsApi, setActiveLodgeId } from "@/lib/api";
 import { Skeleton } from "./ui/skeleton";
 type Notice = {
+  resource_type?: string;
+  resource_id?: string;
+  lodge_id?: string;
   id: string;
   title: string;
   body: string;
@@ -195,6 +199,28 @@ export default function NotificationsPage() {
                         : ""}
                     </small>
                     <div className="notificationActions">
+                      {["ai_report", "ai_group_report"].includes(
+                        n.resource_type || "",
+                      ) &&
+                        n.resource_id &&
+                        n.lodge_id && (
+                          <button
+                            className="button"
+                            onClick={() => {
+                              setActiveLodgeId(n.lodge_id!);
+                              location.assign(
+                                "/lodge-ai?scope=" +
+                                  (n.resource_type === "ai_group_report"
+                                    ? "group"
+                                    : "lodge") +
+                                  "&report=" +
+                                  encodeURIComponent(n.resource_id!),
+                              );
+                            }}
+                          >
+                            {reportCopy.view}
+                          </button>
+                        )}
                       {!n.read_at && (
                         <button
                           className="button"

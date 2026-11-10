@@ -41,4 +41,6 @@ Retain the 720px reading column, private history and scope-safe pending turns. R
 
 ## Verification
 
+Phase 1 interactivity extends existing controls without changing these visual tokens. Use the shared scoped memory cache and instant-action hook for optimistic workflows; retain server-authorized transitions and avoid unsupported Undo actions. See [interactivity implementation and QA](INTERACTIVITY_QA.md). Drag-and-drop, live events, push and broader offline behavior are separate later phases.
+
 Run the production build, existing API suite and browser checks for forms, activation, MFA, registration, role separation and data flows. Review 375/768/1366/1440px in both themes. Automated checks supplement visual/keyboard review; they do not establish full accessibility certification or commercial completion of unavailable integrations.

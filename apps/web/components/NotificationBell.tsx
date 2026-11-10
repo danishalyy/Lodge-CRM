@@ -11,14 +11,17 @@ export default function NotificationBell({
   const [unread, setUnread] = useState(0),
     [available, setAvailable] = useState(true);
   useEffect(() => {
+    let version = 0,
+      optimistic = false;
     let live = true,
       running = false;
     async function load() {
-      if (running || document.hidden) return;
+      if (running || document.hidden || optimistic) return;
       running = true;
+      const started = version;
       try {
         const r = await accountNotificationsApi.summary();
-        if (live) {
+        if (live && started === version) {
           setUnread(Number(r.unread) || 0);
           setAvailable(true);
         }
@@ -26,16 +29,30 @@ export default function NotificationBell({
         if (live) setAvailable(false);
       } finally {
         running = false;
+        if (live && started !== version) void load();
       }
     }
+    const changed = (event: Event) => {
+      const delta = (event as CustomEvent).detail?.delta;
+      if (typeof delta === "number") {
+        optimistic = true;
+        version++;
+        setUnread((old) => Math.max(0, old + delta));
+      } else {
+        optimistic = false;
+        void load();
+      }
+    };
     void load();
     const timer = setInterval(load, 30000);
-    window.addEventListener("safarios-notifications-changed", load);
+    window.addEventListener("safarios-data-refresh", load);
+    window.addEventListener("safarios-notifications-changed", changed);
     document.addEventListener("visibilitychange", load);
     return () => {
       live = false;
       clearInterval(timer);
-      window.removeEventListener("safarios-notifications-changed", load);
+      window.removeEventListener("safarios-data-refresh", load);
+      window.removeEventListener("safarios-notifications-changed", changed);
       document.removeEventListener("visibilitychange", load);
     };
   }, []);

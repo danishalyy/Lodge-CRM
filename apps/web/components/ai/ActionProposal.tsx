@@ -7,6 +7,7 @@ import { readableLabel } from "@/lib/strings/content";
 import { formatDate, formatDateTime } from "@/lib/formatting";
 import { Button } from "@/components/ui/button";
 import Drawer from "@/components/Drawer";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { toast } from "sonner";
 export type Proposal = {
   id: string;
@@ -62,10 +63,14 @@ export default function ActionProposal({
   const expired =
     row.status === "expired" ||
     (row.status === "pending" && Date.parse(row.expires_at) <= now);
+  const [pendingKind, setPendingKind] = useState("");
   async function act(kind: "review" | "confirm" | "cancel") {
-    if (pending.current) return;
+    if (pending.current || !current()) return;
     pending.current = true;
     setBusy(true);
+    setPendingKind(kind);
+    const before = row;
+    if (kind === "cancel") setRow((old) => ({ ...old, status: "cancelling" }));
     setError("");
     try {
       const result = await aiApi.action(
@@ -85,21 +90,35 @@ export default function ActionProposal({
       }
     } catch (e) {
       if (!current()) return;
+      setRow(before);
       setReview(null);
       if (
         e instanceof ApiError &&
         ([401, 403, 404].includes(e.status) ||
-          (e.status === 409 && /access changed|account changed/i.test(e.message)))
+          (e.status === 409 &&
+            /access changed|account changed/i.test(e.message)))
       )
         onDenied(e.message);
       else {
         setError((e as Error).message);
+        if (!(e instanceof ApiError && e.status === 409))
+          toast.error((e as Error).message, {
+            action: {
+              label: instant.retry,
+              onClick: () => {
+                if (current()) void act(kind === "confirm" ? "review" : kind);
+              },
+            },
+          });
         if (e instanceof ApiError && e.status === 409)
           setRow((old) => ({ ...old, status: "unavailable" }));
       }
     } finally {
       pending.current = false;
-      if (current()) setBusy(false);
+      if (current()) {
+        setBusy(false);
+        setPendingKind("");
+      }
     }
   }
   function value(key: string, raw: unknown): string {
@@ -137,7 +156,9 @@ export default function ActionProposal({
         </p>
       ))}
       <p className="aiActionState" role="status">
-        {row.status === "confirmed" ? (
+        {row.status === "cancelling" ? (
+          instant.dismissing
+        ) : row.status === "confirmed" ? (
           <>
             <Check size={15} />
             {copy.confirmed}
@@ -152,7 +173,7 @@ export default function ActionProposal({
           copy.nothingChanged
         )}
       </p>
-      {row.status === "pending" && !expired && (
+      {["pending", "cancelling"].includes(row.status) && !expired && (
         <div className="actions">
           <Button
             variant="secondary"
@@ -160,10 +181,12 @@ export default function ActionProposal({
             onClick={() => act("review")}
             disabled={busy}
           >
-            {copy.review}
+            {pendingKind === "review" ? instant.reviewing : copy.review}
           </Button>
           <Button variant="ghost" onClick={() => act("cancel")} disabled={busy}>
-            {copy.cancelProposal}
+            {pendingKind === "cancel"
+              ? instant.dismissing
+              : copy.cancelProposal}
           </Button>
         </div>
       )}

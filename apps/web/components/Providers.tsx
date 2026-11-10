@@ -1,7 +1,10 @@
 "use client";
+import { useEffect } from "react";
+import { startDataRefresh } from "@/lib/data-cache";
 import { MotionConfig } from "framer-motion";
 import { Toaster } from "sonner";
 export default function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(startDataRefresh, []);
   return (
     <MotionConfig
       reducedMotion="user"

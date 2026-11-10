@@ -1,4 +1,6 @@
 "use client";
+import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -9,7 +11,13 @@ import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
-import { lodgeApi, operationsApi } from "@/lib/api";
+import {
+  getActiveUserId,
+  getActiveLodgeId,
+  ApiError,
+  lodgeApi,
+  operationsApi,
+} from "@/lib/api";
 type Req = {
   id: string;
   guest_name: string;
@@ -17,6 +25,7 @@ type Req = {
   description: string;
   department_name?: string;
   assigned_staff_name?: string;
+  assigned_staff_id?: string | null;
   task_id?: string;
   priority: string;
   status: string;
@@ -35,8 +44,10 @@ export default function GuestRequestsPage() {
   const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
   const canManage = access.permission("requests.manage");
-  const [rows, setRows] = useState<Req[]>([]),
-    [guests, setGuests] = useState<Guest[]>([]),
+  const { rows, setRows, pending, mutate } = useInstantRows<Req>(
+    access.scopeKey,
+  );
+  const [guests, setGuests] = useState<Guest[]>([]),
     [deps, setDeps] = useState<Department[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
     [open, setOpen] = useState(false),
@@ -64,6 +75,7 @@ export default function GuestRequestsPage() {
       setGuests(g);
       setDeps(d);
       setStaff(s);
+      setError("");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -91,13 +103,52 @@ export default function GuestRequestsPage() {
       setError(e.message);
     }
   }
+  useDataRefresh(load, pending.length > 0 || open);
   async function update(id: string, body: any) {
-    try {
-      await operationsApi.requests.update(id, body);
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    }
+    const before = rows.find((row) => row.id === id);
+    const scope = {
+      userId: getActiveUserId(),
+      lodgeId: getActiveLodgeId(),
+      silent: true,
+    };
+    const patch = {
+      ...body,
+      ...(body.assigned_staff_id !== undefined
+        ? {
+            assigned_staff_name:
+              staff.find((s) => s.id === body.assigned_staff_id)?.full_name ||
+              "",
+          }
+        : {}),
+    };
+    await mutate(
+      id,
+      patch,
+      (value) => {
+        const { assigned_staff_name, ...payload } = value as any;
+        return operationsApi.requests.update(id, payload, scope);
+      },
+      {
+        message: instant.request,
+        undo:
+          body.assigned_staff_id && before?.assigned_staff_id
+            ? {
+                assigned_staff_id: before.assigned_staff_id,
+                assigned_staff_name: before.assigned_staff_name,
+              }
+            : before &&
+                ["waiting", "in_progress"].includes(before.status) &&
+                ["waiting", "in_progress"].includes(body.status)
+              ? { status: before.status }
+              : undefined,
+        refresh: load,
+        onError: (e) => {
+          setError((e as Error).message);
+          if (e instanceof ApiError && [401, 403, 404, 409].includes(e.status))
+            setRows([]);
+        },
+      },
+    );
   }
   async function createTask(id: string) {
     try {
@@ -138,7 +189,11 @@ export default function GuestRequestsPage() {
           Create a guest before recording a guest request.
         </div>
       )}
-      {error && <div className="panel dangerText">{error}</div>}
+      {error && (
+        <div className="panel dangerText" role="alert">
+          {error}
+        </div>
+      )}
       <CollectionView
         loading={collectionLoading}
         error={Boolean(error)}
@@ -175,12 +230,37 @@ export default function GuestRequestsPage() {
                     {r.department_name || "—"}
                     <br />
                     <small>{r.assigned_staff_name || "Unassigned"}</small>
+                    {canManage && staff.length > 0 && (
+                      <select
+                        className="field"
+                        aria-label={instant.assignRequest(r.description)}
+                        disabled={pending.includes(r.id)}
+                        value={r.assigned_staff_id || ""}
+                        onChange={(e) =>
+                          update(r.id, { assigned_staff_id: e.target.value })
+                        }
+                      >
+                        <option value="" disabled>
+                          {instant.unassigned}
+                        </option>
+                        {staff
+                          .filter((s) => s.employment_status === "active")
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.full_name}
+                            </option>
+                          ))}
+                      </select>
+                    )}
                   </td>
                   <td>
                     <StatusPill value={r.priority} />
                   </td>
                   <td>
                     <StatusPill value={r.status} />
+                    {pending.includes(r.id) && (
+                      <small role="status">{instant.saving}</small>
+                    )}
                   </td>
                   <td>
                     {r.task_id ? (
@@ -198,10 +278,13 @@ export default function GuestRequestsPage() {
                   </td>
                   <td>
                     {canManage &&
-                      !["resolved", "cancelled"].includes(r.status) && (
+                      (!["resolved", "cancelled"].includes(r.status) ||
+                        pending.includes(r.id)) && (
                         <>
                           <button
                             className="button secondary"
+                            disabled={pending.includes(r.id)}
+                            aria-busy={pending.includes(r.id)}
                             onClick={() =>
                               next[r.status] &&
                               update(r.id, { status: next[r.status] })
@@ -211,6 +294,7 @@ export default function GuestRequestsPage() {
                           </button>{" "}
                           <button
                             className="button secondary"
+                            disabled={pending.includes(r.id)}
                             onClick={() => resolve(r)}
                           >
                             Resolve

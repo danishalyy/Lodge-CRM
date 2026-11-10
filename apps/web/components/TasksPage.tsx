@@ -1,4 +1,6 @@
 "use client";
+import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { OperationsCalendar } from "./DataViz";
 import { dateInputValue } from "@/lib/formatting";
 import { CollectionView } from "@/components/ui/collection-view";
@@ -65,8 +67,10 @@ export default function TasksPage() {
   );
   const access = useWorkspaceAccess();
   const attachmentsEnabled = access.feature("task_attachments");
-  const [rows, setRows] = useState<Task[]>([]),
-    [staff, setStaff] = useState<Staff[]>([]),
+  const { rows, setRows, pending, mutate } = useInstantRows<Task>(
+    access.scopeKey,
+  );
+  const [staff, setStaff] = useState<Staff[]>([]),
     [deps, setDeps] = useState<Department[]>([]),
     [rooms, setRooms] = useState<Room[]>([]),
     [guests, setGuests] = useState<Guest[]>([]),
@@ -90,8 +94,9 @@ export default function TasksPage() {
   const [vehicles, setVehicles] = useState<any[]>([]),
     [tickets, setTickets] = useState<any[]>([]),
     [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(false),
+    [formBusy, setBusy] = useState(false),
     [detailVersion, setDetailVersion] = useState(0);
+  const busy = formBusy || Boolean(selected && pending.includes(selected.id));
   const mounted = useRef(false),
     generation = useRef(0),
     details = useRef(0),
@@ -255,26 +260,28 @@ export default function TasksPage() {
       if (current()) setBusy(false);
     }
   }
+  useDataRefresh(load, pending.length > 0 || busy);
   async function update(id: string, body: any) {
     if (!current() || mutation.current) return;
-    mutation.current = true;
-    setBusy(true);
-    try {
-      await lodgeApi.updateTask(id, body, actor.current);
-      if (!current()) return;
+    const success = await mutate(
+      id,
+      body,
+      (patch) =>
+        lodgeApi.updateTask(id, patch, { ...actor.current, silent: true }),
+      {
+        message: instant.task,
+        onError: failure,
+      },
+    );
+    if (success && current()) {
       const fresh = await load();
       const row = fresh?.find((task: Task) => task.id === id);
       if (current() && selected?.id === id && row) await openTask(row);
-    } catch (e) {
-      failure(e);
-    } finally {
-      mutation.current = false;
-      if (current()) setBusy(false);
     }
   }
   async function saveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected) return;
+    if (!selected || pending.includes(selected.id)) return;
     const f = new FormData(event.currentTarget),
       body: any = {};
     if (f.get("assigned_staff_id"))
@@ -545,21 +552,28 @@ export default function TasksPage() {
                     <td>{r.due_at ? formatDateTime(r.due_at) : "—"}</td>
                     <td>
                       <StatusPill value={r.status} />
+                      {pending.includes(r.id) && (
+                        <small role="status">{instant.saving}</small>
+                      )}
                     </td>
                     <td>
-                      {next[r.status] && mayProgress(r) && (
-                        <button
-                          className="button secondary"
-                          disabled={busy}
-                          onClick={() =>
-                            r.status === "created"
-                              ? openTask(r)
-                              : update(r.id, { status: next[r.status] })
-                          }
-                        >
-                          {readableLabel(next[r.status]!)}
-                        </button>
-                      )}
+                      {(next[r.status] || pending.includes(r.id)) &&
+                        mayProgress(r) && (
+                          <button
+                            className="button secondary"
+                            disabled={busy || pending.includes(r.id)}
+                            aria-busy={pending.includes(r.id)}
+                            onClick={() =>
+                              r.status === "created"
+                                ? openTask(r)
+                                : update(r.id, { status: next[r.status] })
+                            }
+                          >
+                            {next[r.status]
+                              ? readableLabel(next[r.status]!)
+                              : instant.saving}
+                          </button>
+                        )}
                     </td>
                   </tr>
                 ))}

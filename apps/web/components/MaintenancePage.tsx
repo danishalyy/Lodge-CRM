@@ -1,4 +1,7 @@
 "use client";
+import { Skeleton } from "./ui/skeleton";
+import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { readableLabel } from "@/lib/strings/content";
 import { formatMoney } from "@/lib/formatting";
 import { formatDateTime, formatDate } from "@/lib/formatting";
@@ -8,7 +11,14 @@ import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { FormEvent, useEffect, useState } from "react";
 import StatusPill from "./StatusPill";
 import Drawer from "./Drawer";
-import { authApi, getActiveLodgeId, lodgeApi, operationsApi } from "@/lib/api";
+import {
+  authApi,
+  getActiveLodgeId,
+  getActiveUserId,
+  ApiError,
+  lodgeApi,
+  operationsApi,
+} from "@/lib/api";
 type Issue = {
   id: string;
   title: string;
@@ -37,8 +47,13 @@ export default function MaintenancePage() {
   const access = useWorkspaceAccess();
   const [createOpen, setCreateOpen] = useState(false);
   const [assetOpen, setAssetOpen] = useState(false);
-  const [issues, setIssues] = useState<Issue[]>([]),
-    [rooms, setRooms] = useState<Room[]>([]),
+  const {
+    rows: issues,
+    setRows: setIssues,
+    pending,
+    mutate,
+  } = useInstantRows<Issue>(access.scopeKey);
+  const [rooms, setRooms] = useState<Room[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
     [vehicles, setVehicles] = useState<Vehicle[]>([]),
     [assets, setAssets] = useState<any[]>([]),
@@ -52,6 +67,7 @@ export default function MaintenancePage() {
   useEffect(() => {
     if (!canAssets && tab === "assets") setTab("tickets");
   }, [canAssets, tab]);
+  const [loading, setLoading] = useState(true);
   const load = async () => {
     try {
       const me = await authApi.me();
@@ -85,8 +101,11 @@ export default function MaintenancePage() {
       setStaff(s);
       setVehicles(v);
       setAssets(a);
+      setError("");
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -142,13 +161,39 @@ export default function MaintenancePage() {
       setError(e.message);
     }
   }
+  useDataRefresh(load, pending.length > 0 || createOpen || assetOpen);
   async function update(id: string, body: any) {
-    try {
-      await lodgeApi.updateMaintenance(id, body);
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    }
+    const before = issues.find((row) => row.id === id);
+    const scope = {
+      userId: getActiveUserId(),
+      lodgeId: getActiveLodgeId(),
+      silent: true,
+    };
+    await mutate(
+      id,
+      body,
+      (patch) => lodgeApi.updateMaintenance(id, patch, scope),
+      {
+        message: instant.maintenance,
+        undo:
+          before &&
+          ["waiting", "in_progress"].includes(before.status) &&
+          ["waiting", "in_progress"].includes(body.status)
+            ? { status: before.status }
+            : undefined,
+        refresh: load,
+        onError: (e) => {
+          setError((e as Error).message);
+          if (
+            e instanceof ApiError &&
+            [401, 403, 404, 409].includes(e.status)
+          ) {
+            setIssues([]);
+            setSelected(null);
+          }
+        },
+      },
+    );
   }
   async function complete(i: Issue) {
     const resolution = window.prompt("Repair / resolution notes");
@@ -185,6 +230,12 @@ export default function MaintenancePage() {
   }
   return (
     <>
+      {loading && !issues.length && (
+        <div role="status" aria-label={instant.loading}>
+          <Skeleton className="h-20 mb-4" />
+          <Skeleton className="h-20" />
+        </div>
+      )}
       <div className="pageHeader">
         <div>
           <span className="eyebrow">MAINTENANCE & WORKSHOP</span>
@@ -205,7 +256,11 @@ export default function MaintenancePage() {
           </button>
         )}
       </div>
-      {error && <div className="panel dangerText">{error}</div>}
+      {error && (
+        <div className="panel dangerText" role="alert">
+          {error}
+        </div>
+      )}
       <div className="tabs">
         <button
           className={tab === "tickets" ? "button primary" : "button"}
@@ -397,23 +452,32 @@ export default function MaintenancePage() {
                         <div className="taskMeta">
                           <StatusPill value={i.priority} />{" "}
                           <StatusPill value={i.status} />
+                          {pending.includes(i.id) && (
+                            <small role="status">{instant.saving}</small>
+                          )}
                           <div style={{ marginTop: 6 }}>
-                            {canManage && next[i.status] && (
-                              <button
-                                className="button secondary"
-                                onClick={() =>
-                                  update(i.id, { status: next[i.status] })
-                                }
-                              >
-                                {readableLabel(next[i.status]!)}
-                              </button>
-                            )}{" "}
+                            {canManage &&
+                              (next[i.status] || pending.includes(i.id)) && (
+                                <button
+                                  className="button secondary"
+                                  disabled={pending.includes(i.id)}
+                                  aria-busy={pending.includes(i.id)}
+                                  onClick={() =>
+                                    update(i.id, { status: next[i.status] })
+                                  }
+                                >
+                                  {next[i.status]
+                                    ? readableLabel(next[i.status]!)
+                                    : instant.saving}
+                                </button>
+                              )}{" "}
                             {canManage &&
                               !["completed", "cancelled"].includes(
                                 i.status,
                               ) && (
                                 <button
                                   className="button secondary"
+                                  disabled={pending.includes(i.id)}
                                   onClick={() => complete(i)}
                                 >
                                   Complete
@@ -427,7 +491,7 @@ export default function MaintenancePage() {
                 );
               })}
             </div>
-            {!issues.length && (
+            {!loading && !issues.length && (
               <div className="empty">
                 No maintenance tickets have been created.
               </div>

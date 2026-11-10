@@ -1,4 +1,7 @@
 "use client";
+import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
+import { Skeleton } from "./ui/skeleton";
 import { readableLabel } from "@/lib/strings/content";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { Field } from "@/components/ui/field";
@@ -6,7 +9,12 @@ import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
-import { lodgeApi } from "@/lib/api";
+import {
+  getActiveUserId,
+  getActiveLodgeId,
+  ApiError,
+  lodgeApi,
+} from "@/lib/api";
 type Room = {
   id: string;
   name: string;
@@ -27,15 +35,21 @@ const statuses = [
 export default function RoomsPage() {
   const access = useWorkspaceAccess();
   const canManage = access.permission("units.manage");
-  const [rows, setRows] = useState<Room[]>([]),
-    [selected, setSelected] = useState<Room | null>(null),
+  const { rows, setRows, pending, mutate } = useInstantRows<Room>(
+    access.scopeKey,
+  );
+  const [selected, setSelected] = useState<Room | null>(null),
     [open, setOpen] = useState(false),
     [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const load = async () => {
     try {
       setRows(await lodgeApi.rooms());
+      setError("");
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -56,13 +70,32 @@ export default function RoomsPage() {
       setError(e.message);
     }
   }
+  useDataRefresh(load, pending.length > 0 || open);
   async function update(id: string, status: string) {
-    try {
-      await lodgeApi.updateRoom(id, { status });
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    }
+    const scope = {
+      userId: getActiveUserId(),
+      lodgeId: getActiveLodgeId(),
+      silent: true,
+    };
+    await mutate(
+      id,
+      { status },
+      (patch) => lodgeApi.updateRoom(id, patch, scope),
+      {
+        message: instant.room,
+        refresh: load,
+        onError: (e) => {
+          setError((e as Error).message);
+          if (
+            e instanceof ApiError &&
+            [401, 403, 404, 409].includes(e.status)
+          ) {
+            setRows([]);
+            setSelected(null);
+          }
+        },
+      },
+    );
   }
   return (
     <>
@@ -78,7 +111,16 @@ export default function RoomsPage() {
           </button>
         )}
       </div>
-      {error && <div className="panel dangerText">{error}</div>}
+      {error && (
+        <div className="panel dangerText" role="alert">
+          {error}
+        </div>
+      )}
+      {loading && !rows.length && (
+        <div role="status" aria-label={instant.loading}>
+          <Skeleton className="h-20 mb-4" />
+        </div>
+      )}
       <div className="roomStatusBoard">
         {[
           "available",
@@ -115,6 +157,9 @@ export default function RoomsPage() {
                       <b>{r.name}</b>
                     </button>
                     <StatusPill value={r.status} />
+                    {pending.includes(r.id) && (
+                      <small role="status">{instant.saving}</small>
+                    )}
                   </div>
                   <p>
                     {r.unit_type}
@@ -124,7 +169,8 @@ export default function RoomsPage() {
                     className="select"
                     value={r.status}
                     onChange={(e) => update(r.id, e.target.value)}
-                    disabled={!canManage}
+                    disabled={!canManage || pending.includes(r.id)}
+                    aria-busy={pending.includes(r.id)}
                     aria-label="Status"
                   >
                     {statuses.map((s) => (

@@ -3,10 +3,19 @@ import { formatDateTime } from "@/lib/formatting";
 import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Bell, Archive, CheckCheck, RefreshCw } from "lucide-react";
 import { reportCopy } from "@/lib/strings/ai-reports";
-import { accountNotificationsApi, setActiveLodgeId } from "@/lib/api";
+import {
+  accountNotificationsApi,
+  getActiveUserId,
+  getActiveLodgeId,
+  ApiError,
+  setActiveLodgeId,
+} from "@/lib/api";
+import { toast } from "sonner";
+import { useDataRefresh } from "@/lib/use-instant-actions";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { Skeleton } from "./ui/skeleton";
 type Notice = {
   resource_type?: string;
@@ -38,12 +47,22 @@ export default function NotificationsPage() {
     [unreadOnly, setUnreadOnly] = useState(false),
     [severity, setSeverity] = useState(""),
     [saving, setSaving] = useState(false);
+  const actionLock = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (actionLock.current)
+        window.dispatchEvent(new Event("safarios-notifications-changed"));
+    };
+  }, []);
   const load = useCallback(
     async (quiet = false) => {
       if (!quiet) setLoading(true);
       try {
         const data = await accountNotificationsApi.list(unreadOnly, severity);
-        setRows(data);
+        if (!actionLock.current) setRows(data);
         setError("");
       } catch (e) {
         setError(
@@ -74,24 +93,69 @@ export default function NotificationsPage() {
       clearInterval(timer);
     };
   }, [load]);
-  function announce() {
-    window.dispatchEvent(new Event("safarios-notifications-changed"));
+  useDataRefresh(() => load(true), !!busy);
+  function announce(delta?: number) {
+    window.dispatchEvent(
+      new CustomEvent("safarios-notifications-changed", { detail: { delta } }),
+    );
   }
   async function act(action: "read" | "archive" | "all", id = "") {
-    if (busy) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
+    const actor = `${getActiveUserId()}:${getActiveLodgeId()}`;
+    const current = () =>
+      alive.current && actor === `${getActiveUserId()}:${getActiveLodgeId()}`;
+    const before = rows;
+    const optimistic = action !== "archive";
+    const delta =
+      action === "all"
+        ? -rows.filter((n) => !n.read_at).length
+        : before.find((n) => n.id === id)?.read_at
+          ? 0
+          : -1;
     setBusy(id || "all");
-    try {
-      if (action === "all") await accountNotificationsApi.readAll();
-      else if (action === "read") await accountNotificationsApi.read(id);
-      else await accountNotificationsApi.archive(id);
-      await load(true);
-      announce();
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Unable to update notification.",
+    setError("");
+    if (optimistic) {
+      setRows((old) =>
+        old.map((n) =>
+          action === "all" || n.id === id
+            ? { ...n, read_at: n.read_at || new Date().toISOString() }
+            : n,
+        ),
       );
+      announce(action === "all" ? -Infinity : delta);
+    }
+    try {
+      if (action === "all") await accountNotificationsApi.readAll(true);
+      else if (action === "read") await accountNotificationsApi.read(id, true);
+      else await accountNotificationsApi.archive(id);
+      if (!current()) return;
+      if (optimistic)
+        toast.success(
+          action === "all" ? instant.allRead : instant.notification,
+        );
+    } catch (e) {
+      if (!current()) return;
+      setRows(before);
+      const message =
+        e instanceof Error ? e.message : "Unable to update notification.";
+      setError(message);
+      if (!(e instanceof ApiError && [401, 403, 404, 409].includes(e.status)))
+        toast.error(message, {
+          action: {
+            label: instant.retry,
+            onClick: () => {
+              if (current()) void act(action, id);
+            },
+          },
+        });
     } finally {
-      setBusy("");
+      actionLock.current = false;
+      if (current()) {
+        setBusy("");
+        await load(true);
+      }
+      if (actor === `${getActiveUserId()}:${getActiveLodgeId()}`) announce();
     }
   }
   async function save(e: React.FormEvent) {
@@ -126,7 +190,7 @@ export default function NotificationsPage() {
           disabled={!!busy || !rows.some((r) => !r.read_at)}
         >
           <CheckCheck size={16} />
-          Mark all read
+          {busy === "all" ? instant.saving : "Mark all read"}
         </button>
       </div>
       {error && (
@@ -169,7 +233,7 @@ export default function NotificationsPage() {
               <RefreshCw size={16} />
             </button>
           </div>
-          {loading ? (
+          {loading && !rows.length ? (
             <div role="status" aria-label="Loading notifications">
               <Skeleton className="h-20 mb-4" />
               <Skeleton className="h-20" />
@@ -221,19 +285,20 @@ export default function NotificationsPage() {
                             {reportCopy.view}
                           </button>
                         )}
-                      {!n.read_at && (
+                      {(!n.read_at || busy === n.id) && (
                         <button
                           className="button"
                           disabled={!!busy}
                           onClick={() => act("read", n.id)}
                         >
-                          Mark read
+                          {busy === n.id ? instant.saving : "Mark read"}
                         </button>
                       )}
                       <button
                         className="button"
                         disabled={!!busy}
                         onClick={() => act("archive", n.id)}
+                        aria-busy={busy === n.id}
                         aria-label={`Archive ${n.title}`}
                       >
                         <Archive size={14} />

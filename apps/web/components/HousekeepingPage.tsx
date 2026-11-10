@@ -1,4 +1,7 @@
 "use client";
+import { Skeleton } from "./ui/skeleton";
+import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
+import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { readableLabel } from "@/lib/strings/content";
 import { formatDateTime } from "@/lib/formatting";
 import { Field } from "@/components/ui/field";
@@ -7,7 +10,14 @@ import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { FormEvent, useEffect, useState } from "react";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
-import { authApi, getActiveLodgeId, lodgeApi, operationsApi } from "@/lib/api";
+import {
+  authApi,
+  getActiveLodgeId,
+  getActiveUserId,
+  ApiError,
+  lodgeApi,
+  operationsApi,
+} from "@/lib/api";
 type Room = {
   id: string;
   name: string;
@@ -32,10 +42,16 @@ export default function HousekeepingPage() {
   const [assetOpen, setAssetOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
-    [jobs, setJobs] = useState<any[]>([]),
     [error, setError] = useState(""),
     [canManage, setCanManage] = useState(false);
+  const {
+    rows: jobs,
+    setRows: setJobs,
+    pending,
+    mutate,
+  } = useInstantRows<any>(access.scopeKey);
   const fullWorkflow = access.feature("housekeeping_full");
+  const [loading, setLoading] = useState(true);
   const load = async () => {
     try {
       const me = await authApi.me();
@@ -57,8 +73,11 @@ export default function HousekeepingPage() {
       setRooms(r);
       setStaff(s);
       setJobs(j);
+      setError("");
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -88,16 +107,41 @@ export default function HousekeepingPage() {
       setError(e.message);
     }
   }
+  useDataRefresh(load, pending.length > 0 || createOpen || assetOpen);
   async function update(id: string, status: string) {
-    try {
-      await operationsApi.housekeeping.update(id, { status });
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    }
+    const scope = {
+      userId: getActiveUserId(),
+      lodgeId: getActiveLodgeId(),
+      silent: true,
+    };
+    await mutate(
+      id,
+      { status },
+      (patch) => operationsApi.housekeeping.update(id, patch, scope),
+      {
+        message: instant.housekeeping,
+        refresh: load,
+        onError: (e) => {
+          setError((e as Error).message);
+          if (
+            e instanceof ApiError &&
+            [401, 403, 404, 409].includes(e.status)
+          ) {
+            setJobs([]);
+            setRooms([]);
+          }
+        },
+      },
+    );
   }
   return (
     <>
+      {loading && !jobs.length && (
+        <div role="status" aria-label={instant.loading}>
+          <Skeleton className="h-20 mb-4" />
+          <Skeleton className="h-20" />
+        </div>
+      )}
       <div className="pageHeader">
         <div>
           <span className="eyebrow">HOUSEKEEPING</span>
@@ -116,7 +160,11 @@ export default function HousekeepingPage() {
           </button>
         )}
       </div>
-      {error && <div className="panel dangerText">{error}</div>}
+      {error && (
+        <div className="panel dangerText" role="alert">
+          {error}
+        </div>
+      )}
       <div className="summaryStrip">
         {[
           "ready",
@@ -291,16 +339,24 @@ export default function HousekeepingPage() {
                       </div>
                       <div>
                         <StatusPill value={j.status} />
-                        {canManage && next[j.status] && (
-                          <div style={{ marginTop: 6 }}>
-                            <button
-                              className="button secondary"
-                              onClick={() => update(j.id, next[j.status]!)}
-                            >
-                              {readableLabel(next[j.status]!)}
-                            </button>
-                          </div>
+                        {pending.includes(j.id) && (
+                          <small role="status">{instant.saving}</small>
                         )}
+                        {canManage &&
+                          (next[j.status] || pending.includes(j.id)) && (
+                            <div style={{ marginTop: 6 }}>
+                              <button
+                                className="button secondary"
+                                disabled={pending.includes(j.id)}
+                                aria-busy={pending.includes(j.id)}
+                                onClick={() => update(j.id, next[j.status]!)}
+                              >
+                                {next[j.status]
+                                  ? readableLabel(next[j.status]!)
+                                  : instant.saving}
+                              </button>
+                            </div>
+                          )}
                       </div>
                     </div>
                   ))}
@@ -308,7 +364,7 @@ export default function HousekeepingPage() {
               );
             })}
           </div>
-          {!jobs.length && (
+          {!loading && !jobs.length && (
             <div className="empty">No housekeeping jobs have been created.</div>
           )}
         </section>

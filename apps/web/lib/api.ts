@@ -3,6 +3,8 @@ import { formCopy } from "./strings/forms";
 import { originatingForm } from "./form-submission";
 import { actionFeedback } from "./action-feedback";
 import { toast } from "sonner";
+import { instantCopy } from "./strings/interactivity";
+import { cachedRead, invalidateData } from "./data-cache";
 // Same-origin requests keep session/CSRF cookies on the application domain.
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -17,6 +19,7 @@ export function getActiveLodgeId() {
     : localStorage.getItem("active_lodge_id") || "";
 }
 export function setActiveLodgeId(id: string) {
+  if (id !== getActiveLodgeId()) invalidateData();
   if (typeof window !== "undefined")
     localStorage.setItem("active_lodge_id", id);
 }
@@ -26,11 +29,23 @@ export function getActiveUserId() {
     : localStorage.getItem("active_user_id") || "";
 }
 function clearAccountContext() {
+  invalidateData();
   if (typeof window === "undefined") return;
   for (const key of ["active_user_id", "active_lodge_id", "active_lodge_name"])
     localStorage.removeItem(key);
 }
+let accessSnapshot = "";
 function bindAccount(user: any) {
+  const signature = JSON.stringify([
+    user.id,
+    user.is_super_admin,
+    user.memberships,
+    user.groups,
+  ]);
+  if (signature !== accessSnapshot) {
+    invalidateData();
+    accessSnapshot = signature;
+  }
   if (typeof window === "undefined") return user;
   const previousUser = getActiveUserId(),
     previousLodge = getActiveLodgeId();
@@ -153,7 +168,40 @@ export function formatApiError(status: number, payload: unknown): ApiError {
   );
 }
 
-async function request<T>(path: string, init: RequestInit = {}) {
+type RequestOptions = RequestInit & { silent?: boolean };
+async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  const actor = getActiveUserId(),
+    lodge = getActiveLodgeId();
+  const read =
+    !init.method || ["GET", "HEAD"].includes(init.method.toUpperCase());
+  const load = async () => {
+    if (actor !== getActiveUserId() || lodge !== getActiveLodgeId())
+      throw new ApiError(instantCopy.contextChanged, 409);
+    const result = await networkRequest<T>(path, init);
+    if (
+      path !== "/api/v1/auth/me" &&
+      (actor !== getActiveUserId() || lodge !== getActiveLodgeId())
+    )
+      throw new ApiError(instantCopy.contextChanged, 409);
+    return result;
+  };
+  if (
+    read &&
+    (/^\/api\/v1\/lodges\/[^/]+\/(tasks|requests|rooms|housekeeping-jobs|maintenance)$/.test(
+      path,
+    ) ||
+      /^\/api\/v1\/auth\/notifications(\?|\/summary|$)/.test(path))
+  )
+    return cachedRead(`${actor}:${lodge}:${path}`, load);
+  if (!read) invalidateData();
+  try {
+    return await load();
+  } finally {
+    if (!read) invalidateData();
+  }
+}
+async function networkRequest<T>(path: string, init: RequestOptions = {}) {
+  const { silent, ...fetchInit } = init;
   const form = originatingForm();
   const headers = new Headers(init.headers || {});
   const expectedUser = getActiveUserId();
@@ -177,12 +225,13 @@ async function request<T>(path: string, init: RequestInit = {}) {
     if (csrf) headers.set("X-CSRF-Token", csrf);
   }
   const res = await fetch(`${API_URL}${path}`, {
-    ...init,
+    ...fetchInit,
     headers,
     credentials: "include",
     cache: "no-store",
   }).catch((error) => {
     if (
+      !silent &&
       init.method &&
       !["GET", "HEAD"].includes(init.method.toUpperCase()) &&
       !path.startsWith("/api/v1/auth/")
@@ -201,6 +250,7 @@ async function request<T>(path: string, init: RequestInit = {}) {
   )
     location.href = "/login";
   if (!res.ok) {
+    if ([401, 403, 409].includes(res.status)) invalidateData();
     const payload = await res.json().catch(() => null);
     const error = formatApiError(res.status, payload);
     if (
@@ -215,6 +265,7 @@ async function request<T>(path: string, init: RequestInit = {}) {
         new CustomEvent("safarios-field-errors", { detail: error.fieldErrors }),
       );
     if (
+      !silent &&
       init.method &&
       !["GET", "HEAD"].includes(init.method.toUpperCase()) &&
       !path.startsWith("/api/v1/auth/")
@@ -223,7 +274,8 @@ async function request<T>(path: string, init: RequestInit = {}) {
     throw error;
   }
   const result = res.status === 204 ? undefined : await res.json();
-  actionFeedback(path, (init.method || "GET").toUpperCase(), result);
+  if (!silent)
+    actionFeedback(path, (init.method || "GET").toUpperCase(), result);
   return result as T;
 }
 const lodgePath = (suffix: string) => {
@@ -231,7 +283,7 @@ const lodgePath = (suffix: string) => {
   if (!id) throw new Error("No lodge selected");
   return `/api/v1/lodges/${id}/${suffix}`;
 };
-type AccountScope = { userId: string; lodgeId: string };
+type AccountScope = { userId: string; lodgeId: string; silent?: boolean };
 const scopedPath = (name: string, scope?: AccountScope) =>
   scope ? `/api/v1/lodges/${scope.lodgeId}/${name}` : lodgePath(name);
 const scopedHeaders = (scope?: AccountScope) =>
@@ -247,6 +299,7 @@ const tenantCollection = (name: string) => ({
   update: <T = any>(recordId: string, body: any, scope?: AccountScope) =>
     request<T>(scopedPath(`${name}/${recordId}`, scope), {
       method: "PATCH",
+      silent: scope?.silent,
       headers: scopedHeaders(scope),
       body: JSON.stringify(body),
     }),
@@ -317,12 +370,28 @@ export const lodgeApi: any = {
   guests: tenantCollection("guests").list,
   createGuest: tenantCollection("guests").create,
   updateGuest: tenantCollection("guests").update,
-  guestCommunications: (id: string, offset = 0, scope?: AccountScope) => request<any>(scopedPath(`guests/${id}/communications?limit=25&offset=${offset}`, scope), {headers:scopedHeaders(scope)}),
-  logGuestCommunication: (id: string, body: unknown, scope?: AccountScope) => request<any>(scopedPath(`guests/${id}/communications`,scope), {method:"POST", headers:scopedHeaders(scope), body:JSON.stringify(body)}),
+  guestCommunications: (id: string, offset = 0, scope?: AccountScope) =>
+    request<any>(
+      scopedPath(
+        `guests/${id}/communications?limit=25&offset=${offset}`,
+        scope,
+      ),
+      { headers: scopedHeaders(scope) },
+    ),
+  logGuestCommunication: (id: string, body: unknown, scope?: AccountScope) =>
+    request<any>(scopedPath(`guests/${id}/communications`, scope), {
+      method: "POST",
+      headers: scopedHeaders(scope),
+      body: JSON.stringify(body),
+    }),
   tasks: tenantCollection("tasks").list,
   createTask: tenantCollection("tasks").create,
   updateTask: tenantCollection("tasks").update,
-  taskHistory: (id:string, offset=0, scope?:AccountScope)=>request<any>(scopedPath(`tasks/${id}/history?limit=25&offset=${offset}`,scope),{headers:scopedHeaders(scope)}),
+  taskHistory: (id: string, offset = 0, scope?: AccountScope) =>
+    request<any>(
+      scopedPath(`tasks/${id}/history?limit=25&offset=${offset}`, scope),
+      { headers: scopedHeaders(scope) },
+    ),
   rooms: tenantCollection("rooms").list,
   createRoom: tenantCollection("rooms").create,
   updateRoom: tenantCollection("rooms").update,
@@ -465,8 +534,10 @@ export const operationsApi = {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    update: (id: string, body: any) =>
-      request<any>(lodgePath(`housekeeping-jobs/${id}`), {
+    update: (id: string, body: any, scope?: AccountScope) =>
+      request<any>(scopedPath(`housekeeping-jobs/${id}`, scope), {
+        silent: scope?.silent,
+        headers: scopedHeaders(scope),
         method: "PATCH",
         body: JSON.stringify(body),
       }),
@@ -655,10 +726,13 @@ export const accountNotificationsApi = {
     ),
   summary: () =>
     request<{ unread: number }>("/api/v1/auth/notifications/summary"),
-  read: (id: string) =>
-    request(`/api/v1/auth/notifications/${id}/read`, { method: "POST" }),
-  readAll: () =>
-    request("/api/v1/auth/notifications/read-all", { method: "POST" }),
+  read: (id: string, silent = false) =>
+    request(`/api/v1/auth/notifications/${id}/read`, {
+      method: "POST",
+      silent,
+    }),
+  readAll: (silent = false) =>
+    request("/api/v1/auth/notifications/read-all", { method: "POST", silent }),
   archive: (id: string) =>
     request(`/api/v1/auth/notifications/${id}/archive`, { method: "POST" }),
   preferences: () => request<any>("/api/v1/auth/notification-preferences"),

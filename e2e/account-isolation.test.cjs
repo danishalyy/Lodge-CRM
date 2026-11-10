@@ -1166,3 +1166,168 @@ test('canvas wildlife shows real scoped pending records while offline without is
   await page.locator('.queuedRecord').getByRole('heading',{name:'Elephant',exact:true}).waitFor();assert.equal(await page.locator('.queuedRecord').getByText('Waiting to sync',{exact:true}).count(),1);assert.deepEqual(writes,[]);
  }finally{await context.setOffline(false);await context.close()}
 });
+
+test('instant cache deduplicates scoped reads, clones results, retries failures and rejects overtaken snapshots',async()=>{
+ const output={};const js=ts.transpileModule(fs.readFileSync(path.join(web,'lib/data-cache.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;new Function('exports',js)(output);
+ let calls=0,release;const first=()=>{calls++;return new Promise(r=>release=r)};
+ const a=output.cachedRead('user-a:lodge-a:tasks',first),b=output.cachedRead('user-a:lodge-a:tasks',first);release([{id:'one'}]);
+ const [one,two]=await Promise.all([a,b]);assert.equal(calls,1);one[0].id='changed';assert.equal(two[0].id,'one');
+ assert.deepEqual(await output.cachedRead('user-b:lodge-a:tasks',async()=>[{id:'private-b'}]),[{id:'private-b'}]);
+ output.invalidateData();let attempts=0;
+ await assert.rejects(output.cachedRead('failure',async()=>{attempts++;throw Error('unavailable')}));
+ assert.equal(await output.cachedRead('failure',async()=>{attempts++;return 'recovered'}),'recovered');assert.equal(attempts,2);
+ let finish,reads=0;const old=output.cachedRead('late',()=>{reads++;return reads===1?new Promise(r=>finish=r):Promise.resolve('fresh')});
+ output.invalidateData();finish('stale');assert.equal(await old,'fresh');assert.equal(reads,2);
+});
+
+test('instant task status rolls back, prevents duplicate submits and retries with the original scoped endpoint',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let status='assigned',calls=0,release,reject=true;
+ try{
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/tasks**',async r=>{
+   const p=new URL(r.request().url()).pathname;
+   if(p.endsWith('/tasks'))return r.fulfill({json:[{id:'instant-task',title:'Inspect water pump',description:'',status,priority:'normal',can_transition:true}]});
+   if(p.endsWith('/instant-task')&&r.request().method()==='PATCH'){calls++;assert.equal(r.request().headers()['x-expected-user-id'],'premium-design-owner');const body=r.request().postDataJSON();await new Promise(resolve=>release=resolve);if(reject)return r.fulfill({status:500,json:{detail:'internal'}});status=body.status;return r.fulfill({json:{id:'instant-task',status}})}
+   return r.fulfill({json:[]});
+  });
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Accepted',exact:true}).click();
+  await page.getByText('Saving…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Started',exact:true}).isDisabled(),true);assert.equal(calls,1);
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));assert.equal(calls,1);release();
+  await page.getByRole('button',{name:'Accepted',exact:true}).waitFor();await page.getByRole('button',{name:'Retry',exact:true}).click();await page.getByText('Saving…',{exact:true}).waitFor();assert.equal(calls,2);reject=false;release();
+  await page.getByText('Task updated',{exact:true}).waitFor();await page.getByRole('button',{name:'Started',exact:true}).waitFor();assert.equal(status,'accepted');assert.equal(await page.getByRole('button',{name:'Undo',exact:true}).count(),0);
+ }finally{release?.();await context.close()}
+});
+
+test('instant maintenance supports a real reverse transition with Undo and preserves records during focus refresh',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let status='in_progress',writes=[],release,hold=false;
+ try{
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/maintenance**',async r=>{
+   const p=new URL(r.request().url()).pathname;
+   if(p.endsWith('/maintenance')){if(hold)await new Promise(resolve=>release=resolve);return r.fulfill({json:[{id:'instant-maint',title:'Repair gate',status,priority:'normal',category:'general'}]})}
+   if(p.endsWith('/instant-maint')){status=r.request().postDataJSON().status;writes.push(status);return r.fulfill({json:{id:'instant-maint',status}})}
+   return r.fulfill({json:[]});
+  });
+  await page.goto(base+'/maintenance');await page.getByRole('button',{name:'Waiting',exact:true}).click();await page.getByRole('button',{name:'Undo',exact:true}).click();await page.getByText('Change undone',{exact:true}).waitFor();assert.deepEqual(writes,['waiting','in_progress']);
+  hold=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelector('h1')?.textContent==='Maintenance');assert.equal(await page.getByText('Repair gate',{exact:true}).isVisible(),true);hold=false;release?.();
+ }finally{release?.();await context.close()}
+});
+
+test('instant notification read updates its badge immediately and rolls back on rejection',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let read=false,release;
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/auth/notifications**',async r=>{
+   const p=new URL(r.request().url()).pathname;
+   if(p.endsWith('/summary'))return r.fulfill({json:{unread:read?0:1}});
+   if(p.endsWith('/read')){await new Promise(resolve=>release=resolve);return r.fulfill({status:500,json:{detail:'internal'}})}
+   return r.fulfill({json:[{id:'instant-notice',title:'Task assigned to you',body:'Review your assigned work.',severity:'normal',created_at:'2026-11-10T06:00:00Z',read_at:read?'2026-11-10T07:00:00Z':null}]});
+  });
+  await page.goto(base+'/notifications');await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).waitFor();await page.getByRole('button',{name:'Mark read',exact:true}).click();await page.getByRole('button',{name:'Saving…',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Saving…',exact:true}).isDisabled(),true);await page.getByRole('link',{name:'Notifications',exact:true}).first().waitFor();await page.evaluate(()=>window.dispatchEvent(new Event('safarios-data-refresh')));await page.waitForTimeout(100);assert.equal(await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).count(),0);release();
+  await page.getByRole('button',{name:'Mark read',exact:true}).waitFor();await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).waitFor();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();
+ }finally{release?.();await context.close()}
+});
+
+test('instant request reassignment uses the existing endpoint and offers Undo only for an existing assignee',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let assigned='staff-a';const writes=[];
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/staff',r=>r.fulfill({json:[{id:'staff-a',full_name:'Alex',employment_status:'active'},{id:'staff-b',full_name:'Bea',employment_status:'active'}]}));
+  await page.route('**/api/v1/lodges/premium-lodge/requests**',async r=>{
+   if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();assert.deepEqual(Object.keys(body),['assigned_staff_id']);assigned=body.assigned_staff_id;writes.push(assigned);return r.fulfill({json:{id:'request-assign',status:'assigned'}})}
+   return r.fulfill({json:[{id:'request-assign',guest_name:'Fixture guest',description:'Extra towels',request_type:'housekeeping',priority:'normal',status:'assigned',assigned_staff_id:assigned,assigned_staff_name:assigned==='staff-a'?'Alex':'Bea',resolution:''}]});
+  });
+  await page.goto(base+'/requests');await page.getByLabel('Assign request Extra towels',{exact:true}).selectOption('staff-b');await page.getByRole('button',{name:'Undo',exact:true}).click();await page.getByText('Change undone',{exact:true}).waitFor();assert.deepEqual(writes,['staff-b','staff-a']);
+ }finally{await context.close()}
+});
+
+test('instant room and housekeeping changes retain pending controls and roll back rejected writes',async()=>{
+ for(const module of ['rooms','housekeeping']){
+  const {context,page}=await accountPage(premiumTestAccount());let release,writes=0;
+  try{
+   await premiumFixtures(page);const endpoint=module==='rooms'?'rooms':'housekeeping-jobs';
+   await page.route(`**/api/v1/lodges/premium-lodge/${endpoint}**`,async r=>{
+    if(r.request().method()==='PATCH'){writes++;await new Promise(resolve=>release=resolve);return r.fulfill({status:500,json:{detail:'internal'}})}
+    return r.fulfill({json:module==='rooms'?[{id:'room-instant',name:'Marula',unit_type:'Suite',status:'available',notes:''}]:[{id:'hk-instant',unit_id:'room-instant',unit_name:'Marula',job_type:'cleaning',status:'assigned',notes:''}]});
+   });
+   await page.goto(base+'/'+module);
+   if(module==='rooms')await page.getByLabel('Status',{exact:true}).selectOption('cleaning');else await page.getByRole('button',{name:'Accepted',exact:true}).click();
+   await page.getByText('Saving…',{exact:true}).waitFor();assert.equal(writes,1);
+   if(module==='rooms')assert.equal(await page.getByLabel('Status',{exact:true}).isDisabled(),true);else assert.equal(await page.getByRole('button',{name:'In progress',exact:true}).isDisabled(),true);
+   release();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();
+   if(module==='rooms')assert.equal(await page.getByLabel('Status',{exact:true}).inputValue(),'available');else await page.getByRole('button',{name:'Accepted',exact:true}).waitFor();
+  }finally{release?.();await context.close()}
+ }
+});
+
+test('instant AI dismissal rolls back on rejection and retry never confirms an action',async()=>{
+ const {context,page}=await accountPage({id:'instant-ai-owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'instant-ai-lodge',permissions:['ai.use','ai.actions'],entitlements:['ai','ai_actions']}]});let release,fail=true,cancels=0,confirms=0;
+ const proposal={id:'instant-action',action:'create_task',status:'pending',expires_at:new Date(Date.now()+600000).toISOString(),preview:{fields:[{key:'title',value:'Check radio'}]}};
+ try{
+  await page.route('**/api/v1/lodges/instant-ai-lodge/ai/**',async r=>{
+   const p=new URL(r.request().url()).pathname;
+   if(p.endsWith('/status'))return r.fulfill({json:{state:'ready',tools:[{name:'get_tasks',suggestion:'Prepare a task'}]}});
+   if(p.endsWith('/conversations'))return r.fulfill({json:r.request().method()==='POST'?{id:'instant-chat'}:[]});
+   if(p.endsWith('/messages')){const msg={id:'instant-reply',role:'assistant',content:'Review this proposal.',sources:[],actions:[proposal]};return r.fulfill({json:r.request().method()==='POST'?msg:[msg]})}
+   if(p.endsWith('/cancel')){cancels++;await new Promise(resolve=>release=resolve);return fail?r.fulfill({status:500,json:{detail:'internal'}}):r.fulfill({json:{...proposal,status:'cancelled'}})}
+   if(p.endsWith('/confirm')){confirms++;throw Error('Dismissal must never confirm')}
+   return r.fulfill({json:[]});
+  });
+  await page.goto(base+'/lodge-ai');await page.getByLabel('Your question',{exact:true}).fill('Prepare a task');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByRole('button',{name:'Discard proposal',exact:true}).click();await page.getByRole('button',{name:'Dismissing…',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Dismissing…',exact:true}).isDisabled(),true);release();await page.getByRole('button',{name:'Discard proposal',exact:true}).waitFor();await page.getByRole('button',{name:'Retry',exact:true}).click();await page.getByRole('button',{name:'Dismissing…',exact:true}).waitFor();fail=false;release();await page.locator('.aiActionState').getByText('Proposal discarded',{exact:true}).waitFor();assert.equal(cancels,2);assert.equal(confirms,0);
+ }finally{release?.();await context.close()}
+});
+
+test('instant API cache clears on logout and lodge selection and never caches auth checks',async()=>{
+ const vm=require('node:vm');const cache={};new Function('exports',ts.transpileModule(fs.readFileSync(path.join(web,'lib/data-cache.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(cache);
+ const storage=new Map([['active_user_id','cache-owner'],['active_lodge_id','cache-lodge']]);const calls=[];const api={};
+ const sandbox={exports:api,process:{env:{}},Headers,FormData,structuredClone,window:{dispatchEvent:()=>{}},document:{cookie:''},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:async(url,options)=>{calls.push({url,options});return {ok:true,status:200,json:async()=>url.endsWith('/auth/me')?{id:'cache-owner',memberships:[{lodge_id:storage.get('active_lodge_id')}]}:url.endsWith('/rooms')?[{id:'private-room'}]:{}}},require:name=>name.includes('data-cache')?cache:name.includes('form-submission')?{originatingForm:()=>null}:name.includes('action-feedback')?{actionFeedback:()=>{}}:name.includes('formatting')?{storeFormatting:()=>{}}:name==='sonner'?{toast:{error:()=>{}}}:{formCopy:{}}};
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(web,'lib/api.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,sandbox);
+ await api.authApi.me();await api.authApi.me();assert.equal(calls.filter(c=>c.url.endsWith('/auth/me')).length,2);
+ await api.lodgeApi.rooms();await api.lodgeApi.rooms();assert.equal(calls.filter(c=>c.url.endsWith('/rooms')).length,1);
+ await api.authApi.logout();assert.equal(storage.has('active_user_id'),false);storage.set('active_user_id','cache-owner');storage.set('active_lodge_id','cache-lodge');await api.lodgeApi.rooms();assert.equal(calls.filter(c=>c.url.endsWith('/rooms')).length,2);
+ api.setActiveLodgeId('other-lodge');await api.lodgeApi.rooms();assert.equal(calls.at(-1).url,'/api/v1/lodges/other-lodge/rooms');assert.equal(calls.at(-1).options.headers.get('X-Expected-User-Id'),'cache-owner');
+});
+
+test('instant late mutation rejection cannot restore data or show an old error after a lodge switch',async()=>{
+ const user=premiumTestAccount();user.groups=[{id:'instant-group',name:'Assigned group'}];user.memberships.push({...user.memberships[0],lodge_id:'second-instant-lodge',lodge_name:'Second lodge'});
+ const {context,page}=await accountPage(user);let release;
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/tasks**',async r=>{
+   if(r.request().method()==='PATCH'){await new Promise(resolve=>release=resolve);return r.fulfill({status:500,json:{detail:'Former property private failure'}})}
+   return r.fulfill({json:[{id:'late-instant',title:'Former property work',status:'assigned',priority:'normal',description:'',can_transition:true}]});
+  });
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Accepted',exact:true}).click();await page.getByText('Saving…',{exact:true}).waitFor();
+  await page.evaluate(()=>{localStorage.setItem('active_lodge_id','second-instant-lodge');window.dispatchEvent(new Event('safarios-lodge-changed'))});await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();release();await page.waitForTimeout(200);
+  assert.equal(await page.getByText('Former property work',{exact:true}).count(),0);assert.equal(await page.getByText('Former property private failure',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Retry',exact:true}).count(),0);
+ }finally{release?.();await context.close()}
+});
+
+test('instant stale controls do not submit under a newly selected lodge before navigation catches up',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let writes=0;
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/housekeeping-jobs**',async r=>{
+   if(r.request().method()==='PATCH'){writes++;return r.fulfill({json:{id:'stale-hk',status:'accepted'}})}
+   return r.fulfill({json:[{id:'stale-hk',unit_id:'room-a',unit_name:'Marula',job_type:'cleaning',status:'assigned',notes:''}]});
+  });
+  await page.goto(base+'/housekeeping');await page.getByRole('button',{name:'Accepted',exact:true}).waitFor();await page.evaluate(()=>localStorage.setItem('active_lodge_id','new-lodge-before-navigation'));await page.getByRole('button',{name:'Accepted',exact:true}).click();assert.equal(writes,0);assert.equal(await page.getByText('Saving…',{exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('instant focus refresh waits for a creation drawer to close and preserves typed values',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let name='Marula',reads=0;
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/rooms',r=>{reads++;return r.fulfill({json:[{id:'refresh-room',name,unit_type:'Suite',status:'available',notes:''}]})});
+  await page.goto(base+'/rooms');await page.getByText('Marula',{exact:true}).waitFor();await page.getByRole('button',{name:'+ Room / Unit',exact:true}).click();const input=page.getByRole('dialog').getByLabel('Name',{exact:true});await input.fill('Draft room name');const before=reads;name='Updated on server';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForTimeout(100);assert.equal(await input.inputValue(),'Draft room name');assert.equal(reads,before);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Updated on server',{exact:true}).waitFor();assert.ok(reads>before);
+ }finally{await context.close()}
+});
+
+test('instant notification badge resumes refresh when navigating away during a pending read',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let release;
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/auth/notifications**',async r=>{
+   const p=new URL(r.request().url()).pathname;
+   if(p.endsWith('/summary'))return r.fulfill({json:{unread:1}});
+   if(p.endsWith('/read')){await new Promise(resolve=>release=resolve);return r.fulfill({status:500,json:{detail:'internal'}})}
+   return r.fulfill({json:[{id:'away-notice',title:'Review assigned work',body:'A private notification.',severity:'normal',created_at:'2026-11-10T06:00:00Z',read_at:null}]});
+  });
+  await page.goto(base+'/notifications');await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).waitFor();await page.getByRole('button',{name:'Mark read',exact:true}).click();await page.getByRole('button',{name:'Saving…',exact:true}).waitFor();await page.getByRole('link',{name:'Tasks',exact:true}).click();await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();release();await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Retry',exact:true}).count(),0);
+ }finally{release?.();await context.close()}
+});

@@ -1,4 +1,5 @@
 "use client";
+import { StatusBoard, type BoardActions } from "./status-board";
 import { toast } from "sonner";
 import React, {
   Children,
@@ -86,6 +87,7 @@ export function CollectionView({
   defaultView = "list",
   name = "records",
   showSearch = true,
+  statusBoard,
 }: {
   children: Node;
   loading?: boolean;
@@ -94,6 +96,7 @@ export function CollectionView({
   defaultView?: "list" | "cards" | "board";
   name?: string;
   showSearch?: boolean;
+  statusBoard?: BoardActions;
 }) {
   const access = useWorkspaceAccess();
   const [view, setView] = useState(defaultView),
@@ -138,6 +141,25 @@ export function CollectionView({
         setSaved(value);
     } catch {}
   }, [key]);
+  const viewKey = `safarios-record-view:${getActiveUserId()}:${getActiveLodgeId()}:${name}`;
+  useEffect(() => {
+    try {
+      const value = localStorage.getItem(viewKey);
+      setView(
+        value === "list" || value === "cards" || value === "board"
+          ? value
+          : defaultView,
+      );
+    } catch {
+      setView(defaultView);
+    }
+  }, [viewKey, defaultView]);
+  function changeView(value: "list" | "cards" | "board") {
+    setView(value);
+    try {
+      localStorage.setItem(viewKey, value);
+    } catch {}
+  }
   const table = find(children, "table"),
     head = find(table, "thead"),
     body = find(table, "tbody");
@@ -161,7 +183,7 @@ export function CollectionView({
       (!filter || rowState(r) === filter),
   );
   const rowKey = (r: React.ReactElement<any>, index: number) =>
-    String(r.key ?? index);
+    String(r.props["data-record-id"] ?? r.key ?? index);
   function open(r: React.ReactElement<any>, event?: React.MouseEvent) {
     const first = flat(r.props.children)[0];
     const button = find(first?.props.children, "button");
@@ -306,7 +328,7 @@ export function CollectionView({
               type="button"
               key={v}
               aria-pressed={v === view}
-              onClick={() => setView(v)}
+              onClick={() => changeView(v)}
             >
               {v === "list" ? (
                 <List size={15} />
@@ -334,11 +356,11 @@ export function CollectionView({
                 toast.error(c.viewSaveError);
               }
             } else if (e.target.value === "saved" && saved) {
-              setView(saved.view);
+              changeView(saved.view);
               setQuery(saved.query);
               setFilter(saved.filter);
             } else {
-              setView(defaultView);
+              changeView(defaultView);
               setQuery("");
               setFilter("");
             }
@@ -390,6 +412,27 @@ export function CollectionView({
         </div>
       ) : error && !rows.length ? null : view === "list" ? (
         replaceBody(children, displayedRows)
+      ) : statusBoard ? (
+        <StatusBoard
+          name={name}
+          mode={view === "cards" ? "cards" : "board"}
+          actions={statusBoard}
+          items={filtered.map((record, index) => {
+            const first = flat(record.props.children)[0];
+            return {
+              id: rowKey(record, index),
+              status: rowState(record),
+              title: text(
+                find(first?.props.children, "strong")?.props.children ||
+                  find(first?.props.children, "b")?.props.children ||
+                  first?.props.children,
+              ).trim(),
+              record,
+              index,
+            };
+          })}
+          renderCard={(item) => card(item.record, item.index)}
+        />
       ) : filtered.length ? (
         view === "cards" ? (
           <div className="collectionCards">{filtered.map(card)}</div>

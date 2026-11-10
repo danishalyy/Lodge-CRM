@@ -1351,3 +1351,24 @@ h2,.cardTitle { font-size:18px; letter-spacing:-.015em; }
 .inlineRetry { margin:0 0 16px; }
 .queuedRecord { border:1px dashed var(--gold); }
 .queuedRecord .statusPill { color:var(--gold-text); background:var(--gold-wash); margin-bottom:12px; }
+
+/* Status-board interaction states reuse the accepted visual tokens. */
+.statusColumn { min-height: 180px; border-radius: 20px; outline: 1px solid transparent; outline-offset: 4px; }
+.statusColumn[data-drop-state="refused"] { outline-style: dashed; outline-color: var(--line); }
+.statusColumn[data-drop-state="refused"][data-over] { outline-color: var(--danger); }
+.statusColumn[data-drop-state="allowed"][data-over] { outline: 2px solid var(--gold); }
+.statusColumnToggle { min-height: 44px; display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
+.statusColumnEmpty { padding: 12px; font-size: 12px; }
+.statusBoardItem { margin-bottom: 16px; }
+.statusBoardItem:focus-visible { outline: 2px solid var(--gold-text); outline-offset: 3px; border-radius: 20px; }
+.statusCardControls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.statusCardControls .select { min-width: 0; flex: 1; min-height: 44px; }
+.statusDragHandle { touch-action: none; cursor: grab; flex-shrink: 0; }
+.statusBoardItem[data-dragging] { opacity: .85; }
+.statusBoardItem .taskRow, .statusBoardItem .roomCard { margin-bottom: 0; }
+
+.statusBoardItem .roomCard { padding: 20px; }
+.collectionCards .statusBoardItem .taskRow { display: flex; flex-direction: column; align-items: stretch; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); padding: 20px; gap: 16px; }
+.collectionCards .statusBoardItem .taskRow small { display: block; margin-top: 8px; color: var(--text-2); }
+
+.statusKeyboardPreview { border: 1px dashed var(--gold); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: var(--surface); color: var(--text); font-size: 14px; }

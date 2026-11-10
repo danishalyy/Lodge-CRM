@@ -1,4 +1,6 @@
 "use client";
+import { StatusBoard } from "./ui/status-board";
+import { roomStatuses } from "@/lib/status-transitions";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { Skeleton } from "./ui/skeleton";
@@ -23,18 +25,10 @@ type Room = {
   notes: string;
   current_guest?: string;
 };
-const statuses = [
-  "available",
-  "occupied",
-  "cleaning",
-  "awaiting_inspection",
-  "ready",
-  "maintenance",
-  "out_of_service",
-];
 export default function RoomsPage() {
   const access = useWorkspaceAccess();
   const canManage = access.permission("units.manage");
+  const canStatus = canManage || access.permission("units.status.manage");
   const { rows, setRows, pending, mutate } = useInstantRows<Room>(
     access.scopeKey,
   );
@@ -77,7 +71,7 @@ export default function RoomsPage() {
       lodgeId: getActiveLodgeId(),
       silent: true,
     };
-    await mutate(
+    return await mutate(
       id,
       { status },
       (patch) => lodgeApi.updateRoom(id, patch, scope),
@@ -88,7 +82,9 @@ export default function RoomsPage() {
           setError((e as Error).message);
           if (
             e instanceof ApiError &&
-            [401, 403, 404, 409].includes(e.status)
+            ([401, 403, 404].includes(e.status) ||
+              (e.status === 409 &&
+                /account changed|access changed/i.test(e.message)))
           ) {
             setRows([]);
             setSelected(null);
@@ -121,70 +117,53 @@ export default function RoomsPage() {
           <Skeleton className="h-20 mb-4" />
         </div>
       )}
-      <div className="roomStatusBoard">
-        {[
-          "available",
-          "occupied",
-          "cleaning",
-          "awaiting_inspection",
-          "maintenance",
-          "out_of_service",
-        ].map((state) => {
-          const units = rows.filter((r) =>
-            state === "available"
-              ? ["available", "ready"].includes(r.status)
-              : r.status === state,
-          );
-          return (
-            <section className="roomStatusColumn" key={state}>
-              <h2>
-                {readableLabel(state)}
-                <span>{units.length}</span>
-              </h2>
-              {units.map((r) => (
-                <article className="roomCard" key={r.id}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 8,
-                    }}
-                  >
-                    <button
-                      className="linkButton"
-                      onClick={() => setSelected(r)}
-                    >
-                      <b>{r.name}</b>
-                    </button>
-                    <StatusPill value={r.status} />
-                    {pending.includes(r.id) && (
-                      <small role="status">{instant.saving}</small>
-                    )}
-                  </div>
-                  <p>
-                    {r.unit_type}
-                    {r.current_guest ? ` · ${r.current_guest}` : ""}
-                  </p>
-                  <select
-                    className="select"
-                    value={r.status}
-                    onChange={(e) => update(r.id, e.target.value)}
-                    disabled={!canManage || pending.includes(r.id)}
-                    aria-busy={pending.includes(r.id)}
-                    aria-label="Status"
-                  >
-                    {statuses.map((s) => (
-                      <option value={s} key={s}>
-                        {readableLabel(s)}
-                      </option>
-                    ))}
-                  </select>
-                </article>
-              ))}
-            </section>
-          );
-        })}
-      </div>
+      <StatusBoard
+        name="rooms"
+        cardsView
+        items={rows.map((row) => ({ ...row, title: row.name }))}
+        actions={{
+          columns: roomStatuses,
+          pending: (id) => pending.includes(id),
+          allowed: (id) => {
+            const row = rows.find((row) => row.id === id);
+            return !access.readOnly && canStatus && row
+              ? roomStatuses.filter(
+                  (s) =>
+                    s !== row.status &&
+                    (!row.current_guest || s === "occupied"),
+                )
+              : [];
+          },
+          onMove: (id, status) => {
+            const row = rows.find((row) => row.id === id);
+            if (!row) return Promise.resolve(false);
+            return update(id, status);
+          },
+        }}
+        renderCard={(r) => (
+          <article className="roomCard" key={r.id}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <button className="linkButton" onClick={() => setSelected(r)}>
+                <b>{r.name}</b>
+              </button>
+              <StatusPill value={r.status} />
+              {pending.includes(r.id) && (
+                <small role="status">{instant.saving}</small>
+              )}
+            </div>
+            <p>
+              {r.unit_type}
+              {r.current_guest ? ` · ${r.current_guest}` : ""}
+            </p>
+          </article>
+        )}
+      />
       {selected && (
         <Drawer onClose={() => setSelected(null)}>
           <div className="drawerHead">

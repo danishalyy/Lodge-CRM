@@ -2,6 +2,7 @@
 import { createContext, useContext, useRef, useEffect } from "react";
 export type WorkspaceAccess = {
   contextId?: string;
+  readOnly?: boolean;
   displayName?: string;
   roleKey?: string;
   lodgeName?: string;
@@ -19,6 +20,7 @@ export function useWorkspaceAccess() {
   const scopeKey = JSON.stringify([
     value.contextId,
     value.platform,
+    Boolean(value.readOnly),
     value.features,
     value.permissions,
   ]);
@@ -33,6 +35,7 @@ export function useWorkspaceAccess() {
   }, []);
   return {
     scopeKey,
+    readOnly: value.platform || Boolean(value.readOnly),
     displayName: value.displayName,
     roleKey: value.roleKey,
     lodgeName: value.lodgeName,

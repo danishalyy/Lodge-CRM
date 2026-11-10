@@ -463,6 +463,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <WorkspaceAccessContext.Provider
             value={{
+              readOnly: ["Expired", "Pending", "Suspended"].includes(
+                membership?.subscription_status,
+              ),
               features: membership?.entitlements || [],
               permissions: membership?.permissions || [],
               displayName: me.full_name,

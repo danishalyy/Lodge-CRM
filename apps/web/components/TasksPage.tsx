@@ -1,4 +1,5 @@
 "use client";
+import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { OperationsCalendar } from "./DataViz";
@@ -262,7 +263,7 @@ export default function TasksPage() {
   }
   useDataRefresh(load, pending.length > 0 || busy);
   async function update(id: string, body: any) {
-    if (!current() || mutation.current) return;
+    if (!current() || mutation.current) return false;
     const success = await mutate(
       id,
       body,
@@ -278,6 +279,7 @@ export default function TasksPage() {
       const row = fresh?.find((task: Task) => task.id === id);
       if (current() && selected?.id === id && row) await openTask(row);
     }
+    return success;
   }
   async function saveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -500,6 +502,22 @@ export default function TasksPage() {
             setError("");
             void load();
           }}
+          statusBoard={{
+            columns: workflowColumns("tasks"),
+            pending: (id) => pending.includes(id),
+            allowed: (id) => {
+              const row = rows.find((r) => r.id === id);
+              return !access.readOnly && row && mayProgress(row)
+                ? nextStatuses("tasks", row.status).filter(
+                    (s) =>
+                      (canManage ||
+                        ["accepted", "started", "completed"].includes(s)) &&
+                      (s !== "assigned" || !!row.assigned_staff_id),
+                  )
+                : [];
+            },
+            onMove: (id, status) => update(id, { status }),
+          }}
           name="TasksPage"
           defaultView={
             [
@@ -529,7 +547,7 @@ export default function TasksPage() {
               </thead>
               <tbody>
                 {visibleTasks.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} data-record-id={r.id}>
                     <td>
                       <button
                         className="linkButton"

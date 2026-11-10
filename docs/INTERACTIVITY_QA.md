@@ -1,8 +1,8 @@
-# Interactivity QA — Phase 1
+# Interactivity QA — Phases 1–2
 
-Only instant actions are implemented here. Boards with drag-and-drop, SSE, push, generalized offline work, global shortcuts and walkthroughs remain later phases and require owner approval.
+Phase 1 provides instant actions; Phase 2 adds shared status boards. SSE, push, generalized offline work, global shortcuts and walkthroughs remain later phases and require owner approval.
 
-## Implementation
+## Phase 1 implementation
 
 `lib/data-cache.ts` provides a two-second, in-memory cache and coalesces simultaneous reads for the selected operational collections and private notification summary/list. Keys include the expected user, selected lodge and exact request path. Results are cloned. Failed responses are evicted; writes invalidate before and after sending. Reads overtaken by invalidation fetch fresh state. Authentication, permissions, AI review tokens and API writes are never cached. Nothing is persisted to disk or a service worker.
 
@@ -51,4 +51,42 @@ Automated browser fixtures verify frontend behavior; real API tests verify backe
 - Static audit: **169 API routes**, **zero guard issues**, **25 visible modules**, **zero missing pages**.
 - New dependencies: **none**. Visual tokens, routes, permission/entitlement keys, RLS, CSRF and MFA contracts are unchanged.
 
-Phase 1 is complete within the existing API capabilities described above. Phases 2–7 remain unstarted pending the owner's approval. Real-device/manual checks and hosted deployment verification are separate from these local automated results.
+Phase 1 is complete within the existing API capabilities described above. Its checkpoint was approved before starting Phase 2 below. Real-device/manual checks and hosted deployment verification are separate from these local automated results.
+
+## Phase 2 — Shared status boards
+
+`components/ui/status-board.tsx` uses the explicitly requested `@dnd-kit/core` dependency (with its accessibility/utilities dependencies). Tasks and Requests adapt their existing `CollectionView` cards; Maintenance, Housekeeping and Rooms reuse their existing cards inside the same board. Ordinary list actions remain available. This is status movement, not arbitrary sorting or bulk assignment.
+
+Each card has a native **Move to…** selector for keyboard and phone use. Board cards also have a drag handle: **Space**, arrow keys, **Space** to drop, **Escape** to cancel. Mouse and touch sensors activate only from the handle, leaving card links, selection, forms and scrolling available. A synchronous keyboard adapter tracks the selected column without waiting for pointer geometry or deferred sensor listeners; the same guarded commit function handles its drop. This also supports rapid key sequences and shows a destination preview. Read-only and expired contexts disable movement. Task-owned workflows retain their existing server-provided `can_transition` capability and cannot gain management cancellation through the board.
+
+`lib/status-transitions.ts` contains presentation hints for existing transitions, not authorization. Disallowed columns refuse a drop, and the move menu disables unavailable targets. Every accepted gesture calls the owning module’s original mutation and the original API endpoint. The server still checks membership, permissions, subscriptions, entitlements, record scope, occupancy, checklist/proof and inspection rules. Resolution/completion notes use the existing notes flow; assigning a task requires its actual assignee. Cancellation uses the existing focus-managed confirmation dialog. Failed server transitions restore the card and announce failure; account/access failures retain the existing denial behavior.
+
+Movement announcements use live regions. A moved card is revealed and focused, while a delayed acknowledgement cannot steal focus from a newly opened form. Keyboard scrolling is immediate rather than decorative animation. Styles reuse existing colour, spacing, focus and surface tokens. Column collapse and board/card choices are stored under user/lodge/module-specific keys; `CollectionView` also remembers its list/card/board choice. Only presentation settings are stored, never records, permissions or authorization decisions. Changing authority cancels the active board gesture.
+
+No backend route, API contract, permission key, RLS, CSRF or MFA check changes in this phase. A new client `readOnly` context reflects existing subscription metadata and can only restrict board actions. Explicit `units.status.manage` allows room status movement without granting room configuration or creation.
+
+### Phase 2 manual checks
+
+1. On desktop, move a permitted card with its handle; try a forbidden column and release outside the board. Confirm refused targets, no unintended write and a clear status announcement.
+2. Focus a handle, press Space, use Left/Right arrows and Space. Repeat with Escape. Tab to **Move to…** and choose a permitted status without dragging. Check focus after completion/rejection.
+3. On a phone, scroll through columns using the card body, drag using the handle, and use the native move menu. Confirm that touching links, inputs or action buttons does not start a drag.
+4. Try to complete required-checklist/proof tasks, an occupied room, or a housekeeping job needing inspection. The server must reject invalid transitions; the card must return to its prior state with error feedback.
+5. Cancel the cancellation dialog using Escape; confirm no write. Confirm cancellation separately and verify a single request. Supply resolution notes when resolving requests or completing maintenance.
+6. Collapse a column and change the view, reload, then use a different account/lodge. Preferences must be scoped, and another account must never adopt records or permissions from saved settings.
+7. Start dragging, then switch to another assigned lodge or revoke the relevant permission/subscription. The old gesture must not submit into the new context. Check read-only, field-role and platform-only accounts.
+8. Check 375, 768, 1366 and 1440px widths, both themes and reduced motion. On real touch hardware, verify drag activation and use the move menu as the reliable alternative.
+
+Phase 3 live updates and subsequent phases remain unstarted pending approval.
+
+### Phase 2 local verification — 10 November 2026
+
+- API suite: **756 passed**. Backend runtime, contracts and security policies are unchanged.
+- Production build: **passed**.
+- Full browser suite: **82 passed**, including the 272 route/width/theme combinations and the new real mouse, touch-event and keyboard cases. After the final refusal-focus and copy cleanup, **six focused checks passed**, including the additional status-only room-permission case (**83 distinct suite checks verified overall**).
+- Populated boards additionally passed 375/768/1366/1440px overflow checks in both themes and automated contrast/accessibility checks after theme transitions settled.
+- Static audit: **169 API routes, zero guard issues; 25 modules, zero missing pages**.
+- Dependency: **@dnd-kit/core 6.3.1**, plus its accessibility/utilities dependencies; no alternative drag library.
+
+Preview screenshots use test fixtures: [desktop dark](screenshots/safarios-status-board-desktop-dark.png), [phone light](screenshots/safarios-status-board-mobile-light.png). Real touch hardware and hosted deployment checks remain separate from local Chromium verification.
+
+Phase 2 implementation is complete. Phase 3 and later work await the owner's approval.

@@ -1,4 +1,5 @@
 "use client";
+import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
 import { CollectionView } from "@/components/ui/collection-view";
@@ -121,7 +122,7 @@ export default function GuestRequestsPage() {
           }
         : {}),
     };
-    await mutate(
+    return await mutate(
       id,
       patch,
       (value) => {
@@ -144,7 +145,12 @@ export default function GuestRequestsPage() {
         refresh: load,
         onError: (e) => {
           setError((e as Error).message);
-          if (e instanceof ApiError && [401, 403, 404, 409].includes(e.status))
+          if (
+            e instanceof ApiError &&
+            ([401, 403, 404].includes(e.status) ||
+              (e.status === 409 &&
+                /account changed|access changed/i.test(e.message)))
+          )
             setRows([]);
         },
       },
@@ -160,8 +166,8 @@ export default function GuestRequestsPage() {
   }
   async function resolve(r: Req) {
     const resolution = prompt("Resolution notes");
-    if (!resolution) return;
-    await update(r.id, { status: "resolved", resolution });
+    if (!resolution) return false;
+    return await update(r.id, { status: "resolved", resolution });
   }
   return (
     <>
@@ -201,6 +207,25 @@ export default function GuestRequestsPage() {
           setError("");
           void load();
         }}
+        statusBoard={{
+          columns: workflowColumns("requests"),
+          pending: (id) => pending.includes(id),
+          allowed: (id) => {
+            const row = rows.find((r) => r.id === id);
+            return !access.readOnly && canManage && row
+              ? nextStatuses("requests", row.status).filter(
+                  (s) => s !== "assigned" || !!row.assigned_staff_id,
+                )
+              : [];
+          },
+          onMove: (id, status) => {
+            const row = rows.find((r) => r.id === id);
+            if (!row) return Promise.resolve(false);
+            return status === "resolved"
+              ? resolve(row)
+              : update(id, { status });
+          },
+        }}
         name="GuestRequestsPage"
         defaultView="board"
       >
@@ -219,7 +244,7 @@ export default function GuestRequestsPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} data-record-id={r.id}>
                   <td>{r.guest_name}</td>
                   <td>
                     <strong>{readableLabel(r.request_type)}</strong>

@@ -1,4 +1,6 @@
 "use client";
+import { StatusBoard } from "./ui/status-board";
+import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { Skeleton } from "./ui/skeleton";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
@@ -169,7 +171,7 @@ export default function MaintenancePage() {
       lodgeId: getActiveLodgeId(),
       silent: true,
     };
-    await mutate(
+    return await mutate(
       id,
       body,
       (patch) => lodgeApi.updateMaintenance(id, patch, scope),
@@ -186,7 +188,9 @@ export default function MaintenancePage() {
           setError((e as Error).message);
           if (
             e instanceof ApiError &&
-            [401, 403, 404, 409].includes(e.status)
+            ([401, 403, 404].includes(e.status) ||
+              (e.status === 409 &&
+                /account changed|access changed/i.test(e.message)))
           ) {
             setIssues([]);
             setSelected(null);
@@ -197,8 +201,8 @@ export default function MaintenancePage() {
   }
   async function complete(i: Issue) {
     const resolution = window.prompt("Repair / resolution notes");
-    if (!resolution) return;
-    await update(i.id, { status: "completed", resolution });
+    if (!resolution) return false;
+    return await update(i.id, { status: "completed", resolution });
   }
   async function openIssue(i: Issue) {
     if (!workshop) return;
@@ -391,106 +395,82 @@ export default function MaintenancePage() {
           )}
           <section className="panel">
             <h2>Maintenance queue</h2>
-            <div
-              className="collectionBoard"
-              tabIndex={0}
-              role="region"
-              aria-label="Workflow board"
-            >
-              {[
-                { label: "New", states: ["new", "open", "reported"] },
-                { label: "Assigned", states: ["assigned", "scheduled"] },
-                {
-                  label: "In repair",
-                  states: ["in_progress", "waiting_parts"],
+            <StatusBoard
+              name="maintenance"
+              cardsView
+              items={issues.map((row) => ({ ...row, title: row.title }))}
+              actions={{
+                columns: workflowColumns("maintenance"),
+                pending: (id) => pending.includes(id),
+                allowed: (id) => {
+                  const row = issues.find((row) => row.id === id);
+                  return !access.readOnly && canManage && row
+                    ? nextStatuses("maintenance", row.status)
+                    : [];
                 },
-                { label: "Review", states: ["resolved", "awaiting_review"] },
-                { label: "Done", states: ["completed", "closed", "cancelled"] },
-              ].map((column) => {
-                const known = [
-                  { label: "New", states: ["new", "open", "reported"] },
-                  { label: "Assigned", states: ["assigned", "scheduled"] },
-                  {
-                    label: "In repair",
-                    states: ["in_progress", "waiting_parts"],
-                  },
-                  { label: "Review", states: ["resolved", "awaiting_review"] },
-                  {
-                    label: "Done",
-                    states: ["completed", "closed", "cancelled"],
-                  },
-                ].flatMap((g) => g.states);
-                const items = issues.filter(
-                  (item) =>
-                    column.states.includes(item.status) ||
-                    (column.label === "New" && !known.includes(item.status)),
-                );
-                return (
-                  <section className="boardColumn" key={column.label}>
-                    <h2>
-                      {column.label}
-                      <span>{items.length}</span>
-                    </h2>
-                    {items.map((i) => (
-                      <div className="taskRow" key={i.id}>
-                        <div className="taskMain">
+                onMove: (id, status) => {
+                  const row = issues.find((row) => row.id === id);
+                  if (!row) return Promise.resolve(false);
+                  return status === "completed"
+                    ? complete(row)
+                    : update(id, { status });
+                },
+              }}
+              renderCard={(i) => (
+                <div className="taskRow" key={i.id}>
+                  <div className="taskMain">
+                    <button
+                      className="linkButton"
+                      onClick={() => openIssue(i)}
+                      disabled={!workshop}
+                    >
+                      <strong>{i.title}</strong>
+                    </button>
+                    <small>
+                      {i.unit_name || i.vehicle_name || i.category} ·{" "}
+                      {i.assigned_staff_name || "Unassigned"}
+                      {i.scheduled_for
+                        ? ` · ${formatDateTime(i.scheduled_for)}`
+                        : ""}
+                    </small>
+                  </div>
+                  <div className="taskMeta">
+                    <StatusPill value={i.priority} />{" "}
+                    <StatusPill value={i.status} />
+                    {pending.includes(i.id) && (
+                      <small role="status">{instant.saving}</small>
+                    )}
+                    <div style={{ marginTop: 6 }}>
+                      {canManage &&
+                        (next[i.status] || pending.includes(i.id)) && (
                           <button
-                            className="linkButton"
-                            onClick={() => openIssue(i)}
-                            disabled={!workshop}
+                            className="button secondary"
+                            disabled={pending.includes(i.id)}
+                            aria-busy={pending.includes(i.id)}
+                            onClick={() =>
+                              update(i.id, { status: next[i.status] })
+                            }
                           >
-                            <strong>{i.title}</strong>
+                            {next[i.status]
+                              ? readableLabel(next[i.status]!)
+                              : instant.saving}
                           </button>
-                          <small>
-                            {i.unit_name || i.vehicle_name || i.category} ·{" "}
-                            {i.assigned_staff_name || "Unassigned"}
-                            {i.scheduled_for
-                              ? ` · ${formatDateTime(i.scheduled_for)}`
-                              : ""}
-                          </small>
-                        </div>
-                        <div className="taskMeta">
-                          <StatusPill value={i.priority} />{" "}
-                          <StatusPill value={i.status} />
-                          {pending.includes(i.id) && (
-                            <small role="status">{instant.saving}</small>
-                          )}
-                          <div style={{ marginTop: 6 }}>
-                            {canManage &&
-                              (next[i.status] || pending.includes(i.id)) && (
-                                <button
-                                  className="button secondary"
-                                  disabled={pending.includes(i.id)}
-                                  aria-busy={pending.includes(i.id)}
-                                  onClick={() =>
-                                    update(i.id, { status: next[i.status] })
-                                  }
-                                >
-                                  {next[i.status]
-                                    ? readableLabel(next[i.status]!)
-                                    : instant.saving}
-                                </button>
-                              )}{" "}
-                            {canManage &&
-                              !["completed", "cancelled"].includes(
-                                i.status,
-                              ) && (
-                                <button
-                                  className="button secondary"
-                                  disabled={pending.includes(i.id)}
-                                  onClick={() => complete(i)}
-                                >
-                                  Complete
-                                </button>
-                              )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                );
-              })}
-            </div>
+                        )}{" "}
+                      {canManage &&
+                        !["completed", "cancelled"].includes(i.status) && (
+                          <button
+                            className="button secondary"
+                            disabled={pending.includes(i.id)}
+                            onClick={() => complete(i)}
+                          >
+                            Complete
+                          </button>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
             {!loading && !issues.length && (
               <div className="empty">
                 No maintenance tickets have been created.

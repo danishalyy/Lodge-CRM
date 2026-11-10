@@ -1249,11 +1249,11 @@ test('instant room and housekeeping changes retain pending controls and roll bac
     return r.fulfill({json:module==='rooms'?[{id:'room-instant',name:'Marula',unit_type:'Suite',status:'available',notes:''}]:[{id:'hk-instant',unit_id:'room-instant',unit_name:'Marula',job_type:'cleaning',status:'assigned',notes:''}]});
    });
    await page.goto(base+'/'+module);
-   if(module==='rooms')await page.getByLabel('Status',{exact:true}).selectOption('cleaning');else await page.getByRole('button',{name:'Accepted',exact:true}).click();
+   if(module==='rooms')await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cleaning');else await page.getByRole('button',{name:'Accepted',exact:true}).click();
    await page.getByText('Saving…',{exact:true}).waitFor();assert.equal(writes,1);
-   if(module==='rooms')assert.equal(await page.getByLabel('Status',{exact:true}).isDisabled(),true);else assert.equal(await page.getByRole('button',{name:'In progress',exact:true}).isDisabled(),true);
+   if(module==='rooms')assert.equal(await page.getByRole('combobox',{name:/^Move to…/}).isDisabled(),true);else assert.equal(await page.getByRole('button',{name:'In progress',exact:true}).isDisabled(),true);
    release();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();
-   if(module==='rooms')assert.equal(await page.getByLabel('Status',{exact:true}).inputValue(),'available');else await page.getByRole('button',{name:'Accepted',exact:true}).waitFor();
+   if(module==='rooms')assert.equal(await page.locator('.roomCard .statusPill').innerText(),'Available');else await page.getByRole('button',{name:'Accepted',exact:true}).waitFor();
   }finally{release?.();await context.close()}
  }
 });
@@ -1330,4 +1330,165 @@ test('instant notification badge resumes refresh when navigating away during a p
   });
   await page.goto(base+'/notifications');await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).waitFor();await page.getByRole('button',{name:'Mark read',exact:true}).click();await page.getByRole('button',{name:'Saving…',exact:true}).waitFor();await page.getByRole('link',{name:'Tasks',exact:true}).click();await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();release();await page.getByRole('link',{name:'Notifications, 1 unread',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Retry',exact:true}).count(),0);
  }finally{release?.();await context.close()}
+});
+
+async function statusBoardFixture(module,{initial,deny=false,readOnly=false,expired=false}={}){
+ const user=premiumTestAccount();if(readOnly)user.memberships[0].permissions=['tasks.view','requests.view','maintenance.view','housekeeping.view','units.view'];if(expired)user.memberships[0].subscription_status='Expired';
+ const {context,page}=await accountPage(user);await page.setViewportSize({width:1440,height:1000});await premiumFixtures(page);
+ const endpoint=module==='housekeeping'?'housekeeping-jobs':module;
+ const row={id:'board-record',title:'Board work',name:'Marula',guest_name:'Board guest',description:'Check lodge supplies',status:initial||({tasks:'assigned',requests:'in_progress',maintenance:'in_progress',housekeeping:'assigned',rooms:'available'})[module],priority:'normal',request_type:'general',category:'general',unit_type:'Suite',unit_name:'Marula',job_type:'cleaning',assigned_staff_id:'staff-a',assigned_staff_name:'Alex',can_transition:true,notes:'',resolution:'',inspector_staff_id:null};
+ const state={row,writes:[],deny};
+ await page.route(`**/api/v1/lodges/premium-lodge/${endpoint}**`,async r=>{
+  const p=new URL(r.request().url()).pathname;
+  if(p.endsWith('/'+endpoint)&&r.request().method()==='GET')return r.fulfill({json:[state.row]});
+  if(p.endsWith('/board-record')&&r.request().method()==='PATCH'){
+   const body=r.request().postDataJSON();state.writes.push(body);assert.equal(r.request().headers()['x-expected-user-id'],'premium-design-owner');
+   if(state.deny)return r.fulfill({status:409,json:{detail:'The record changed. Review its current status.'}});
+   state.row={...state.row,...body};return r.fulfill({json:{id:'board-record',status:state.row.status}});
+  }
+  return r.fallback();
+ });
+ await page.goto(base+'/'+module);await page.getByRole('heading',{name:({tasks:'Tasks',requests:'Guest Requests',maintenance:'Maintenance',housekeeping:'Housekeeping workflow',rooms:'Rooms & Units'})[module],exact:true}).waitFor();
+ if(module==='tasks')await page.getByRole('button',{name:'Board',exact:true}).click();
+ await page.locator('.statusBoardItem').first().waitFor();
+ return {context,page,state};
+}
+async function dragStatusCard(page,target,expected){
+ const handle=page.locator('.statusDragHandle').first();await handle.scrollIntoViewIfNeeded();const from=await handle.boundingBox(),to=await page.locator(`.statusColumn[data-status="${target}"]`).boundingBox();assert.ok(from&&to);
+ await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+from.width/2+12,from.y+from.height/2,{steps:3});await page.locator('[data-dragging]').waitFor();await page.mouse.move(to.x+to.width/2,to.y+65,{steps:15});await page.locator(`.statusColumn[data-status="${target}"][data-over]`).waitFor();if(expected)assert.equal(await page.locator(`.statusColumn[data-status="${target}"]`).getAttribute('data-drop-state'),expected);await page.mouse.up();
+}
+
+test('status board keyboard Space arrows Space updates a task through its guarded endpoint',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks');
+ try{
+  const handle=page.getByRole('button',{name:'Move Board work',exact:true});await handle.focus();await page.keyboard.press('Space');await page.locator('[data-dragging]').waitFor();await page.locator('.statusColumn[data-status="assigned"][data-over]').waitFor();await page.keyboard.press('ArrowRight');await page.locator('.statusColumn[data-status="accepted"][data-over]').waitFor();await page.keyboard.press('Space');await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);assert.equal(await page.locator('.statusColumn[data-status="accepted"] .statusBoardItem').count(),1);await page.waitForFunction(()=>document.activeElement?.classList.contains('statusBoardItem'));
+ }finally{await context.close()}
+});
+
+test('status board pointer drop refuses illegal columns and rolls back a server-rejected valid transition',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks',{deny:true});
+ try{
+  await dragStatusCard(page,'created','refused');await page.getByText('Cannot move to Created.',{exact:true}).waitFor();assert.deepEqual(state.writes,[]);
+  await dragStatusCard(page,'accepted','allowed');await page.getByText('Board work was not moved. Review the message and try a permitted action.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);assert.equal(await page.locator('.statusColumn[data-status="assigned"] .statusBoardItem').count(),1);assert.equal(await page.locator('.statusColumn[data-status="accepted"] .statusBoardItem').count(),0);
+  state.deny=false;await dragStatusCard(page,'accepted','allowed');await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.equal(state.row.status,'accepted');
+ }finally{await page.mouse.up();await context.close()}
+});
+
+test('status board Move to works on phone widths in all workflows and required resolution notes are retained',async()=>{
+ for(const [module,target] of [['requests','resolved'],['maintenance','completed'],['housekeeping','accepted'],['rooms','cleaning']]){
+  const {context,page,state}=await statusBoardFixture(module);
+  try{
+   await page.setViewportSize({width:375,height:1000});
+   if(['requests','maintenance'].includes(module))page.once('dialog',dialog=>dialog.accept('Verified work and recorded resolution.'));
+   const response=page.waitForResponse(r=>r.request().method()==='PATCH'&&r.url().endsWith('/board-record'));await page.getByRole('combobox',{name:/^Move to…/}).selectOption(target);await response;await page.getByRole('status').filter({hasText:/ moved to /}).waitFor();
+   assert.equal(state.writes.length,1,module);assert.equal(state.writes[0].status,target,module);if(['requests','maintenance'].includes(module))assert.equal(state.writes[0].resolution,'Verified work and recorded resolution.');await page.locator(`.statusColumn[data-status="${target}"] .statusBoardItem`).waitFor();await page.waitForFunction(()=>{const node=document.querySelector('.statusBoardItem'),rect=node?.getBoundingClientRect();return rect&&rect.left>=0&&rect.right<=innerWidth+1});
+   await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);
+   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${module} ${width}/${theme}`);if((width===375&&theme==='light')||(width===1440&&theme==='dark')){const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[],`${module} ${width}/${theme}`);if(module==='rooms'&&width===375)await page.screenshot({path:'/tmp/safarios-status-board-mobile-light.png',fullPage:true});if(module==='maintenance'&&width===1440)await page.screenshot({path:'/tmp/safarios-status-board-desktop-dark.png',fullPage:true});}}
+
+   await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[],module);
+   await page.screenshot({path:`/tmp/safarios-status-board-${module}.png`,fullPage:true});
+  }finally{await context.close()}
+ }
+});
+
+test('status board persists collapse and view without storing records and read-only or expired users cannot move',async()=>{
+ const {context,page}=await statusBoardFixture('rooms');
+ try{
+  await page.getByRole('button',{name:'Collapse Available',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Expand Available',exact:true}).waitFor();await page.getByRole('button',{name:'Expand Available',exact:true}).click();await page.getByRole('button',{name:'Cards',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Cards',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Cards',exact:true}).getAttribute('aria-pressed'),'true');const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('safarios-board:premium-design-owner:premium-lodge:rooms')));assert.deepEqual(Object.keys(saved).sort(),['collapsed','view']);assert.equal(saved.view,'cards');assert.equal(JSON.stringify(saved).includes('Marula'),false);
+ }finally{await context.close()}
+ for(const option of [{readOnly:true},{expired:true}]){
+  const {context,page,state}=await statusBoardFixture('rooms',option);
+  try{assert.equal(await page.getByRole('combobox',{name:/^Move to…/}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Move Marula',exact:true}).isDisabled(),true);assert.deepEqual(state.writes,[])}finally{await context.close()}
+ }
+});
+
+test('status board cancellation requires confirmation and Escape leaves the record unchanged',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks');
+ try{
+  await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cancelled');await page.getByRole('dialog').getByRole('heading',{name:'Cancel this record?',exact:true}).waitFor();assert.deepEqual(state.writes,[]);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});assert.deepEqual(state.writes,[]);
+  await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cancelled');await page.getByRole('dialog').getByRole('button',{name:'Cancel record',exact:true}).click();await page.getByText('Board work moved to Cancelled.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'cancelled'}]);
+ }finally{await context.close()}
+});
+
+test('status board touch sensor moves a card and keyboard Escape cancels without writing',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks');let client;
+ try{
+  const handle=page.getByRole('button',{name:'Move Board work',exact:true});await handle.focus();await page.keyboard.press('Space');await page.locator('[data-dragging]').waitFor();await page.locator('.statusColumn[data-status="assigned"][data-over]').waitFor();await page.keyboard.press('ArrowRight');await page.locator('.statusColumn[data-status="accepted"][data-over]').waitFor();await page.keyboard.press('Escape');await page.locator('[data-dragging]').waitFor({state:'hidden'});assert.deepEqual(state.writes,[]);await page.getByText('Move cancelled.',{exact:true}).waitFor();
+  client=await context.newCDPSession(page);await client.send('Emulation.setTouchEmulationEnabled',{enabled:true});await handle.scrollIntoViewIfNeeded();const from=await handle.boundingBox(),to=await page.locator('.statusColumn[data-status="accepted"]').boundingBox();assert.ok(from&&to);
+  await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:from.x+from.width/2,y:from.y+from.height/2,id:1}]});await page.locator('[data-dragging]').waitFor();await page.locator('.statusColumn[data-status="assigned"][data-over]').waitFor();await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:to.x+to.width/2,y:to.y+65,id:1}]});await page.locator('.statusColumn[data-status="accepted"][data-over]').waitFor();await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);
+ }finally{if(client)await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}).catch(()=>{});await context.close()}
+});
+
+test('status board requires an assignee for task assignment and inspection before housekeeping completion',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks',{initial:'created'});
+ try{
+  state.row.assigned_staff_id=null;await page.reload();await page.getByRole('combobox',{name:/^Move to…/}).waitFor();assert.equal(await page.getByRole('combobox',{name:/^Move to…/}).locator('option[value="assigned"]').isDisabled(),true);assert.deepEqual(state.writes,[]);
+ }finally{await context.close()}
+ const hk=await statusBoardFixture('housekeeping',{initial:'in_progress'});
+ try{hk.state.row.inspector_staff_id='named-inspector';await hk.page.reload();await hk.page.getByRole('combobox',{name:/^Move to…/}).waitFor();assert.equal(await hk.page.getByRole('combobox',{name:/^Move to…/}).locator('option[value="completed"]').isDisabled(),true);assert.equal(await hk.page.getByRole('combobox',{name:/^Move to…/}).locator('option[value="awaiting_inspection"]').isDisabled(),false);assert.deepEqual(hk.state.writes,[])}finally{await hk.context.close()}
+});
+
+test('status board changing lodge during a drag cancels the old gesture without submitting',async()=>{
+ const user=premiumTestAccount();user.groups=[{id:'board-group',name:'Assigned group'}];user.memberships.push({...user.memberships[0],lodge_id:'board-second-lodge',lodge_name:'Second lodge'});
+ const {context,page}=await accountPage(user);const writes=[];
+ try{
+  await page.setViewportSize({width:1440,height:1000});await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/tasks**',r=>{if(r.request().method()==='PATCH'){writes.push(r.request().url());return r.fulfill({json:{id:'scoped-board',status:'accepted'}})}if(new URL(r.request().url()).pathname.endsWith('/tasks'))return r.fulfill({json:[{id:'scoped-board',title:'Former lodge task',status:'assigned',priority:'normal',description:'',assigned_staff_id:'staff-a',can_transition:true}]});return r.fallback()});
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Board',exact:true}).click();const handle=page.getByRole('button',{name:'Move Former lodge task',exact:true});await handle.focus();await page.keyboard.press('Space');await page.locator('[data-dragging]').waitFor();await page.evaluate(()=>{localStorage.setItem('active_lodge_id','board-second-lodge');window.dispatchEvent(new Event('safarios-lodge-changed'))});await page.getByRole('heading',{name:'Tasks',exact:true}).waitFor();await page.keyboard.press('ArrowRight');await page.keyboard.press('Space');assert.deepEqual(writes,[]);assert.equal(await page.getByText('Former lodge task',{exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('status board card view retains its Move menu and persists the selected presentation',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks');
+ try{
+  await page.getByRole('button',{name:'Cards',exact:true}).click();await page.reload();await page.getByRole('combobox',{name:/^Move to…/}).waitFor();assert.equal(await page.getByRole('button',{name:'Cards',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.statusColumn').count(),0);assert.equal(await page.getByRole('button',{name:'Move Board work',exact:true}).isDisabled(),true);await page.getByRole('combobox',{name:/^Move to…/}).selectOption('accepted');await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);
+ }finally{await context.close()}
+});
+
+test('status board does not adopt another account or lodge presentation settings',async()=>{
+ const first=await statusBoardFixture('rooms');let saved;
+ try{await first.page.getByRole('button',{name:'Cards',exact:true}).click();saved=await first.page.evaluate(()=>Object.entries(localStorage));}finally{await first.context.close()}
+ for(const otherLodge of [false,true]){
+  const user=premiumTestAccount();if(otherLodge)user.memberships[0].lodge_id='other-board-lodge';else user.id='other-board-user';
+  const {context,page}=await accountPage(user);
+  try{
+   await context.addInitScript(pairs=>{for(const [key,value] of pairs)localStorage.setItem(key,value)},saved);await premiumFixtures(page);await page.route('**/api/v1/lodges/*/rooms',r=>r.fulfill({json:[{id:'other-board-room',name:'Other scoped room',unit_type:'Suite',status:'available',notes:''}]}));
+   await page.goto(base+'/rooms');await page.getByText('Other scoped room',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Status board',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.getByRole('button',{name:'Cards',exact:true}).getAttribute('aria-pressed'),'false');assert.equal(await page.getByText('Marula',{exact:true}).count(),0);
+  }finally{await context.close()}
+ }
+});
+
+test('status board a delayed move does not steal focus or overwrite a newly opened form',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let release,status='available';
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/rooms**',async r=>{
+   if(r.request().method()==='PATCH'){await new Promise(resolve=>release=resolve);status=r.request().postDataJSON().status;return r.fulfill({json:{id:'focus-room',status}})}
+   return r.fulfill({json:[{id:'focus-room',name:'Marula',unit_type:'Suite',status,notes:''}]});
+  });
+  await page.goto(base+'/rooms');await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cleaning');await page.getByRole('button',{name:'+ Room / Unit',exact:true}).click();const input=page.getByRole('dialog').getByLabel('Name',{exact:true});await input.fill('New room draft');release();await page.getByText('Marula moved to Cleaning.',{exact:true}).waitFor();assert.equal(await input.inputValue(),'New room draft');assert.equal(await input.evaluate(node=>node===document.activeElement),true);
+ }finally{release?.();await context.close()}
+});
+
+test('status board assigned staff can progress owned work but cannot assign or cancel it',async()=>{
+ const user={id:'board-staff',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'owned-board-lodge',role_key:'general_staff',permissions:['tasks.view','tasks.own.manage'],entitlements:['tasks']}]};
+ const {context,page,requests}=await accountPage(user);let status='assigned';const writes=[];
+ try{
+  await page.route('**/api/v1/lodges/owned-board-lodge/tasks**',r=>{if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();writes.push(body);status=body.status;return r.fulfill({json:{id:'own-board-task',status}})}return r.fulfill({json:[{id:'own-board-task',title:'Owned task',description:'',priority:'normal',status,assigned_staff_id:'staff-a',can_transition:true}]})});
+  await page.goto(base+'/tasks');const menu=page.getByRole('combobox',{name:/^Move to…/});await menu.waitFor();assert.equal(await menu.locator('option[value="cancelled"]').isDisabled(),true);await page.getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Move Owned task',exact:true}).focus();await page.keyboard.press('Space');for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');await page.keyboard.press('Space');await page.getByText('Cannot move to Cancelled.',{exact:true}).waitFor();await page.waitForFunction(()=>{const r=document.querySelector('.statusBoardItem')?.getBoundingClientRect();return r&&r.left>=0&&r.right<=innerWidth+1});assert.deepEqual(writes,[]);await menu.selectOption('accepted');await page.getByText('Owned task moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'accepted'}]);status='created';await page.reload();await menu.waitFor();assert.equal(await menu.isDisabled(),true);assert.equal(await menu.locator('option[value="assigned"]').isDisabled(),true);assert.equal(requests.some(p=>/\/(staff|guests|departments|rooms)$/.test(p)),false);
+ }finally{await context.close()}
+});
+
+test('status board rapid keyboard pick move drop and cancel do not lose input',async()=>{
+ const {context,page,state}=await statusBoardFixture('tasks');
+ try{
+  const handle=page.getByRole('button',{name:'Move Board work',exact:true});await handle.focus();await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');await page.keyboard.press('Space');await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);
+  await handle.focus();await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');await page.keyboard.press('Escape');await page.getByText('Move cancelled.',{exact:true}).waitFor();assert.equal(await page.locator('[data-dragging]').count(),0);assert.deepEqual(state.writes,[{status:'accepted'}]);
+ }finally{await context.close()}
+});
+
+test('status board room-status permission allows status updates without room configuration controls',async()=>{
+ const {context,page}=await accountPage({id:'room-status-user',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'room-status-lodge',permissions:['units.view','units.status.manage'],entitlements:['units'],subscription_status:'Active'}]});let status='available';const writes=[];
+ try{
+  await page.route('**/api/v1/lodges/room-status-lodge/rooms**',r=>{if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();writes.push(body);status=body.status;return r.fulfill({json:{id:'status-only-room',status}})}return r.fulfill({json:[{id:'status-only-room',name:'Acacia',unit_type:'Suite',status,notes:''}]})});
+  await page.goto(base+'/rooms');const menu=page.getByRole('combobox',{name:'Move to… Acacia',exact:true});await menu.waitFor();assert.equal(await page.getByRole('button',{name:'+ Room / Unit',exact:true}).count(),0);assert.equal(await menu.isDisabled(),false);await menu.selectOption('cleaning');await page.getByText('Acacia moved to Cleaning.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'cleaning'}]);
+ }finally{await context.close()}
 });

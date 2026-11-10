@@ -1,4 +1,6 @@
 "use client";
+import { StatusBoard } from "./ui/status-board";
+import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { Skeleton } from "./ui/skeleton";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
@@ -114,7 +116,7 @@ export default function HousekeepingPage() {
       lodgeId: getActiveLodgeId(),
       silent: true,
     };
-    await mutate(
+    return await mutate(
       id,
       { status },
       (patch) => operationsApi.housekeeping.update(id, patch, scope),
@@ -125,7 +127,9 @@ export default function HousekeepingPage() {
           setError((e as Error).message);
           if (
             e instanceof ApiError &&
-            [401, 403, 404, 409].includes(e.status)
+            ([401, 403, 404].includes(e.status) ||
+              (e.status === 409 &&
+                /account changed|access changed/i.test(e.message)))
           ) {
             setJobs([]);
             setRooms([]);
@@ -274,96 +278,70 @@ export default function HousekeepingPage() {
         )}
         <section className="panel">
           <h2>Active housekeeping</h2>
-          <div
-            className="collectionBoard"
-            tabIndex={0}
-            role="region"
-            aria-label="Workflow board"
-          >
-            {[
-              {
-                label: "Cleaning",
-                states: [
-                  "created",
-                  "assigned",
-                  "pending",
-                  "cleaning",
-                  "in_progress",
-                ],
+          <StatusBoard
+            name="housekeeping"
+            cardsView
+            items={jobs.map((row) => ({
+              ...row,
+              title: row.unit_name || row.job_type,
+            }))}
+            actions={{
+              columns: workflowColumns("housekeeping"),
+              pending: (id) => pending.includes(id),
+              allowed: (id) => {
+                const row = jobs.find((row) => row.id === id);
+                return !access.readOnly && canManage && row
+                  ? nextStatuses("housekeeping", row.status).filter(
+                      (s) =>
+                        !(
+                          row.status === "in_progress" &&
+                          s === "completed" &&
+                          row.inspector_staff_id
+                        ),
+                    )
+                  : [];
               },
-              {
-                label: "Inspection",
-                states: ["awaiting_inspection", "inspected"],
+              onMove: (id, status) => {
+                const row = jobs.find((row) => row.id === id);
+                if (!row) return Promise.resolve(false);
+                return update(id, status);
               },
-              { label: "Ready", states: ["ready", "completed", "cancelled"] },
-            ].map((column) => {
-              const known = [
-                {
-                  label: "Cleaning",
-                  states: [
-                    "created",
-                    "assigned",
-                    "pending",
-                    "cleaning",
-                    "in_progress",
-                  ],
-                },
-                {
-                  label: "Inspection",
-                  states: ["awaiting_inspection", "inspected"],
-                },
-                { label: "Ready", states: ["ready", "completed", "cancelled"] },
-              ].flatMap((g) => g.states);
-              const items = jobs.filter(
-                (item) =>
-                  column.states.includes(item.status) ||
-                  (column.label === "Cleaning" && !known.includes(item.status)),
-              );
-              return (
-                <section className="boardColumn" key={column.label}>
-                  <h2>
-                    {column.label}
-                    <span>{items.length}</span>
-                  </h2>
-                  {items.map((j) => (
-                    <div className="taskRow" key={j.id}>
-                      <div>
-                        <strong>
-                          {j.unit_name} · {readableLabel(j.job_type)}
-                        </strong>
-                        <small>
-                          {j.assigned_staff_name || "Unassigned"} · Due{" "}
-                          {j.due_at ? formatDateTime(j.due_at) : "—"}
-                        </small>
-                        {j.linen_notes && <p>{j.linen_notes}</p>}
-                      </div>
-                      <div>
-                        <StatusPill value={j.status} />
-                        {pending.includes(j.id) && (
-                          <small role="status">{instant.saving}</small>
-                        )}
-                        {canManage &&
-                          (next[j.status] || pending.includes(j.id)) && (
-                            <div style={{ marginTop: 6 }}>
-                              <button
-                                className="button secondary"
-                                disabled={pending.includes(j.id)}
-                                aria-busy={pending.includes(j.id)}
-                                onClick={() => update(j.id, next[j.status]!)}
-                              >
-                                {next[j.status]
-                                  ? readableLabel(next[j.status]!)
-                                  : instant.saving}
-                              </button>
-                            </div>
-                          )}
-                      </div>
+            }}
+            renderCard={(j) => (
+              <div className="taskRow" key={j.id}>
+                <div>
+                  <strong>
+                    {j.unit_name} · {readableLabel(j.job_type)}
+                  </strong>
+                  <small>
+                    {j.assigned_staff_name || "Unassigned"} · Due{" "}
+                    {j.due_at ? formatDateTime(j.due_at) : "—"}
+                  </small>
+                  {j.linen_notes && <p>{j.linen_notes}</p>}
+                </div>
+                <div>
+                  <StatusPill value={j.status} />
+                  {pending.includes(j.id) && (
+                    <small role="status">{instant.saving}</small>
+                  )}
+                  {canManage && (next[j.status] || pending.includes(j.id)) && (
+                    <div style={{ marginTop: 6 }}>
+                      <button
+                        className="button secondary"
+                        disabled={pending.includes(j.id)}
+                        aria-busy={pending.includes(j.id)}
+                        onClick={() => update(j.id, next[j.status]!)}
+                      >
+                        {next[j.status]
+                          ? readableLabel(next[j.status]!)
+                          : instant.saving}
+                      </button>
                     </div>
-                  ))}
-                </section>
-              );
-            })}
-          </div>
+                  )}
+                </div>
+              </div>
+            )}
+          />
           {!loading && !jobs.length && (
             <div className="empty">No housekeeping jobs have been created.</div>
           )}

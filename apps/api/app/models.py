@@ -1053,3 +1053,47 @@ class LiveEvent(Base):
     kind: Mapped[str] = mapped_column(String(40))
     version: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=text('gen_random_uuid()'))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text('clock_timestamp()'))
+
+
+class OfflineReceipt(Base):
+    __tablename__ = 'offline_receipts'
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('lodges.id', ondelete='CASCADE'), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text('now()'))
+
+
+class PushPreference(Base):
+    __tablename__ = 'push_preferences'
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('lodges.id', ondelete='CASCADE'), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    categories: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class PushSubscription(Base):
+    __tablename__ = 'push_subscriptions'
+    __table_args__ = (Index('ix_push_subscriptions_owner','lodge_id','user_id'),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('lodges.id', ondelete='CASCADE'))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'))
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('auth_sessions.id', ondelete='CASCADE'))
+    endpoint_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    encrypted_subscription: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text('now()'))
+
+
+class PushDelivery(Base):
+    __tablename__ = 'push_deliveries'
+    __table_args__ = (UniqueConstraint('subscription_id','notification_id',name='uq_push_delivery_notice'),Index('ix_push_deliveries_due','status','next_attempt_at'))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('lodges.id', ondelete='CASCADE'))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'))
+    subscription_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey('push_subscriptions.id', ondelete='CASCADE'), nullable=True)
+    notification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('notifications.id', ondelete='CASCADE'))
+    status: Mapped[str] = mapped_column(String(20), default='pending')
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_code: Mapped[str] = mapped_column(String(40), default='')

@@ -37,7 +37,7 @@ BUILT={
  'transfers':('Transfers','Coordinate guest pickups and drop-offs.','Safari and fleet'),
  'wildlife':('Wildlife sightings','Record sightings and photographs with protected-species access.','Safari and fleet'),
  'ranger':('Ranger workspace','Assigned guide work and safari operations.','Safari and fleet'),
- 'offline_mobile':('Offline wildlife recording','Queue wildlife sightings on the web and sync later.','Safari and fleet'),
+ 'offline_mobile':('Offline field workflows','Queue task status and checklists, housekeeping, transfers and wildlife with private device sync.','Safari and fleet'),
  'fb':('Food and drink staff access','Invite staff using the food-and-drink preset.','Food and drink'),
  'fb_operations':('Meal services','Schedule meals and view dietary requirements.','Food and drink'),
  'reports':('Operational reports','Review permitted operations and cost summaries.','Reports and AI'),

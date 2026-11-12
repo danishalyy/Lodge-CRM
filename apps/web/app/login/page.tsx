@@ -1,4 +1,5 @@
 "use client";
+import { offlineCopy } from "@/lib/strings/offline";
 import { uiCopy as c } from "@/lib/strings/redesign";
 import { CodeInput } from "@/components/ui/code-input";
 import { Field } from "@/components/ui/field";
@@ -9,11 +10,15 @@ import { PasswordField } from "@/components/ui/password-field";
 import ThemeToggle from "@/components/ThemeToggle";
 import { accountHome } from "@/lib/account-routing";
 import SafariBrand from "@/components/SafariBrand";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authApi, setActiveLodgeId } from "@/lib/api";
 export default function Login() {
   const router = useRouter();
+  const [pendingSignout, setPendingSignout] = useState(false);
+  useEffect(() => {
+    setPendingSignout(!!localStorage.getItem("safarios_local_signout"));
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -42,6 +47,7 @@ export default function Login() {
         setError("Enter the 6-digit code from your authenticator app.");
       } else setError(e.message);
     } finally {
+      setPendingSignout(!!localStorage.getItem("safarios_local_signout"));
       setBusy(false);
     }
   }
@@ -78,6 +84,7 @@ export default function Login() {
         <Form className="panel authCard" onSubmit={submit}>
           <span className="eyebrow">SECURE ACCESS</span>
           <h1>{c.loginTitle}</h1>
+          {pendingSignout && <p role="status">{offlineCopy.localSignout}</p>}
           <p>{c.loginIntro}</p>
           <Field label="Email">
             <input

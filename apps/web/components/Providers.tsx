@@ -1,4 +1,5 @@
 "use client";
+import PwaRegistration from "./PwaRegistration";
 import { useEffect } from "react";
 import { startDataRefresh } from "@/lib/data-cache";
 import { MotionConfig } from "framer-motion";
@@ -16,6 +17,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <i />
       </div>
       <div className="grain" aria-hidden="true" />
+      <PwaRegistration />
       {children}
       <Toaster
         richColors

@@ -46,6 +46,8 @@ def create_notification(db:Session,*,lodge_id,notification_type:str,severity:str
             staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==lodge_id))
             if not member or (staff and staff.employment_status!="active"):continue
         db.add(NotificationRecipient(lodge_id=lodge_id,notification_id=notification.id,user_id=user_id))
+        from .push_service import queue_push
+        queue_push(db,notification,user)
         pref=db.scalar(select(NotificationPreference).where(NotificationPreference.lodge_id==lodge_id,NotificationPreference.user_id==user_id))
         enabled=pref.email_enabled if pref else user.email_notifications_enabled
         minimum=pref.email_min_severity if pref else user.email_min_severity

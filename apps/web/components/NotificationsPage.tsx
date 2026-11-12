@@ -1,4 +1,5 @@
 "use client";
+import PushSettings from "./PushSettings";
 import { formatDateTime } from "@/lib/formatting";
 import { readableLabel } from "@/lib/strings/content";
 import { Field } from "@/components/ui/field";
@@ -201,6 +202,7 @@ export default function NotificationsPage() {
           </button>
         </div>
       )}
+      <PushSettings />
       <div className="notificationLayout">
         <section className="panel">
           <div className="notificationToolbar">

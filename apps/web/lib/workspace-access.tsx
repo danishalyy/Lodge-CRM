@@ -1,4 +1,5 @@
 "use client";
+import { getActiveUserId, getActiveLodgeId } from "./api";
 import { createContext, useContext, useRef, useEffect } from "react";
 export type WorkspaceAccess = {
   contextId?: string;
@@ -39,7 +40,12 @@ export function useWorkspaceAccess() {
     displayName: value.displayName,
     roleKey: value.roleKey,
     lodgeName: value.lodgeName,
-    isCurrent: () => mounted.current && currentScope.current === scopeKey,
+    isCurrent: () =>
+      mounted.current &&
+      !localStorage.getItem("safarios_local_signout") &&
+      currentScope.current === scopeKey &&
+      (!value.contextId ||
+        value.contextId === `${getActiveUserId()}:${getActiveLodgeId()}`),
     feature: (key: string) => !value.platform && value.features.includes(key),
     permission: (key: string) =>
       !value.platform && value.permissions.includes(key),

@@ -349,6 +349,10 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
             raise HTTPException(401, "Invalid or already-used MFA code")
         set_rls_context(db,None,False,str(user.id))
         audit(db,request,None,user.id,"mfa.recovery_used" if body.recovery_code else "mfa.verified","account",str(user.id))
+    previous_cookie=request.cookies.get("lodge_session")
+    if previous_cookie:
+        previous_session=db.scalar(select(AuthSession).where(AuthSession.token_hash==token_hash(previous_cookie),AuthSession.revoked_at.is_(None)))
+        if previous_session:previous_session.revoked_at=now
     user.failed_login_count=0;user.locked_until=None;db.commit()
     clear_login_limit(request, body.email)
     create_session(db, user, response)
@@ -504,6 +508,13 @@ def logout(response: Response, request: Request, user: User = Depends(current_us
         s = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash(raw), AuthSession.revoked_at.is_(None)))
         if s:
             s.revoked_at = datetime.now(timezone.utc)
+            from .models import PushSubscription
+            from sqlalchemy import delete
+            # Membership query is owner-scoped; visit each tenant without granting
+            # platform authority to an operational account.
+            for member in db.scalars(select(Membership).where(Membership.user_id==user.id)).all():
+                set_rls_context(db,str(member.lodge_id),False,str(user.id))
+                db.execute(delete(PushSubscription).where(PushSubscription.session_id==s.id,PushSubscription.user_id==user.id))
             db.commit()
     response.delete_cookie("lodge_session", path="/")
     response.delete_cookie("lodge_csrf", path="/")
@@ -1739,6 +1750,11 @@ def register_wildlife_media(lodge_id:str,body:WildlifeMediaRegister,request:Requ
     prefix=f"lodges/{lodge_id}/wildlife/"
     if not body.object_key.startswith(prefix):raise HTTPException(400,"Invalid media object key")
     ensure_fk(db,WildlifeSighting,body.sighting_id,lodge_id,"Wildlife sighting")
+    existing=db.scalar(select(WildlifeMedia).where(WildlifeMedia.lodge_id==lodge_id,WildlifeMedia.object_key==body.object_key))
+    if existing:
+        if existing.sighting_id!=body.sighting_id or existing.uploaded_by_user_id!=user.id or existing.sha256!=body.sha256.lower() or existing.size_bytes!=body.size_bytes or existing.content_type!=body.content_type:
+            raise HTTPException(409,"This media object has already been registered with different details")
+        return {"id":str(existing.id),"sighting_id":str(existing.sighting_id)}
     try:head=s3_internal.head_object(Bucket=settings.object_storage_bucket,Key=body.object_key)
     except ClientError:raise HTTPException(409,"Uploaded object was not found in object storage")
     if int(head.get("ContentLength",0))!=body.size_bytes:raise HTTPException(409,"Uploaded file size does not match")
@@ -2139,6 +2155,7 @@ def add_task_comment(lodge_id:str,record_id:str,body:TaskCommentCreate,request:R
 
 @app.get("/api/v1/lodges/{lodge_id}/housekeeping-jobs")
 def list_housekeeping_jobs(lodge_id:str,user:User=Depends(require_permission("housekeeping.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
+    ensure_feature(db,lodge_id,"housekeeping")
     ctx=_ctx(db,user,lodge_id);q=select(HousekeepingJob).where(HousekeepingJob.lodge_id==lodge_id)
     if ctx.role_key=="housekeeping":q=q.where(HousekeepingJob.assigned_staff_id==_require_own_staff(ctx).id)
     elif ctx.role_key=="department_manager":q=q.join(StaffProfile,StaffProfile.id==HousekeepingJob.assigned_staff_id).where(StaffProfile.department_id==ctx.department_id)
@@ -2152,6 +2169,7 @@ def create_housekeeping_job(lodge_id:str,body:HousekeepingCreate,request:Request
     return result
 
 def _create_housekeeping_job_record(lodge_id, body, request, user, db):
+    ensure_feature(db,lodge_id,"housekeeping")
     full_workflow=entitlement_enabled(db,lodge_id,"housekeeping_full")
     if not full_workflow and (body.job_type not in {"cleaning","guest_request"} or body.inspector_staff_id or body.linen_notes):
         raise HTTPException(403,"Turndown, inspections and linen workflows require Standard or Premium")
@@ -2165,6 +2183,7 @@ def _create_housekeeping_job_record(lodge_id, body, request, user, db):
 HK_TRANSITIONS={"assigned":{"accepted","in_progress","cancelled"},"accepted":{"in_progress","cancelled"},"in_progress":{"awaiting_inspection","completed","cancelled"},"awaiting_inspection":{"completed","in_progress","cancelled"},"completed":set(),"cancelled":set()}
 @app.patch("/api/v1/lodges/{lodge_id}/housekeeping-jobs/{record_id}",dependencies=[Depends(require_csrf)])
 def update_housekeeping_job(lodge_id:str,record_id:str,body:HousekeepingUpdate,request:Request,user:User=Depends(require_permission("housekeeping.view",write=True)),db:Session=Depends(get_db)):
+    ensure_feature(db,lodge_id,"housekeeping")
     ctx=_ctx(db,user,lodge_id);row=tenant_get(db,HousekeepingJob,record_id,lodge_id,"Housekeeping job");full=_may(db,ctx,"housekeeping.manage");own=_may(db,ctx,"housekeeping.own.manage") and ctx.staff and row.assigned_staff_id==ctx.staff.id;inspector=bool(ctx.staff and row.inspector_staff_id==ctx.staff.id)
     inspector_completion=inspector and row.status=="awaiting_inspection" and body.status=="completed"
     if not full and not own and not inspector_completion:raise HTTPException(403,"You may only update housekeeping assigned to you or inspections assigned to you")
@@ -2411,3 +2430,9 @@ app.include_router(task_history_router)
 # Payload-free invalidations use ordinary lodge/session authorization.
 from .live_events import router as live_events_router
 app.include_router(live_events_router)
+
+from .offline_routes import router as offline_router
+app.include_router(offline_router)
+
+from .push_routes import router as push_router
+app.include_router(push_router)

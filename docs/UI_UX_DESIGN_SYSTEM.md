@@ -29,7 +29,7 @@ Cards have 20px corners and no shadow/blur; controls12px, overlays28px. Inputs48
 
 `GroupedNavigation` groups authorized routes and persists collapsed sections. The active group stays open. `UserMenu` provides account security/theme/sign-out; `NavigationEnhancements` keeps the existing focus-managed mobile drawer and role-aware bottom tabs. Desktop sidebar260px/rail72px; topbar64px. `CollectionView` uses existing authorized table rows for local search, status filters, saved presentations, cards, boards and detail drawers. It creates no new data endpoint or bulk mutation. Selection supports reviewing visible records. Existing owning-module actions remain authoritative. Workspace changes clear detail/selection state.
 
-`PageHeader`, `KpiCard`, `CodeInput`, `DietaryChips` and `SyncChip` support consistent future screens. OTP stays one accessible input with six visual cells, natural typing/paste and the existing validation contract. Sync reports the actual scoped wildlife queue only; it does not claim complete staff offline support.
+`PageHeader`, `KpiCard`, `CodeInput`, `DietaryChips` and `SyncChip` support consistent future screens. OTP stays one accessible input with six visual cells, natural typing/paste and the existing validation contract. Sync reports the actual shared queue for the selected user/lodge, with a guarded device drawer for supported task/checklist, housekeeping, transfer and wildlife commands. It distinguishes device-only Queued work from server-acknowledged Synced work; unsupported edits still require a connection.
 
 ## Scope and precedence
 
@@ -41,6 +41,6 @@ Retain the 720px reading column, private history and scope-safe pending turns. R
 
 ## Verification
 
-Phase 1 interactivity extends existing controls without changing these visual tokens. Use the shared scoped memory cache and instant-action hook for optimistic workflows; retain server-authorized transitions and avoid unsupported Undo actions. See [interactivity implementation and QA](INTERACTIVITY_QA.md). Drag-and-drop, live events, push and broader offline behavior are separate later phases.
+Phase 1 interactivity extends existing controls without changing these visual tokens. Use the shared scoped memory cache and instant-action hook for optimistic workflows; retain server-authorized transitions and avoid unsupported Undo actions. See [interactivity implementation and QA](INTERACTIVITY_QA.md). Shared boards, live events and the Phase 4 PWA/device queue/push patterns are recorded in that guide; global shortcuts and walkthroughs remain separately approved phases.
 
 Run the production build, existing API suite and browser checks for forms, activation, MFA, registration, role separation and data flows. Review 375/768/1366/1440px in both themes. Automated checks supplement visual/keyboard review; they do not establish full accessibility certification or commercial completion of unavailable integrations.

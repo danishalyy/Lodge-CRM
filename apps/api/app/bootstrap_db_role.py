@@ -26,11 +26,11 @@ with psycopg.connect(admin_url,autocommit=True) as conn:
         cur.execute(sql.SQL('GRANT CONNECT ON DATABASE {} TO {}').format(sql.Identifier(dbname),sql.Identifier(app_role)))
         cur.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}').format(sql.Identifier(app_role)))
         cur.execute(sql.SQL('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {}').format(sql.Identifier(app_role)))
-        cur.execute(sql.SQL('REVOKE UPDATE, DELETE ON TABLE operational_events, audit_logs, task_history, live_events FROM {}').format(sql.Identifier(app_role)))
+        cur.execute(sql.SQL('REVOKE UPDATE, DELETE ON TABLE operational_events, audit_logs, task_history, live_events, offline_receipts FROM {}').format(sql.Identifier(app_role)))
         cur.execute(sql.SQL('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {}').format(sql.Identifier(app_role)))
         cur.execute(sql.SQL('ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA public GRANT SELECT, INSERT ON TABLES TO {}').format(sql.Identifier(owner),sql.Identifier(app_role)))
         # History tables are append-only. Re-apply after broad grants so future bootstrap runs cannot weaken them.
-        cur.execute(sql.SQL('REVOKE UPDATE, DELETE ON TABLE operational_events, audit_logs, task_history, live_events FROM {}').format(sql.Identifier(app_role)))
+        cur.execute(sql.SQL('REVOKE UPDATE, DELETE ON TABLE operational_events, audit_logs, task_history, live_events, offline_receipts FROM {}').format(sql.Identifier(app_role)))
         cur.execute(sql.SQL('ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO {}').format(sql.Identifier(owner),sql.Identifier(app_role)))
         cur.execute('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname=%s',(app_role,))
         superuser,bypass=cur.fetchone()

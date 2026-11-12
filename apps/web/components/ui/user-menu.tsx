@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ChevronUp, Settings, UserRound } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
+import { SyncChip } from "./sync-chip";
 import SignOutButton from "../SignOutButton";
 import { uiCopy as c } from "@/lib/strings/redesign";
 export function UserMenu({ name, role }: { name?: string; role?: string }) {
@@ -58,6 +59,7 @@ export function UserMenu({ name, role }: { name?: string; role?: string }) {
           <span>{c.theme}</span>
           <ThemeToggle />
         </div>
+        <SyncChip />
         <SignOutButton />
       </div>
     </details>

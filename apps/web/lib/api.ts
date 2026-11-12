@@ -1,3 +1,5 @@
+import { clearOfflineUser } from "./offlineWildlife";
+import { clearPushDevice } from "./device-state";
 import { storeFormatting } from "./formatting";
 import { formCopy } from "./strings/forms";
 import { originatingForm } from "./form-submission";
@@ -19,7 +21,10 @@ export function getActiveLodgeId() {
     : localStorage.getItem("active_lodge_id") || "";
 }
 export function setActiveLodgeId(id: string) {
-  if (id !== getActiveLodgeId()) invalidateData();
+  if (id !== getActiveLodgeId()) {
+    invalidateData();
+    if (typeof navigator !== "undefined") void clearPushDevice();
+  }
   if (typeof window !== "undefined")
     localStorage.setItem("active_lodge_id", id);
 }
@@ -31,6 +36,11 @@ export function getActiveUserId() {
 function clearAccountContext() {
   invalidateData();
   if (typeof window === "undefined") return;
+  const previous = getActiveUserId();
+  if (previous) {
+    void clearOfflineUser(previous).catch(() => {});
+    void clearPushDevice();
+  }
   for (const key of ["active_user_id", "active_lodge_id", "active_lodge_name"])
     localStorage.removeItem(key);
 }
@@ -174,13 +184,19 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
     lodge = getActiveLodgeId();
   const read =
     !init.method || ["GET", "HEAD"].includes(init.method.toUpperCase());
+  const locked = () =>
+    typeof localStorage !== "undefined" &&
+    !!localStorage.getItem("safarios_local_signout") &&
+    !/^\/api\/v1\/auth\/(login|logout|activate|invitations\/preview|password-reset\/(request|confirm))$/.test(
+      path,
+    );
   const load = async () => {
-    if (actor !== getActiveUserId() || lodge !== getActiveLodgeId())
+    if (locked() || actor !== getActiveUserId() || lodge !== getActiveLodgeId())
       throw new ApiError(instantCopy.contextChanged, 409);
     const result = await networkRequest<T>(path, init);
     if (
       path !== "/api/v1/auth/me" &&
-      (actor !== getActiveUserId() || lodge !== getActiveLodgeId())
+      (locked() || actor !== getActiveUserId() || lodge !== getActiveLodgeId())
     )
       throw new ApiError(instantCopy.contextChanged, 409);
     return result;
@@ -305,14 +321,36 @@ const tenantCollection = (name: string) => ({
     }),
 });
 
+const LOCAL_SIGNOUT = "safarios_local_signout";
+async function finishPendingSignout() {
+  if (typeof localStorage === "undefined") return false;
+  const previous = localStorage.getItem(LOCAL_SIGNOUT);
+  if (!previous) return false;
+  await clearOfflineUser(previous);
+  try {
+    await request("/api/v1/auth/logout", {
+      method: "POST",
+      silent: true,
+      headers: { "X-Expected-User-Id": previous },
+    });
+  } catch (error) {
+    if (!(error instanceof ApiError) || ![401, 403, 409].includes(error.status))
+      throw error;
+  }
+  if (localStorage.getItem(LOCAL_SIGNOUT) === previous)
+    localStorage.removeItem(LOCAL_SIGNOUT);
+  return true;
+}
+
 export const authApi = {
-  login: (
+  login: async (
     email: string,
     password: string,
     otp?: string,
     recovery_code?: string,
-  ) =>
-    request("/api/v1/auth/login", {
+  ) => {
+    await finishPendingSignout();
+    return request("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({
         email,
@@ -320,22 +358,56 @@ export const authApi = {
         otp: otp || undefined,
         recovery_code: recovery_code || undefined,
       }),
-    }),
+    });
+  },
   previewInvitation: (token: string) =>
     request<any>("/api/v1/auth/invitations/preview", {
       method: "POST",
       body: JSON.stringify({ token }),
     }),
-  activate: (token: string, password: string) =>
-    request("/api/v1/auth/activate", {
+  activate: async (token: string, password: string) => {
+    await finishPendingSignout();
+    return request("/api/v1/auth/activate", {
       method: "POST",
       body: JSON.stringify({ token, password }),
-    }),
-  logout: async () => {
-    await request("/api/v1/auth/logout", { method: "POST" });
-    clearAccountContext();
+    });
   },
-  me: () => request<any>("/api/v1/auth/me").then(bindAccount),
+  logout: async () => {
+    invalidateData();
+    const actor = getActiveUserId();
+    if (actor) localStorage.setItem(LOCAL_SIGNOUT, actor);
+    const cleanup = await Promise.allSettled([
+      actor ? clearOfflineUser(actor) : Promise.resolve(),
+      clearPushDevice(),
+    ]);
+    let ended = false;
+    try {
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        await request("/api/v1/auth/logout", { method: "POST", silent: true });
+        ended = true;
+      }
+    } catch {
+      /* Offline sign-out locks this device; reconnect finishes revocation. */
+    } finally {
+      if (getActiveUserId() === actor) clearAccountContext();
+      if (
+        ended &&
+        cleanup.every((result) => result.status === "fulfilled") &&
+        localStorage.getItem(LOCAL_SIGNOUT) === actor
+      )
+        localStorage.removeItem(LOCAL_SIGNOUT);
+    }
+  },
+  me: async () => {
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(LOCAL_SIGNOUT)
+    ) {
+      await finishPendingSignout().catch(() => {});
+      throw new ApiError(formCopy.expired, 401);
+    }
+    return request<any>("/api/v1/auth/me").then(bindAccount);
+  },
   requestPasswordReset: (email: string) =>
     request<any>("/api/v1/auth/password-reset/request", {
       method: "POST",
@@ -889,4 +961,42 @@ export const aiReportApi = {
     ),
   read: (id: string) =>
     request<any>(lodgePath(`ai/reports/${encodeURIComponent(id)}`)),
+};
+
+export const offlineApi = {
+  apply: (body: unknown, scope: AccountScope) =>
+    request(scopedPath("offline-actions", scope), {
+      method: "POST",
+      silent: true,
+      headers: { ...scopedHeaders(scope), "X-Lodge-Context": scope.lodgeId },
+      body: JSON.stringify(body),
+    }),
+  sighting: (body: unknown, scope: AccountScope) =>
+    request<any>(scopedPath("offline-sightings", scope), {
+      method: "POST",
+      silent: true,
+      headers: { ...scopedHeaders(scope), "X-Lodge-Context": scope.lodgeId },
+      body: JSON.stringify(body),
+    }),
+};
+export const browserPushApi = {
+  preferences: () => request<any>(lodgePath("push/preferences")),
+  save: (body: unknown) =>
+    request<any>(lodgePath("push/preferences"), {
+      method: "PATCH",
+      silent: true,
+      body: JSON.stringify(body),
+    }),
+  subscribe: (body: unknown) =>
+    request<any>(lodgePath("push/subscriptions"), {
+      method: "POST",
+      silent: true,
+      body: JSON.stringify(body),
+    }),
+  unsubscribe: (id: string, lodge_id: string) =>
+    request("/api/v1/auth/push/subscriptions", {
+      method: "DELETE",
+      silent: true,
+      body: JSON.stringify({ id, lodge_id }),
+    }),
 };

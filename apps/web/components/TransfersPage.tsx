@@ -1,4 +1,6 @@
 "use client";
+import { useDataRefresh } from "@/lib/use-instant-actions";
+import { queueChange } from "@/lib/offline-sync";
 import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -49,8 +51,10 @@ const next: Record<string, string | undefined> = {
 export default function TransfersPage() {
   const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
-  const canManage = access.permission("transfers.manage");
-  const canTransition = canManage || access.permission("transfers.own.manage");
+  const canManage = !access.readOnly && access.permission("transfers.manage");
+  const canTransition =
+    !access.readOnly &&
+    (canManage || access.permission("transfers.own.manage"));
 
   const [rows, setRows] = useState<Transfer[]>([]),
     [staff, setStaff] = useState<Staff[]>([]),
@@ -102,6 +106,7 @@ export default function TransfersPage() {
     setStays([]);
     load();
   }, [access.scopeKey]);
+  useDataRefresh(load, open);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canManage) return;
@@ -133,7 +138,18 @@ export default function TransfersPage() {
     }
   }
   async function update(id: string, status: string) {
+    if (!canTransition || !access.isCurrent()) return;
     try {
+      if (!navigator.onLine) {
+        const row = rows.find((t) => t.id === id);
+        if (!row) return;
+        await queueChange(access, "transfer.status", id, row.status, status);
+        if (access.isCurrent())
+          setRows((old) =>
+            old.map((t) => (t.id === id ? { ...t, status } : t)),
+          );
+        return;
+      }
       await operationsApi.transfers.update(id, { status });
       await load();
     } catch (e: any) {

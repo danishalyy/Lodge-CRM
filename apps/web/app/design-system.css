@@ -3164,3 +3164,13 @@ textarea:focus-visible {
   .topbar:has(.liveUpdatePill) .mobilePlatformName { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 }
 .topActions .liveUpdatePill { min-height:44px; }
+.offlineWorkList { display:grid; gap:16px; margin-top:24px; }
+.offlineWorkList h3 { font-size:16px; }
+.offlineWorkHead { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.sidebarFooter>.syncChip { margin-bottom:12px; }
+.syncChip { min-height:44px; cursor:pointer; }
+.pushSettings { margin-top:24px; }
+.pushSettings .checkRow { min-height:44px; gap:12px; }
+.syncChip { background:var(--surface); }
+:root[data-sidebar="collapsed"] .sidebarFooter>.syncChip { width:44px; padding:10px; justify-content:center; }
+:root[data-sidebar="collapsed"] .sidebarFooter>.syncChip>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

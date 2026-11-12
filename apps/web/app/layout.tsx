@@ -9,6 +9,13 @@ import "./design-system.css";
 import "./reference-theme.css";
 
 export const metadata: Metadata = {
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "SafariOS",
+    statusBarStyle: "black-translucent",
+  },
+  icons: { apple: "/icons/icon-192.png", icon: "/icons/icon-192.png" },
   title: "SafariOS · Lodge operations",
   description:
     "SafariOS — the operating system for exceptional lodge hospitality",

@@ -1,4 +1,5 @@
 "use client";
+import { queueChange } from "@/lib/offline-sync";
 import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
@@ -265,6 +266,30 @@ export default function TasksPage() {
   useDataRefresh(load, pending.length > 0 || busy);
   async function update(id: string, body: any) {
     if (!current() || mutation.current) return false;
+    if (!navigator.onLine) {
+      const row = rows.find((t) => t.id === id);
+      if (
+        !row ||
+        !mayProgress(row) ||
+        Object.keys(body).some((key) => key !== "status")
+      )
+        return false;
+      try {
+        await queueChange(access, "task.status", id, row.status, body.status);
+        if (current()) {
+          setRows((old) =>
+            old.map((t) => (t.id === id ? { ...t, status: body.status } : t)),
+          );
+          setSelected((old) =>
+            old?.id === id ? { ...old, status: body.status } : old,
+          );
+        }
+        return current();
+      } catch (e) {
+        failure(e);
+        return false;
+      }
+    }
     const success = await mutate(
       id,
       body,
@@ -869,11 +894,47 @@ export default function TasksPage() {
               <input
                 type="checkbox"
                 checked={i.completed}
-                disabled={!mayProgress(selected)}
+                disabled={!mayProgress(selected) || busy}
                 onChange={async (e) => {
                   const stamp = details.current;
-                  if (!current()) return;
+                  if (!current() || mutation.current) return;
                   try {
+                    if (!navigator.onLine) {
+                      const value = e.target.checked;
+                      mutation.current = true;
+                      setBusy(true);
+                      setChecklist((old) =>
+                        old.map((item) =>
+                          item.id === i.id
+                            ? { ...item, completed: value }
+                            : item,
+                        ),
+                      );
+                      try {
+                        await queueChange(
+                          access,
+                          "task.checklist",
+                          selected.id,
+                          i.completed,
+                          value,
+                          i.id,
+                        );
+                      } catch (error) {
+                        if (current() && stamp === details.current)
+                          setChecklist((old) =>
+                            old.map((item) =>
+                              item.id === i.id
+                                ? { ...item, completed: i.completed }
+                                : item,
+                            ),
+                          );
+                        throw error;
+                      } finally {
+                        mutation.current = false;
+                        if (current()) setBusy(false);
+                      }
+                      return;
+                    }
                     await operationsApi.taskWorkflow.updateChecklist(
                       selected.id,
                       i.id,

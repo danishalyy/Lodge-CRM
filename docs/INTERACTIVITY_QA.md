@@ -1,6 +1,6 @@
-# Interactivity QA — Phases 1–3
+# Interactivity QA — Phases 1–4
 
-Phase 1 provides instant actions; Phase 2 adds shared status boards; Phase 3 adds private, resumable live invalidations. Push, generalized offline work, global shortcuts and walkthroughs remain later phases and require owner approval.
+Phase 1 provides instant actions; Phase 2 adds shared status boards; Phase 3 adds private, resumable live invalidations; Phase 4 adds installability, private device queues and opt-in browser push. Global shortcuts and walkthroughs remain later phases and require owner approval.
 
 ## Phase 1 implementation
 
@@ -135,7 +135,7 @@ The CRM application role intentionally cannot perform this maintenance. Do not g
 5. Remove membership, revoke the session, change permissions/package, suspend the lodge or expire the subscription while connected. Access changes should hide operational children for revalidation; revoked access must remain denied, and expiry must remove workflow writes while retaining authorized reads.
 6. Change an assignment so a field user loses record access. Their next reconciliation must remove the record; the stream must not disclose its ID after access is lost. Verify behavior in both themes, reduced motion and 375/768/1366/1440px layouts.
 
-Phase 4 and later phases await the owner's approval. Production proxy verification, scheduled outbox retention, real-device checks and workload sizing remain deployment checks.
+The following section records the separately approved Phase 4. Production proxy verification, scheduled live-outbox retention, real-device checks and workload sizing remain deployment checks.
 
 ### Phase 3 local verification — 12 November 2026
 
@@ -148,4 +148,85 @@ Phase 4 and later phases await the owner's approval. Production proxy verificati
 
 The [queued-update phone preview](screenshots/safarios-live-queued-mobile.png) uses browser test fixtures. On a narrow phone, the status icon retains an accessible state label while the update button preserves space for the SafariOS mark.
 
-Phase 3 implementation is complete. Hosted streaming/proxy checks, scheduled retention, capacity sizing and real-device verification remain deployment work. Phase 4 (installable app, generalized offline work and push) and later phases require owner approval.
+Phase 3 implementation is complete. Hosted streaming/proxy checks, scheduled live-event retention, capacity sizing and real-device verification remain deployment work. The following section records Phase 4.
+
+## Phase 4 — installable app, device queue and browser push
+
+The manifest at `/manifest.webmanifest` provides a standalone SafariOS app with maskable 192px/512px icons derived from the approved acacia mark. `PwaRegistration` installs the same-origin service worker in secure contexts. Its cache contains only the public offline page, manifest, SafariOS assets and hashed Next static files; static entries are bounded. Authenticated documents, RSC responses, APIs and lodge media are never added to Cache Storage. Navigation always goes to the network, falling back to a public offline page on connection failure. Public assets can remain cached after sign-out because they contain no account information. Private in-memory reads are invalidated on identity changes and sign-out; restored browser pages reload for authentication.
+
+Offline changes are available on an already authenticated, loaded workspace when connectivity is lost. A cold offline launch shows the public fallback and requires reconnection to authenticate; it does not restore a private dashboard from disk. This is intentional. The queue stores only a user's pending input and minimal command metadata, never copies of guest/HR records or authenticated API responses.
+
+### Shared queue and replay
+
+`lib/offlineWildlife.ts` now exposes shared typed queue operations while retaining the existing wildlife function exports. IndexedDB version 3 migrates scoped wildlife photos into a shared store keyed by user, lodge and command ID. Legacy unscoped records are never adopted. New commands cover task status, task checklist ticks, housekeeping status, transfer status and wildlife sightings/photos. Unsupported edits still require a connection. The existing `offline_mobile` entitlement gates capture/replay; no plan grants or role checks are expanded. Existing housekeeping read/create/update routes also enforce the declared housekeeping feature flag; replay review found that this check was missing there.
+
+The shared sync manager replays only in a visible, authenticated tab. It pins the original user/lodge, revalidates metadata, uses Web Locks where available and atomic, renewable per-item IDB leases with owner tokens as a fallback. A late result from an older lease cannot overwrite a newer claim. Network failures retain queued work with backoff. Permanent validation, authorization and conflict responses become Rejected; Retry is deliberate, keeps the original command ID and expected state, and cannot force an overwrite. Discard requires confirmation. Synced entries retain only completion metadata; input payloads and photo blobs are removed. Removing a completed entry affects only this device, not the lodge record.
+
+The SyncChip and device drawer report Online, Offline with queued count, Syncing and Needs attention. Each row shows Queued/Syncing/Synced/Rejected, its action, starting/target state and a readable error. Offline checklist ticks update immediately, disable duplicate interaction while storage commits and roll back on storage failure. Other queued status changes update the local view after successful storage; queued feedback explicitly says the change has not reached the server yet.
+
+`POST /api/v1/lodges/{lodge_id}/offline-actions` is a narrow adapter over the existing workflow handlers. It accepts only the four supported status/checklist command types. Normal membership, module permission, feature, subscription-write, record-scope, transition, proof and inspection rules still apply. It locks the record and checks the supplied starting state. A receipt is committed atomically with the existing handler's mutation/audit entry. Reusing an ID with a different body is rejected; an authorized retry after a lost acknowledgement returns the prior receipt without repeating the change. Receipts are RLS-protected, user/lodge scoped and append-only for the application role. They retain only IDs, a request hash and creation time.
+
+`POST /api/v1/lodges/{lodge_id}/offline-sightings` reuses existing per-lodge `client_ref` idempotency and enforces offline access. Photo upload/registration checkpoints are retained until acknowledged. Retrying an identical, already registered object returns its existing ID only for the same uploader, sighting, checksum, type and size. Conflicting details still return 409; storage verification and upload permissions remain intact.
+
+### Account and device boundaries
+
+Sign-out clears the user's queued work across lodges, removes the browser push binding, unsubscribes the device and invalidates private memory caches. A persisted local sign-out marker locks private requests immediately if the network is unavailable; reconnection finishes server-session revocation before private pages, login or activation can resume. Cleanup is retried if storage was temporarily blocked. A successful new login revokes the browser's replaced session after password/MFA checks succeed; sessions on other devices are unchanged. Session cookies remain HttpOnly. An offline device cannot revoke a remote server session until it reconnects.
+
+Changing accounts purges the previous user's device work. Group Admin lodge switches keep separately scoped queues, stop the previous scope's replay and remove its push binding; returning to that lodge still requires current membership and entitlements. Changing roles, employment, package or subscription never grants replay authority from saved client state. The API remains authoritative for every item.
+
+### Browser push
+
+Browser push is optional and disabled until installation keys are configured. Opening notification settings does not prompt for browser permission; **Enable on this device** is the only permission-prompt action. Preferences cover task assignment, guest-request assignment, overdue tasks and arrival-readiness alerts generated by the existing notification system. These preferences apply to the user's devices for the selected lodge. Turning off a device clears its binding and subscription; personal opt-out remains available after subscription expiry without granting operational write access. Super Admin remains platform-only; lodge push is never a way to enter a lodge workspace.
+
+Subscription endpoints and browser keys are encrypted at rest with a dedicated Fernet key, and RLS restricts device/preferences reads to their user and lodge. Notification creation records a durable, payload-free intent in the same transaction. The trusted worker resolves private device bindings and rechecks session expiry/revocation, active user/membership/employment, current permissions/entitlements, subscription state, recipient ownership, unread/archive state, record scope and category preferences before delivery. Operational callers cannot read another user's devices. Expired-session capabilities are purged; terminal delivery metadata is retained for eight days. HTTP 404/410 removes the stale endpoint; transient failures use bounded retries and sanitized error codes.
+
+Push payloads contain only a generic type and opaque device binding. The worker never sends notification titles, guest names, room details, message contents or record IDs. The service worker verifies the binding and current authenticated account before presenting a generic SafariOS alert. Clicking it opens the guarded notification inbox. Clearing a binding suppresses late delivery/clicks. Delivery is best-effort; the browser groups duplicate alerts under one tag. Push destinations are restricted to supported browser vendor HTTPS services, browser keys are validated and redirects are disabled.
+
+### Configure/install locally or on the VPS
+
+Update using the existing Compose migration/grants ordering:
+
+```bash
+git pull
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+```
+
+Migration `0026_offline_push`, current grants and the updated API image must be applied before running the new workers. The new runtime dependency is `pywebpush==2.5.0`.
+
+For optional push, generate keys privately in your own terminal:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm --no-deps api python -m app.generate_push_keys
+```
+
+Copy the generated public/private/encryption values into `infra/.env` and set `PUSH_VAPID_SUBJECT` to a monitored contact such as `mailto:operations@your-domain.example`. Keep private/encryption keys out of Git and chat. Recreate API/worker/beat with the same four values; Compose passes them to each service. Do not rotate the encryption key without a binding migration or re-enrolment plan. Incomplete/invalid optional configuration leaves core CRM usable and push unavailable. `.env.example` contains blank placeholders.
+
+Service workers/push require HTTPS, with localhost allowed for development. The API's same-origin proxy and existing security headers remain in place. Browser delivery needs worker egress to supported push vendors on HTTPS. No booking, accounting, SMS or messaging provider is selected by this phase.
+
+On desktop Chrome/Edge, use the browser's **Install app** action. On iPhone/iPad with supported iOS (16.4+), use **Share → Add to Home Screen**, open SafariOS from that icon, then explicitly enable notifications. Mobile installation, operating-system delivery and the eventual Hostinger HTTPS/proxy/firewall configuration require real-device/deployment checks.
+
+### Phase 4 manual checks
+
+1. Open an authorized task, checklist, housekeeping job or transfer while online. Disconnect, apply a permitted change and check the explicit device-only message and Queued row. Reconnect: check Syncing then Synced and the authoritative record. Repeat with a wildlife photo.
+2. Change the record from another account before replay. The old expected state must be rejected, without overwriting newer work. Review Retry and Discard; Escape must cancel confirmation without deleting anything. Try required proof, inspection and assignee rules.
+3. Open two tabs, queue work and reconnect simultaneously. Confirm one active lease and stable command IDs. Interrupt/restart during upload, registration or an acknowledgement; retries must not duplicate the sighting or workflow mutation.
+4. Revoke membership, employment, permission, offline entitlement or subscription before reconnecting. The server must reject or stop replay. Repeat as a field-role user, Group Admin switching lodges, and platform-only account.
+5. Sign out offline and reconnect. No private page or previous queue should be restored. Switch accounts and use browser Back; confirm authentication and scope guards. A cold offline launch must show only the public fallback.
+6. Inspect Cache Storage: only public/static assets should exist. Check that guest, HR, notification, authentication and RSC responses are absent. Verify scoped v2 photo migration and that unscoped legacy rows never appear under a new owner.
+7. Configure push on a test installation. Check that no permission prompt appears before Enable. Change each category, turn off the device, revoke its session/membership and simulate an expired vendor endpoint. No personal/guest data may appear in push payloads or OS alerts, and stale bindings must not display/open notifications.
+8. Review both themes at 375/768/1366/1440px, reduced motion, keyboard focus, drawer dismissal, readable statuses and retry/empty/error feedback. Confirm SafariOS and lodge branding remain intact.
+
+Phase 5 and later phases require the owner's approval. Production key/HTTPS setup, real-device delivery, hosted proxy/firewall checks and load measurements remain deployment work.
+
+
+### Phase 4 local verification — 12 November 2026
+
+- Full API suite: **825 passed**, including real PostgreSQL tests for offline state conflicts, immutable atomic receipts, duplicate acknowledgements, own-work/tenant scope, checklist/inspection rules, offline entitlements, housekeeping feature gating, expiry, CSRF and photo-registration retry. Browser-push tests cover opt-out/categories, encrypted keys, approved destinations, redirect refusal, current recipient/resource access, session replacement/revocation, stale endpoints and durable failures.
+- Production frontend build: **passed** after the final changes. Compose configuration and static guard audit also passed: **176 routes, zero guard issues; 25 modules, zero missing pages**.
+- Full browser suite: **97 passed**, including the original login, activation, MFA, registration and create-guest flows, existing workflows, 272 screen/width/theme combinations and the new PWA paths. Final review added two more cases and rechecked the affected components: **three final targeted checks passed**, verifying **99 distinct suite checks overall**. The targeted runs supplement the earlier full run.
+- The device drawer passed 375/768/1366/1440px overflow and automated WCAG 2 A/AA checks in both themes, with collapsed-navigation and visual review. Escape preserves the parent device drawer when cancelling confirmation; Discard cannot race an active replay claim. Late push setup cannot clear a new account's binding. These checks do not certify full accessibility or OS/browser delivery on physical devices.
+- Native notification/push delivery is simulated in browser tests; API transport tests are mocked. No customer notification or external message was sent. Real HTTPS/VAPID/vendor delivery and iOS Home Screen behavior remain deployment/device checks.
+
+Previews use test fixtures: [device sync — desktop dark](screenshots/safarios-device-sync-desktop-dark.png), [device sync — phone light](screenshots/safarios-device-sync-mobile-light.png).
+
+Phase 4 implementation is complete. Remaining setup is installation-specific push keys/contact, HTTPS/worker egress and real-device verification; the existing Phase 3 hosted proxy/live-outbox-retention checks also remain. Phase 5 (speed, shortcuts and quick actions) and later phases await owner approval.

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
     email_encryption_key: str = ""
+    push_vapid_public_key: str = ""
+    push_vapid_private_key: str = ""
+    push_vapid_subject: str = ""
+    push_encryption_key: str = ""
     notification_escalation_minutes: int = Field(60, ge=1, le=10080)
     invitation_ttl_hours: int = Field(72, ge=1, le=168)
     invitation_resend_cooldown_seconds: int = Field(60, ge=1, le=86400)

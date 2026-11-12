@@ -1,46 +1,91 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff, RefreshCw, AlertCircle } from "lucide-react";
 import { getActiveLodgeId, getActiveUserId } from "@/lib/api";
-import { queuedSightings } from "@/lib/offlineWildlife";
-import { uiCopy as c } from "@/lib/strings/redesign";
+import { queuedWork } from "@/lib/offlineWildlife";
+import { offlineCopy as c } from "@/lib/strings/offline";
 export function SyncChip() {
   const [online, setOnline] = useState(true),
-    [count, setCount] = useState(0);
+    [count, setCount] = useState(0),
+    [syncing, setSyncing] = useState(false),
+    [failed, setFailed] = useState(false),
+    [available, setAvailable] = useState(false);
   useEffect(() => {
-    let alive = true;
-    const update = () => {
+    let alive = true,
+      version = 0;
+    const update = async () => {
+      const stamp = ++version,
+        scope = { userId: getActiveUserId(), lodgeId: getActiveLodgeId() };
       setOnline(navigator.onLine);
-      const scope = { userId: getActiveUserId(), lodgeId: getActiveLodgeId() };
-      queuedSightings(scope)
-        .then((rows) => {
-          if (
-            alive &&
-            scope.userId === getActiveUserId() &&
-            scope.lodgeId === getActiveLodgeId()
-          )
-            setCount(rows.length);
-        })
-        .catch(() => {});
+      if (!scope.userId || !scope.lodgeId) {
+        setAvailable(false);
+        return;
+      }
+      try {
+        const rows = await queuedWork(scope);
+        if (
+          alive &&
+          stamp === version &&
+          scope.userId === getActiveUserId() &&
+          scope.lodgeId === getActiveLodgeId()
+        ) {
+          setAvailable(true);
+          setCount(
+            rows.filter(
+              (row) => row.state === "queued" || row.state === "syncing",
+            ).length,
+          );
+          setSyncing(rows.some((row) => row.state === "syncing"));
+          setFailed(rows.some((row) => row.state === "rejected"));
+        }
+      } catch {
+        if (alive) {
+          setAvailable(true);
+          setFailed(true);
+        }
+      }
     };
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    window.addEventListener("focus", update);
+    void update();
+    for (const name of ["online", "offline", "focus", "safarios-queue-changed"])
+      window.addEventListener(name, update);
     return () => {
       alive = false;
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-      window.removeEventListener("focus", update);
+      for (const name of [
+        "online",
+        "offline",
+        "focus",
+        "safarios-queue-changed",
+      ])
+        window.removeEventListener(name, update);
     };
   }, []);
+  if (!available) return null;
+  const Icon = syncing
+    ? RefreshCw
+    : failed
+      ? AlertCircle
+      : online
+        ? Wifi
+        : WifiOff;
   return (
-    <span className={"syncChip" + (!online ? " offline" : "")} role="status">
-      {online ? <Wifi size={13} /> : <WifiOff size={13} />}
-      <span>
-        {online ? c.online : c.offline}
-        {count ? " · " + c.queued(count) : ""}
+    <button
+      type="button"
+      className={"syncChip" + (!online ? " offline" : "")}
+      aria-label={c.open}
+      title={`${syncing ? c.syncing : failed ? c.failed : online ? c.online : c.offline}${count ? " · " + c.count(count) : ""}`}
+      onClick={() => window.dispatchEvent(new Event("safarios-open-sync"))}
+    >
+      <Icon size={14} aria-hidden="true" />
+      <span role="status">
+        {syncing
+          ? c.syncing
+          : failed
+            ? c.failed
+            : online
+              ? c.online
+              : c.offline}
+        {count ? " · " + c.count(count) : ""}
       </span>
-    </span>
+    </button>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { syncOffline } from "@/lib/offline-sync";
+import { offlineCopy } from "@/lib/strings/offline";
 import { CollectionView } from "@/components/ui/collection-view";
 import { useWorkspaceAccess } from "@/lib/workspace-access";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -73,7 +75,7 @@ async function uploadPhoto(
 export default function WildlifePage() {
   const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
-  const canManage = access.permission("wildlife.manage");
+  const canManage = !access.readOnly && access.permission("wildlife.manage");
 
   const [rows, setRows] = useState<Sighting[]>([]),
     [open, setOpen] = useState(false),
@@ -93,6 +95,10 @@ export default function WildlifePage() {
       if (!access.isCurrent()) return;
       setDeviceRows(pending);
       setQueued(pending.length);
+      if (!navigator.onLine) {
+        setError("");
+        return;
+      }
       const nextRows = await operationsApi.wildlife.list<Sighting[]>();
       if (!access.isCurrent()) return;
       setRows(nextRows);
@@ -108,9 +114,11 @@ export default function WildlifePage() {
         new URLSearchParams(window.location.search).get("record") === "1",
     );
     load();
-    const fn = () => syncQueue();
-    window.addEventListener("online", fn);
-    return () => window.removeEventListener("online", fn);
+    const fn = () => {
+      void load();
+    };
+    window.addEventListener("safarios-queue-changed", fn);
+    return () => window.removeEventListener("safarios-queue-changed", fn);
   }, [access.scopeKey]);
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -128,31 +136,14 @@ export default function WildlifePage() {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   }
-  async function syncOne(scope: QueueScope, q: QueuedSighting) {
-    const created = await operationsApi.wildlife.create(q.payload, scope);
-    if (q.photo)
-      await uploadPhoto(
-        q.photo,
-        q.photoType || "image/jpeg",
-        created.id,
-        scope,
-      );
-    await removeQueuedSighting(scope, q.id);
-  }
   async function syncQueue() {
     if (!canManage || !navigator.onLine) return;
-    try {
-      await authApi.me();
-      const scope = queueScope();
-      for (const q of await queuedSightings(scope)) await syncOne(scope, q);
-      await load();
-    } catch (e: any) {
-      setError(`Offline sync stopped: ${e.message}`);
-    }
+    await syncOffline(queueScope());
+    await load();
   }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!canManage) return;
+    if (!canManage || !access.isCurrent()) return;
     const f = new FormData(e.currentTarget);
     const file = f.get("photo") as File;
     const id = crypto.randomUUID();
@@ -171,6 +162,8 @@ export default function WildlifePage() {
     };
     try {
       if (!navigator.onLine) {
+        if (!access.feature("offline_mobile"))
+          throw new Error(offlineCopy.feature);
         await queueSighting(queueScope(), {
           id,
           payload,
@@ -230,7 +223,10 @@ export default function WildlifePage() {
         <div className="collectionCards">
           {deviceRows.map((record) => (
             <article className="recordCard queuedRecord" key={record.id}>
-              <span className="statusPill">Waiting to sync</span>
+              <span className="statusPill">
+                {offlineCopy[record.state || "queued"]}
+              </span>
+              {record.error && <p role="alert">{record.error}</p>}
               <h2>{record.payload.species}</h2>
               <p>{formatDateTime(record.payload.observed_at)}</p>
               {record.photo && <small>Photo saved on this device</small>}

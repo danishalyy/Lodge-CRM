@@ -134,3 +134,9 @@ def generate_hr_expiry_alerts():
 from .ai.knowledge_jobs import ingest as ingest_knowledge
 
 from .ai.report_jobs import dispatch_reports as dispatch_ai_reports, generate_report as generate_ai_report
+
+
+@celery_app.task(name="app.worker.process_browser_push")
+def process_browser_push():
+    from .push_service import process_push
+    return process_push(SessionLocal)

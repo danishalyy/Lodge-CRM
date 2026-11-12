@@ -1163,7 +1163,7 @@ test('canvas wildlife shows real scoped pending records while offline without is
   await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/wildlife',r=>{if(r.request().method()!=='GET')writes.push(r.request().method());return r.fulfill({json:[]})});
   await page.goto(base+'/wildlife');await page.getByRole('heading',{name:'Wildlife sightings',exact:true}).waitFor();await context.setOffline(true);
   await page.getByRole('button',{name:'+ Sighting',exact:true}).click();await page.getByLabel('Species',{exact:true}).fill('Elephant');await page.getByLabel('Observed at',{exact:true}).fill('2026-11-10T09:00');await page.getByRole('button',{name:'Save offline',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
-  await page.locator('.queuedRecord').getByRole('heading',{name:'Elephant',exact:true}).waitFor();assert.equal(await page.locator('.queuedRecord').getByText('Waiting to sync',{exact:true}).count(),1);assert.deepEqual(writes,[]);
+  await page.locator('.queuedRecord').getByRole('heading',{name:'Elephant',exact:true}).waitFor();assert.equal(await page.locator('.queuedRecord').getByText('Queued',{exact:true}).count(),1);assert.deepEqual(writes,[]);
  }finally{await context.setOffline(false);await context.close()}
 });
 
@@ -1278,7 +1278,7 @@ test('instant AI dismissal rolls back on rejection and retry never confirms an a
 test('instant API cache clears on logout and lodge selection and never caches auth checks',async()=>{
  const vm=require('node:vm');const cache={};new Function('exports',ts.transpileModule(fs.readFileSync(path.join(web,'lib/data-cache.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(cache);
  const storage=new Map([['active_user_id','cache-owner'],['active_lodge_id','cache-lodge']]);const calls=[];const api={};
- const sandbox={exports:api,process:{env:{}},Headers,FormData,structuredClone,window:{dispatchEvent:()=>{}},document:{cookie:''},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:async(url,options)=>{calls.push({url,options});return {ok:true,status:200,json:async()=>url.endsWith('/auth/me')?{id:'cache-owner',memberships:[{lodge_id:storage.get('active_lodge_id')}]}:url.endsWith('/rooms')?[{id:'private-room'}]:{}}},require:name=>name.includes('data-cache')?cache:name.includes('form-submission')?{originatingForm:()=>null}:name.includes('action-feedback')?{actionFeedback:()=>{}}:name.includes('formatting')?{storeFormatting:()=>{}}:name==='sonner'?{toast:{error:()=>{}}}:{formCopy:{}}};
+ const sandbox={exports:api,process:{env:{}},Headers,FormData,structuredClone,window:{dispatchEvent:()=>{}},document:{cookie:''},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:async(url,options)=>{calls.push({url,options});return {ok:true,status:200,json:async()=>url.endsWith('/auth/me')?{id:'cache-owner',memberships:[{lodge_id:storage.get('active_lodge_id')}]}:url.endsWith('/rooms')?[{id:'private-room'}]:{}}},require:name=>name.includes('offlineWildlife')?{clearOfflineUser:async()=>{}}:name.includes('device-state')?{clearPushDevice:async()=>{}}:name.includes('data-cache')?cache:name.includes('form-submission')?{originatingForm:()=>null}:name.includes('action-feedback')?{actionFeedback:()=>{}}:name.includes('formatting')?{storeFormatting:()=>{}}:name==='sonner'?{toast:{error:()=>{}}}:{formCopy:{}}};
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(web,'lib/api.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,sandbox);
  await api.authApi.me();await api.authApi.me();assert.equal(calls.filter(c=>c.url.endsWith('/auth/me')).length,2);
  await api.lodgeApi.rooms();await api.lodgeApi.rooms();assert.equal(calls.filter(c=>c.url.endsWith('/rooms')).length,1);
@@ -1541,4 +1541,155 @@ test('live dashboard refresh preserves transient data with Retry and clears deni
   await page.goto(base+'/dashboard');await page.locator('.premiumMetric strong').filter({hasText:/^7$/}).waitFor();status=500;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('alert').waitFor();assert.equal(await page.locator('.premiumMetric strong').filter({hasText:/^7$/}).count(),1);
   status=403;await page.getByRole('alert').getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Command Centre unavailable',exact:true}).waitFor();assert.equal(await page.locator('.premiumMetric strong').count(),0);
  }finally{await context.close()}
+});
+
+async function exposeOfflineStore(page){
+ const js=ts.transpileModule(fs.readFileSync(path.join(web,'lib/offlineWildlife.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ await page.addScriptTag({content:`window.deviceQueue=(()=>{const exports={};${js};return exports;})();`});
+}
+
+test('PWA shared queue migrates scoped photos, leases each item once and fences logout cleanup',async()=>{
+ const context=await browser.newContext(),page=await context.newPage();
+ try{
+  await page.goto(base+'/login');
+  await page.evaluate(async()=>{await new Promise((resolve,reject)=>{const r=indexedDB.open('lodge-crm-offline',2);r.onupgradeneeded=()=>{const store=r.result.createObjectStore('wildlife-queue-v2',{keyPath:['userId','lodgeId','id']});store.createIndex('owner',['userId','lodgeId']);store.put({userId:'old-user',lodgeId:'old-lodge',id:'old-photo',createdAt:new Date().toISOString(),payload:{species:'Elephant'},photo:new Blob(['photo'])})};r.onsuccess=()=>{r.result.close();resolve()};r.onerror=()=>reject(r.error)});});
+  await exposeOfflineStore(page);
+  const result=await page.evaluate(async()=>{const q=window.deviceQueue,scope={userId:'old-user',lodgeId:'old-lodge'},other={userId:'new-user',lodgeId:'old-lodge'};const migrated=await q.queuedWork(scope);await q.queueWork(other,{id:'other',kind:'task.status',recordId:'record',expected:'assigned',value:'accepted',createdAt:new Date().toISOString()});const claims=await Promise.all([q.changeQueuedWork(scope,'old-photo',{state:'syncing',leaseOwner:'one',leaseUntil:Date.now()+60000},true),q.changeQueuedWork(scope,'old-photo',{state:'syncing',leaseOwner:'two',leaseUntil:Date.now()+60000},true)]);const wrong=await q.changeQueuedWork(scope,'old-photo',{state:'synced'},false,'wrong-owner');await q.clearOfflineUser(scope.userId);return {photo:await migrated[0].photo.text(),kind:migrated[0].kind,claims,wrong,old:(await q.queuedWork(scope)).length,other:(await q.queuedWork(other)).length};});
+  assert.equal(result.photo,'photo');assert.equal(result.kind,'wildlife.sighting');assert.equal(result.claims.filter(Boolean).length,1);assert.equal(result.wrong,false);assert.equal(result.old,0);assert.equal(result.other,1);
+ }finally{await context.close()}
+});
+
+async function offlineTaskPage(reject=false){
+ const user=premiumTestAccount();user.memberships[0].entitlements.push('offline_mobile');
+ const a=await accountPage(user);a.state={status:'assigned',reject,replays:[],writes:0};a.id='b1111111-1111-4111-8111-111111111111';
+ await a.context.addCookies([{name:'lodge_csrf',value:'device-test-csrf',url:base}]);
+ await premiumFixtures(a.page);
+ await a.page.route('**/api/v1/lodges/premium-lodge/tasks**',r=>{const p=new URL(r.request().url()).pathname;if(p.endsWith('/history'))return r.fulfill({json:{items:[],timing:null,has_more:false}});if(p.endsWith('/tasks'))return r.fulfill({json:[{id:a.id,title:'Offline pump inspection',description:'',status:a.state.status,priority:'normal',can_transition:true}]});if(r.request().method()!=='GET')a.state.writes++;return r.fulfill({json:[]})});
+ await a.page.route('**/api/v1/lodges/premium-lodge/offline-actions',r=>{const body=r.request().postDataJSON();a.state.replays.push(body);assert.equal(r.request().headers()['x-expected-user-id'],'premium-design-owner');assert.equal(r.request().headers()['x-lodge-context'],'premium-lodge');assert.equal(r.request().headers()['x-csrf-token'],'device-test-csrf');if(a.state.reject)return r.fulfill({status:403,json:{detail:'You no longer have permission to apply this queued change'}});if(body.kind==='task.status')a.state.status=body.value;return r.fulfill({json:{id:body.id,status:'synced'}})});
+ await a.page.goto(base+'/tasks');await a.page.getByRole('button',{name:'Accepted',exact:true}).waitFor();return a;
+}
+
+test('PWA task status queues offline and reconnect replays once under the original identity',async()=>{
+ const a=await offlineTaskPage();const {context,page,state}=a;
+ try{
+  await context.setOffline(true);await page.getByRole('button',{name:'Accepted',exact:true}).click();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();assert.equal(state.writes,0);assert.equal(state.replays.length,0);
+  await page.getByRole('button',{name:'Review device sync',exact:true}).first().click();await page.locator('[data-queue-state="queued"]').waitFor();assert.equal(await page.locator('[data-queue-state="queued"]').count(),1);
+  await context.setOffline(false);await page.locator('[data-queue-state="synced"]').waitFor();assert.equal(state.replays.length,1);assert.equal(state.replays[0].kind,'task.status');assert.equal(state.replays[0].expected,'assigned');assert.equal(state.replays[0].value,'accepted');assert.equal(state.status,'accepted');
+  await page.getByRole('button',{name:'Close device sync',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('online')));await page.waitForTimeout(300);assert.equal(state.replays.length,1);
+ }finally{await context.setOffline(false);await context.close()}
+});
+
+test('PWA rejected replay is visible, refreshes authoritative state and supports deliberate Retry',async()=>{
+ const a=await offlineTaskPage(true);const {context,page,state}=a;
+ try{
+  await context.setOffline(true);await page.getByRole('button',{name:'Accepted',exact:true}).click();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();await page.getByRole('button',{name:'Review device sync',exact:true}).first().click();await context.setOffline(false);await page.locator('[data-queue-state="rejected"]').waitFor();await page.getByRole('alert').filter({hasText:'You no longer have permission'}).waitFor();assert.equal(state.status,'assigned');assert.equal(state.replays.length,1);
+  state.reject=false;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.locator('[data-queue-state="synced"]').waitFor();assert.equal(state.replays.length,2);assert.equal(state.replays[0].id,state.replays[1].id);assert.equal(state.status,'accepted');
+ }finally{await context.setOffline(false);await context.close()}
+});
+
+test('PWA housekeeping and transfer status use the shared device queue without offline writes',async()=>{
+ for(const [module,endpoint,status,target,action,kind] of [['housekeeping','housekeeping-jobs','assigned','accepted','Accepted','housekeeping.status'],['transfers','transfers','scheduled','confirmed','Confirmed','transfer.status']]){
+  const user=premiumTestAccount();user.memberships[0].entitlements.push('offline_mobile');const {context,page}=await accountPage(user);let writes=0;
+  try{
+   await premiumFixtures(page);await page.route(`**/api/v1/lodges/premium-lodge/${endpoint}**`,r=>{if(r.request().method()!=='GET')writes++;return r.fulfill({json:[{id:'b2222222-2222-4222-8222-222222222222',unit_name:'Marula',unit_id:'room',job_type:'cleaning',status,notes:'',transfer_type:'pickup',guest_name:'Fixture guest',scheduled_at:'2026-11-12T10:00:00Z',expected_end_at:'2026-11-12T11:00:00Z',pickup_location:'Airport',dropoff_location:'Lodge',can_transition:true}]})});
+   await page.goto(base+'/'+module);await page.getByRole('button',{name:action,exact:true}).waitFor();await context.setOffline(true);await page.getByRole('button',{name:action,exact:true}).click();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();assert.equal(writes,0);await exposeOfflineStore(page);const rows=await page.evaluate(()=>window.deviceQueue.queuedWork({userId:'premium-design-owner',lodgeId:'premium-lodge'}));assert.equal(rows.length,1);assert.equal(rows[0].kind,kind);assert.equal(rows[0].expected,status);assert.equal(rows[0].value,target);
+  }finally{await context.setOffline(false);await context.close()}
+ }
+});
+
+test('PWA offline sign-out clears the queue and prevents private restoration on reconnect',async()=>{
+ const a=await offlineTaskPage();const {context,page}=a;
+ try{
+  await page.evaluate(()=>navigator.serviceWorker.ready);await context.setOffline(true);await page.getByRole('button',{name:'Accepted',exact:true}).click();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.waitForURL('**/login');assert.equal(await page.getByText('Offline pump inspection',{exact:true}).count(),0);
+  await context.setOffline(false);await exposeOfflineStore(page);assert.equal(await page.evaluate(async()=>(await window.deviceQueue.queuedWork({userId:'premium-design-owner',lodgeId:'premium-lodge'})).length),0);
+  await page.goto(base+'/tasks');await page.waitForURL('**/login');assert.equal(await page.getByText('Offline pump inspection',{exact:true}).count(),0);assert.equal(await page.evaluate(()=>localStorage.getItem('active_user_id')),null);
+ }finally{await context.setOffline(false);await context.close()}
+});
+
+test('PWA manifest is installable and offline navigation serves only a public fallback',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());
+ try{
+  await premiumFixtures(page);await page.goto(base+'/rooms');await page.getByRole('heading',{name:'Rooms & Units',exact:true}).waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+  const manifest=await page.evaluate(async()=>await(await fetch('/manifest.webmanifest')).json());assert.equal(manifest.display,'standalone');assert.equal(manifest.name,'SafariOS · Lodge operations');assert.deepEqual(manifest.icons.map(i=>i.sizes),['192x192','512x512']);
+  const urls=await page.evaluate(async()=>{const urls=[];for(const key of await caches.keys())for(const request of await(await caches.open(key)).keys())urls.push(new URL(request.url).pathname);return urls;});assert.ok(urls.includes('/offline.html'));assert.equal(urls.some(url=>url.startsWith('/api/')||url==='/rooms'||url==='/dashboard'),false);
+  await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'You’re offline',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Rooms & Units',exact:true}).count(),0);
+ }finally{await context.setOffline(false);await context.close()}
+});
+
+test('PWA checklist progress queues a boolean change without an offline PATCH',async()=>{
+ const a=await offlineTaskPage();const {context,page,state}=a;const item='c1111111-1111-4111-8111-111111111111';
+ try{
+  await page.route(`**/api/v1/lodges/premium-lodge/tasks/${a.id}/checklist`,r=>{if(r.request().method()!=='GET')state.writes++;return r.fulfill({json:[{id:item,label:'Check drinking water',completed:false,is_required:true}]})});
+  await page.getByRole('button',{name:'Offline pump inspection',exact:true}).click();await page.getByRole('dialog').getByLabel('Check drinking water',{exact:false}).waitFor();await context.setOffline(true);await page.getByRole('dialog').getByLabel('Check drinking water',{exact:false}).check();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();assert.equal(state.writes,0);await exposeOfflineStore(page);const rows=await page.evaluate(()=>window.deviceQueue.queuedWork({userId:'premium-design-owner',lodgeId:'premium-lodge'}));assert.equal(rows[0].kind,'task.checklist');assert.equal(rows[0].expected,false);assert.equal(rows[0].value,true);assert.equal(rows[0].itemId,item);
+ }finally{await context.setOffline(false);await context.close()}
+});
+
+test('PWA browser push prompts only after opt-in and disable removes the device binding',async()=>{
+ const user=premiumTestAccount(),{context,page}=await accountPage(user);let binding=null,saved=null,removed=0,release;
+ const key=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url'),id='d1111111-1111-4111-8111-111111111111';
+ try{
+  await context.addInitScript(()=>{window.pushPromptCalls=0;window.pushSubscribeCalls=0;window.pushUnsubscribeCalls=0;let subscribed=false;const item={toJSON:()=>({endpoint:'https://fcm.googleapis.com/fcm/send/browser-fixture',keys:{p256dh:'fixture',auth:'fixture'}}),unsubscribe:async()=>{subscribed=false;window.pushUnsubscribeCalls++;return true}};Object.defineProperty(Notification,'requestPermission',{configurable:true,value:async()=>{window.pushPromptCalls++;return 'granted'}});Object.defineProperty(ServiceWorkerRegistration.prototype,'pushManager',{configurable:true,get:()=>({getSubscription:async()=>subscribed?item:null,subscribe:async()=>{subscribed=true;window.pushSubscribeCalls++;return item}})});});
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/push/preferences',r=>{if(r.request().method()==='PATCH'){saved=r.request().postDataJSON();return r.fulfill({json:saved})}return r.fulfill({json:{configured:true,public_key:key,enabled:!!binding,bindings:binding?[binding]:[],categories:{task_assigned:true,request:true,overdue:true,arrival:true}}})});
+  await page.route('**/api/v1/lodges/premium-lodge/push/subscriptions',r=>{binding=id;return r.fulfill({json:{id,enabled:true}})});
+  await page.route('**/api/v1/auth/push/subscriptions',r=>{removed++;binding=null;return r.fulfill({json:{ok:true}})});
+  await page.goto(base+'/notifications');await page.getByRole('button',{name:'Browser notifications',exact:true}).click();await page.getByRole('button',{name:'Enable on this device',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.pushPromptCalls),0);
+  await page.getByRole('button',{name:'Enable on this device',exact:true}).click();await page.getByText('Enabled on this device',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.pushPromptCalls),1);assert.equal(await page.evaluate(()=>window.pushSubscribeCalls),1);
+  await page.getByLabel('Task assignments',{exact:true}).uncheck();await page.locator('.pushSettings').getByRole('button',{name:'Save preferences',exact:true}).click();await page.getByText('Notification preferences updated',{exact:true}).waitFor();assert.equal(saved.categories.task_assigned,false);
+  await page.getByRole('button',{name:'Turn off on this device',exact:true}).click();await page.getByRole('button',{name:'Enable on this device',exact:true}).waitFor();assert.ok(removed>=1);assert.equal(await page.evaluate(()=>localStorage.getItem('safarios_push_binding')),null);assert.equal(await page.evaluate(()=>window.pushPromptCalls),1);
+  let posted;const seen=new Promise(resolve=>posted=resolve);
+  await page.route('**/api/v1/lodges/premium-lodge/push/subscriptions',async r=>{await new Promise(resolve=>{release=resolve;posted()});return r.fulfill({json:{id,enabled:true}})});
+  await page.getByRole('button',{name:'Enable on this device',exact:true}).click();await seen;
+  const unsubscribed=await page.evaluate(()=>window.pushUnsubscribeCalls);
+  await page.evaluate(()=>{localStorage.setItem('active_user_id','different-user');localStorage.setItem('active_lodge_id','different-lodge');localStorage.setItem('safarios_push_binding',JSON.stringify({id:'new-account-binding',userId:'different-user',lodgeId:'different-lodge'}))});
+  release();await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(()=>window.pushUnsubscribeCalls),unsubscribed,'late old-account setup must not unsubscribe the new account');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('safarios_push_binding')).id),'new-account-binding');
+ }finally{release?.();await context.close()}
+});
+
+test('PWA worker caches no private request and suppresses mismatched, expired and signed-out push',async()=>{
+ const vm=require('node:vm'),handlers={},shown=[],opened=[];let active={id:'device-one',userId:'user-a',lodgeId:'lodge-a'},allow=true,fetches=0,cached=0;
+ const user={id:'user-a',is_super_admin:false,full_name:'Private guest/person detail',memberships:[{lodge_id:'lodge-a',permissions:['notifications.view'],entitlements:['notifications'],subscription_status:'Active'}]};
+ const db={close(){},transaction(){const tx={};tx.objectStore=()=>({get(){const get={result:active};queueMicrotask(()=>{get.onsuccess?.();tx.oncomplete?.()});return get},delete(){active=null}});return tx}};
+ const sandbox={URL,Response,Request,AbortSignal,Promise,console,queueMicrotask,setTimeout,clearTimeout,indexedDB:{open(){const r={};queueMicrotask(()=>r.onsuccess());r.result=db;return r}},caches:{keys:async()=>[],match:async()=>new Response('public offline shell'),open:async()=>({put:async()=>cached++,keys:async()=>[]})},fetch:async url=>{fetches++;if(String(url).includes('/auth/me'))return Response.json(user,{status:allow?200:401});return new Response('private document')},self:{location:{origin:base},addEventListener:(name,fn)=>handlers[name]=fn,registration:{showNotification:async(title,options)=>shown.push({title,options}),getNotifications:async()=>[]},clients:{claim:async()=>{},matchAll:async()=>[],openWindow:async url=>opened.push(url)},skipWaiting(){}}};
+ vm.runInNewContext(fs.readFileSync(path.join(web,'public/sw.js'),'utf8'),sandbox);
+ const send=async binding=>{let job;handlers.push({data:{json:()=>({type:'notification',binding})},waitUntil:p=>job=p});await job};
+ await send('someone-else');assert.equal(shown.length,0);assert.equal(fetches,0);
+ await send('device-one');assert.equal(shown.length,1);assert.equal(shown[0].title,'SafariOS');assert.equal(JSON.stringify(shown).includes('Private guest'),false);
+ allow=false;await send('device-one');assert.equal(shown.length,1);
+ let clear;handlers.message({data:{type:'CLEAR_SESSION',binding:'device-one'},waitUntil:p=>clear=p});await clear;assert.equal(active,null);allow=true;await send('device-one');assert.equal(shown.length,1);
+ let response;handlers.fetch({request:new Request(base+'/api/v1/lodges/lodge-a/tasks'),respondWith:p=>response=p});assert.equal(response,undefined);handlers.fetch({request:{method:'GET',url:base+'/dashboard',mode:'navigate'},respondWith:p=>response=p});await response;assert.equal(cached,0);
+ let click;handlers.notificationclick({notification:{close(){},data:{binding:'device-one'}},waitUntil:p=>click=p});await click;assert.deepEqual(opened,[]);
+});
+
+test('PWA activation finishes pending local sign-out before creating the new session',async()=>{
+ const context=await browser.newContext(),page=await context.newPage(),calls=[];page.setDefaultTimeout(10000);
+ try{
+  await context.addInitScript(()=>{localStorage.setItem('safarios_local_signout','previous-owner')});
+  await page.route('**/api/**',async r=>{const p=new URL(r.request().url()).pathname;if(p.endsWith('/invitations/preview'))return r.fulfill({json:{name:'New owner',email_hint:'n***@example.test',workspace:'Acacia Lodge',expires_at:'2027-01-01T00:00:00Z'}});if(p.endsWith('/auth/logout')){calls.push('logout');assert.equal(r.request().headers()['x-expected-user-id'],'previous-owner');return r.fulfill({json:{ok:true}})}if(p.endsWith('/auth/activate')){calls.push('activate');await context.addCookies([{name:'lodge_session',value:'activated-device-session',url:base}]);return r.fulfill({json:{ok:true}})}if(p.endsWith('/auth/me'))return r.fulfill({json:{id:'new-owner',is_super_admin:false,memberships:[{lodge_id:'new-lodge',permissions:[],entitlements:[]}]}});return r.fulfill({json:[]})});
+  await page.goto(base+'/activate#token=another-valid-invitation-token-for-test');await page.getByLabel('New password',{exact:true}).fill('A new private owner passphrase 42!');await page.getByLabel('Confirm password',{exact:true}).fill('A new private owner passphrase 42!');await page.getByRole('button',{name:'Activate my account',exact:true}).click();await page.waitForURL('**/settings');assert.deepEqual(calls,['logout','activate']);assert.equal(await page.evaluate(()=>localStorage.getItem('safarios_local_signout')),null);
+ }finally{await context.close()}
+});
+
+test('PWA device drawer fits both themes and collapsed navigation, with guarded discard feedback',async()=>{
+ const a=await offlineTaskPage(),{context,page}=a;
+ try{
+  await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
+  assert.ok(await page.evaluate(()=>{const rail=document.querySelector('.sidebar').getBoundingClientRect(),chip=document.querySelector('.sidebarFooter>.syncChip').getBoundingClientRect();return chip.left>=rail.left&&chip.right<=rail.right}));
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await context.setOffline(true);await page.getByRole('button',{name:'Accepted',exact:true}).click();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();await page.getByRole('button',{name:'Review device sync',exact:true}).first().click();
+  for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);if(width===375&&theme==='light'||width===1440&&theme==='dark')await page.screenshot({path:`/tmp/safarios-device-${width}-${theme}.png`});}
+  await page.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('dialog').last().getByRole('button',{name:'Cancel',exact:true}).focus();await page.keyboard.press('Escape');await page.locator('[data-queue-state="queued"]').waitFor();assert.equal(await page.locator('[data-queue-state="queued"]').count(),1);
+  await page.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('dialog').last().getByRole('button',{name:'Discard',exact:true}).click();await page.getByText('Removed from this device',{exact:true}).waitFor();await page.getByText('No queued work on this device.',{exact:true}).waitFor();assert.equal(a.state.replays.length,0);
+ }finally{await context.setOffline(false);await context.close()}
+});
+
+test('PWA discard cannot erase a command that started syncing while confirmation was open',async()=>{
+ const a=await offlineTaskPage(),{context,page,state}=a;let release,posted;const seen=new Promise(resolve=>posted=resolve);
+ try{
+  await page.route('**/api/v1/lodges/premium-lodge/offline-actions',async r=>{state.replays.push(r.request().postDataJSON());await new Promise(resolve=>{release=resolve;posted()});state.status='accepted';return r.fulfill({json:{id:state.replays[0].id,status:'synced'}})});
+  await context.setOffline(true);await page.getByRole('button',{name:'Accepted',exact:true}).click();await page.getByText('Saved on this device. Waiting to sync.',{exact:true}).waitFor();await page.getByRole('button',{name:'Review device sync',exact:true}).first().click();await page.getByRole('button',{name:'Discard',exact:true}).click();await context.setOffline(false);await seen;await page.locator('[data-queue-state="syncing"]').waitFor();
+  await page.getByRole('dialog').last().getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('alert').filter({hasText:'This change is syncing or has already finished.'}).waitFor();assert.equal(await page.locator('[data-queue-state="syncing"]').count(),1);
+  release();await page.locator('[data-queue-state="synced"]').waitFor();assert.equal(state.status,'accepted');assert.equal(state.replays.length,1);
+ }finally{release?.();await context.setOffline(false);await context.close()}
 });

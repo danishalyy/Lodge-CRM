@@ -2,6 +2,8 @@
 import { GroupedNavigation } from "./ui/grouped-navigation";
 import { UserMenu } from "./ui/user-menu";
 import { uiCopy as c } from "@/lib/strings/redesign";
+import OfflineManager from "./OfflineManager";
+import { SyncChip } from "./ui/sync-chip";
 import LiveUpdates from "./LiveUpdates";
 import { liveCopy } from "@/lib/strings/live";
 import StatusPill from "./StatusPill";
@@ -348,6 +350,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="appShell">
       <AccountChangeGuard />
+      {membership && !me.is_super_admin && (
+        <OfflineManager
+          key={`${me.id}:${membership.lodge_id}`}
+          userId={me.id}
+          lodgeId={membership.lodge_id}
+        />
+      )}
       <NavigationEnhancements
         role={membership?.role_key}
         items={visible}
@@ -438,6 +447,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         )}
         <div className="sidebarFooter">
+          {membership && <SyncChip />}
           <UserMenu
             name={me.full_name}
             role={membership?.role || "Super Admin"}

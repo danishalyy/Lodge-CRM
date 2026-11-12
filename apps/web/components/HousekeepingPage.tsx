@@ -1,4 +1,5 @@
 "use client";
+import { queueChange } from "@/lib/offline-sync";
 import { StatusBoard } from "./ui/status-board";
 import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { Skeleton } from "./ui/skeleton";
@@ -113,6 +114,27 @@ export default function HousekeepingPage() {
   }
   useDataRefresh(load, pending.length > 0 || createOpen || assetOpen);
   async function update(id: string, status: string) {
+    if (!navigator.onLine) {
+      const row = jobs.find((job) => job.id === id);
+      if (!row || access.readOnly) return false;
+      try {
+        await queueChange(
+          access,
+          "housekeeping.status",
+          id,
+          row.status,
+          status,
+        );
+        if (access.isCurrent())
+          setJobs((old) =>
+            old.map((job) => (job.id === id ? { ...job, status } : job)),
+          );
+        return access.isCurrent();
+      } catch (e) {
+        if (access.isCurrent()) setError((e as Error).message);
+        return false;
+      }
+    }
     const scope = {
       userId: getActiveUserId(),
       lodgeId: getActiveLodgeId(),

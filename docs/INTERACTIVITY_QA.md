@@ -1,6 +1,6 @@
-# Interactivity QA — Phases 1–2
+# Interactivity QA — Phases 1–3
 
-Phase 1 provides instant actions; Phase 2 adds shared status boards. SSE, push, generalized offline work, global shortcuts and walkthroughs remain later phases and require owner approval.
+Phase 1 provides instant actions; Phase 2 adds shared status boards; Phase 3 adds private, resumable live invalidations. Push, generalized offline work, global shortcuts and walkthroughs remain later phases and require owner approval.
 
 ## Phase 1 implementation
 
@@ -76,7 +76,7 @@ No backend route, API contract, permission key, RLS, CSRF or MFA check changes i
 7. Start dragging, then switch to another assigned lodge or revoke the relevant permission/subscription. The old gesture must not submit into the new context. Check read-only, field-role and platform-only accounts.
 8. Check 375, 768, 1366 and 1440px widths, both themes and reduced motion. On real touch hardware, verify drag activation and use the move menu as the reliable alternative.
 
-Phase 3 live updates and subsequent phases remain unstarted pending approval.
+The next section records the separately approved Phase 3 live updates.
 
 ### Phase 2 local verification — 10 November 2026
 
@@ -89,4 +89,63 @@ Phase 3 live updates and subsequent phases remain unstarted pending approval.
 
 Preview screenshots use test fixtures: [desktop dark](screenshots/safarios-status-board-desktop-dark.png), [phone light](screenshots/safarios-status-board-mobile-light.png). Real touch hardware and hosted deployment checks remain separate from local Chromium verification.
 
-Phase 2 implementation is complete. Phase 3 and later work await the owner's approval.
+Phase 2 implementation is complete.
+
+
+## Phase 3 — private live updates
+
+The additive `GET /api/v1/lodges/{lodge_id}/events` route uses the normal HttpOnly session, expected-user header, selected lodge, membership and subscription-read guards. Platform accounts remain prohibited, including legacy platform memberships. A fresh short transaction rechecks the session, permissions, feature overrides, department and staff assignment on every poll; it never holds a database connection for the lifetime of the response.
+
+Migration `0025_live_events` adds an RLS-protected transactional outbox. Deferred database triggers record inserts/updates for tasks (including checklist/comments/attachments), requests, stays, rooms, maintenance, housekeeping, private notifications/recipients and subscriptions. Rolled-back writes produce no committed events. A per-lodge commit lock keeps sequence allocation in commit order, so a later checkpoint cannot skip an earlier uncommitted change. The application role may append/read but cannot update/delete outbox rows. Existing RLS, CSRF, permissions and audit policies remain intact.
+
+Business event payloads contain only `type`, entity `id`, and a random opaque `version`. They contain no names, guest details, descriptions, assignees or counts. Delivery rechecks module permission, entitlement and the same current-record scope as the module API. Notification events require an actual recipient row for that user. The opaque encrypted resume token is bound to the session, user, lodge and access fingerprint; it exposes no global sequence or other lodge activity. A checkpoint follows each complete batch. Heartbeats run every 15 seconds; streams rotate after five minutes. Access changes close the stream with a control event and force a guarded metadata refresh.
+
+`LiveUpdates` owns one connection in the authorized lodge AppShell, using same-origin fetch so the existing context headers are preserved. It pauses while hidden/offline, aborts on identity changes, reconnects with bounded exponential backoff, remembers its cursor only in memory, deduplicates versions and uses the existing cache invalidation/read hooks. A 30-second authoritative reconciliation also runs while visible. This is the fallback for unavailable SSE and removes records which have left the user's scope without sending newly unauthorized record IDs. Assignment removals may therefore take up to 30 seconds to disappear. No private response is persisted.
+
+While editing, dragging or scrolling, changes accumulate behind an update pill; applying updates is disabled while an editor is active. Finishing an editor does not silently apply the live queue. Idle updates refresh existing rows, briefly highlight affected records using the existing gold token and fade dashboard figures in place. Reduced motion removes the animation. Access or subscription revocation takes priority over editing: operational children unmount during access revalidation; a failed access check stays blocked with Retry. Expired subscriptions retain existing read-only behavior and hide affected workflow write controls.
+
+### Phase 3 deployment and retention
+
+Use the existing Compose migration/grants ordering when updating:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+```
+
+The migration must complete and `db-grants` must run before the new API is served. No new environment variables or dependencies are required. At an external reverse proxy, preserve streaming, disable buffering/caching for `/api/v1/lodges/*/events`, and allow an upstream read timeout longer than the 15-second heartbeat (e.g. 60 seconds). The API sends `X-Accel-Buffering: no` and `Cache-Control: no-store, no-transform`. Verify these settings on the eventual Hostinger VPS; local browser mocks do not verify hosted proxy behavior.
+
+The outbox is ephemeral invalidation metadata, separate from immutable operational/audit history. Schedule an owner-controlled daily retention job before production launch, retaining at least eight days (resume tokens expire after seven). For example, run this bounded statement repeatedly through the existing database maintenance connection until it deletes zero rows:
+
+```sql
+DELETE FROM live_events WHERE id IN (
+  SELECT id FROM live_events
+  WHERE created_at < clock_timestamp() - interval '8 days'
+  ORDER BY created_at LIMIT 10000
+);
+```
+
+The CRM application role intentionally cannot perform this maintenance. Do not grant it DELETE or use it to prune audit/history tables. A reconnect always reconciles current authoritative reads, including after old invalidations have been pruned. A site scheduler and production concurrency/load measurements remain deployment tasks; the implementation polls the database once per second per visible connected tab, so size connection/query capacity using the real lodge workload.
+
+### Phase 3 manual checks
+
+1. Open two authorized accounts in the same lodge. Create/assign/update a task or request, change a room, stay, maintenance ticket or housekeeping job. The second idle page should refresh and briefly highlight the affected record. Check dashboard figures and private notification badges.
+2. Repeat with another lodge, a field-role user and a department manager. Events must never reveal another lodge, an unauthorized module, work outside the role's record scope or another recipient's notification. Use a platform account to confirm the stream is forbidden.
+3. Open an editor and type an unsaved value, then change its record from the other account. The queued pill must appear without replacing the draft. Close the editor and apply the queued updates. Repeat while scrolling and dragging.
+4. Disconnect/reconnect, hide/show the tab and restart the API. Check paused/reconnecting/live states, cursor resume and eventual authoritative data without duplicate mutations. With SSE blocked, visible-page reconciliation should continue every 30 seconds.
+5. Remove membership, revoke the session, change permissions/package, suspend the lodge or expire the subscription while connected. Access changes should hide operational children for revalidation; revoked access must remain denied, and expiry must remove workflow writes while retaining authorized reads.
+6. Change an assignment so a field user loses record access. Their next reconciliation must remove the record; the stream must not disclose its ID after access is lost. Verify behavior in both themes, reduced motion and 375/768/1366/1440px layouts.
+
+Phase 4 and later phases await the owner's approval. Production proxy verification, scheduled outbox retention, real-device checks and workload sizing remain deployment checks.
+
+### Phase 3 local verification — 12 November 2026
+
+- Full API suite: **771 passed**, including 14 real PostgreSQL live-event tests for atomic rollback, late commit/resume, RLS, append-only grants, recipient privacy, department/own-work scope, entitlement overrides, session/membership revocation, suspension, heartbeat and cursor binding.
+- Production frontend build: **passed** after the final changes.
+- Full browser suite: **86 passed**, including the 272 screen/width/theme combinations. After refresh-completion and error-state review, **31 targeted checks passed**, including one additional dashboard-denial flow. The final mobile header adjustment also passed **four live-flow checks**. This verifies **87 distinct suite checks overall**; the final targeted runs supplement the earlier full run.
+- Queued updates passed 375/768/1366/1440px overflow checks. The 375px queued state also passed automated WCAG 2 A/AA checks and visual review; this does not certify comprehensive accessibility or real-device behavior.
+- Static audit: **170 API routes, zero guard issues; 25 modules, zero missing pages**.
+- No new runtime dependencies or production demo records.
+
+The [queued-update phone preview](screenshots/safarios-live-queued-mobile.png) uses browser test fixtures. On a narrow phone, the status icon retains an accessible state label while the update button preserves space for the SafariOS mark.
+
+Phase 3 implementation is complete. Hosted streaming/proxy checks, scheduled retention, capacity sizing and real-device verification remain deployment work. Phase 4 (installable app, generalized offline work and push) and later phases require owner approval.

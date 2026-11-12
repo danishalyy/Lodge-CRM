@@ -8,24 +8,57 @@ import { instantCopy as c } from "./strings/interactivity";
 export function useDataRefresh(refresh: () => unknown, blocked = false) {
   const callback = useRef(refresh),
     busy = useRef(blocked);
-  const queued = useRef(false);
+  const queued = useRef(false),
+    detail = useRef<any>(undefined);
+  const invoke = useRef<(detail?: any) => void>(() => {});
   callback.current = refresh;
   busy.current = blocked;
   useEffect(() => {
-    const run = () => {
-      if (busy.current) queued.current = true;
-      else {
+    let alive = true;
+    invoke.current = (change) => {
+      const actor = getActiveUserId(),
+        lodge = getActiveLodgeId();
+      try {
+        const result = callback.current();
+        void Promise.resolve(result)
+          .then(() => {
+            if (
+              alive &&
+              change?.source === "live" &&
+              actor === getActiveUserId() &&
+              lodge === getActiveLodgeId()
+            )
+              window.dispatchEvent(
+                new CustomEvent("safarios-live-applied", { detail: change }),
+              );
+          })
+          .catch(() => {});
+      } catch {
+        /* The view owns its error state and Retry. */
+      }
+    };
+    const run = (event: Event) => {
+      const change = (event as CustomEvent).detail;
+      if (busy.current) {
+        queued.current = true;
+        detail.current = change;
+      } else {
         queued.current = false;
-        void callback.current();
+        invoke.current(change);
       }
     };
     window.addEventListener("safarios-data-refresh", run);
-    return () => window.removeEventListener("safarios-data-refresh", run);
+    return () => {
+      alive = false;
+      window.removeEventListener("safarios-data-refresh", run);
+      invoke.current = () => {};
+    };
   }, []);
   useEffect(() => {
     if (!blocked && queued.current) {
       queued.current = false;
-      void callback.current();
+      invoke.current(detail.current);
+      detail.current = undefined;
     }
   }, [blocked]);
 }

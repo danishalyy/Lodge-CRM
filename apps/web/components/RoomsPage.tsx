@@ -27,8 +27,9 @@ type Room = {
 };
 export default function RoomsPage() {
   const access = useWorkspaceAccess();
-  const canManage = access.permission("units.manage");
-  const canStatus = canManage || access.permission("units.status.manage");
+  const canManage = !access.readOnly && access.permission("units.manage");
+  const canStatus =
+    !access.readOnly && (canManage || access.permission("units.status.manage"));
   const { rows, setRows, pending, mutate } = useInstantRows<Room>(
     access.scopeKey,
   );

@@ -1,4 +1,5 @@
 "use client";
+import { useDataRefresh } from "@/lib/use-instant-actions";
 import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -40,7 +41,7 @@ export default function StaysPage() {
         : new URLSearchParams(location.search).get("status") || "all",
   );
   const access = useWorkspaceAccess();
-  const canManage = access.permission("stays.manage");
+  const canManage = !access.readOnly && access.permission("stays.manage");
   const [rows, setRows] = useState<Stay[]>([]),
     [guests, setGuests] = useState<Guest[]>([]),
     [rooms, setRooms] = useState<Room[]>([]),
@@ -60,6 +61,8 @@ export default function StaysPage() {
           ? lodgeApi.rooms()
           : Promise.resolve([]),
       ]);
+      if (!access.isCurrent()) return;
+      setError("");
       setRows(s);
       setGuests(g);
       setRooms(r);
@@ -72,6 +75,7 @@ export default function StaysPage() {
   useEffect(() => {
     load();
   }, []);
+  useDataRefresh(load, open);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -184,7 +188,7 @@ export default function StaysPage() {
             </thead>
             <tbody>
               {visibleStays.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} data-record-id={r.id}>
                   <td>{r.guest_name}</td>
                   <td>{r.unit_name}</td>
                   <td>

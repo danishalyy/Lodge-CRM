@@ -205,7 +205,7 @@ export function CollectionView({
           .replace(/\s+/g, " ")
           .trim() || c.unnamed;
     return (
-      <article className="recordCard" key={id}>
+      <article className="recordCard" key={id} data-record-id={id}>
         <header className="recordCardHeader">
           <span className="recordAvatar" aria-hidden="true">
             {title
@@ -261,6 +261,7 @@ export function CollectionView({
   }
   const displayedRows = filtered.map((r, i) =>
     cloneElement(r, {
+      "data-record-id": rowKey(r, i),
       onClick: (event: React.MouseEvent) => {
         if (
           (event.target as HTMLElement).closest(

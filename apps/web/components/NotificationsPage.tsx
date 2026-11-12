@@ -243,6 +243,7 @@ export default function NotificationsPage() {
               {rows.map((n) => (
                 <article
                   key={n.id}
+                  data-record-id={n.id}
                   className={`notificationItem ${n.read_at ? "" : "unread"}`}
                 >
                   <div className={`notificationPriority ${n.severity}`}>

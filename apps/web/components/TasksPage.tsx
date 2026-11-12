@@ -122,7 +122,8 @@ export default function TasksPage() {
     else setError(e.message);
   }
   const mayProgress = (task: Task) =>
-    canManage || (canOwnManage && task.can_transition === true);
+    !access.readOnly &&
+    (canManage || (canOwnManage && task.can_transition === true));
   const load = async () => {
     const n = ++generation.current;
     setLoading(true);
@@ -134,10 +135,10 @@ export default function TasksPage() {
         (x: any) => x.lodge_id === getActiveLodgeId(),
       );
       const manage = Boolean(
-        me.is_super_admin || m?.permissions?.includes("tasks.manage"),
+        !access.readOnly && m?.permissions?.includes("tasks.manage"),
       );
       const ownManage = Boolean(
-        me.is_super_admin || m?.permissions?.includes("tasks.own.manage"),
+        !access.readOnly && m?.permissions?.includes("tasks.own.manage"),
       );
       setCanManage(manage);
       setCanOwnManage(ownManage);

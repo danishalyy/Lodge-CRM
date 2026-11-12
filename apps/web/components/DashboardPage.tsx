@@ -1,4 +1,5 @@
 "use client";
+import { useDataRefresh } from "@/lib/use-instant-actions";
 import Link from "next/link";
 import { PageHeader, KpiCard } from "./ui/presentation";
 import { uiCopy as c } from "@/lib/strings/redesign";
@@ -19,27 +20,37 @@ export default function DashboardPage() {
     [stays, setStays] = useState<any[]>([]),
     [activities, setActivities] = useState<any[]>([]),
     [error, setError] = useState("");
-  useEffect(() => {
-    (async () => {
-      try {
-        const [dash, s, a] = await Promise.allSettled([
-          lodgeApi.dashboard(),
-          access.feature("stays") && access.permission("stays.view")
-            ? operationsApi.stays.list<any[]>()
-            : Promise.resolve([]),
-          access.feature("activities") && access.permission("activities.view")
-            ? operationsApi.activities.list<any[]>()
-            : Promise.resolve([]),
-        ]);
-        if (dash.status === "rejected") throw dash.reason;
-        setData(dash.value);
-        if (s.status === "fulfilled") setStays(s.value);
-        if (a.status === "fulfilled") setActivities(a.value);
-      } catch (e: any) {
-        setError(e.message);
+  const load = async () => {
+    try {
+      const [dash, s, a] = await Promise.allSettled([
+        lodgeApi.dashboard(),
+        access.feature("stays") && access.permission("stays.view")
+          ? operationsApi.stays.list<any[]>()
+          : Promise.resolve([]),
+        access.feature("activities") && access.permission("activities.view")
+          ? operationsApi.activities.list<any[]>()
+          : Promise.resolve([]),
+      ]);
+      if (!access.isCurrent()) return;
+      if (dash.status === "rejected") throw dash.reason;
+      setError("");
+      setData(dash.value);
+      if (s.status === "fulfilled") setStays(s.value);
+      if (a.status === "fulfilled") setActivities(a.value);
+    } catch (e: any) {
+      if (!access.isCurrent()) return;
+      if ([401, 403, 409].includes(e.status)) {
+        setData(null);
+        setStays([]);
+        setActivities([]);
       }
-    })();
+      setError(e.message);
+    }
+  };
+  useEffect(() => {
+    void load();
   }, []);
+  useDataRefresh(load);
   const events = useMemo<CalendarEvent[]>(() => {
     const x: CalendarEvent[] = [];
     stays.forEach((s) => {
@@ -66,12 +77,15 @@ export default function DashboardPage() {
     });
     return x;
   }, [stays, activities]);
-  if (error)
+  if (error && !data)
     return (
       <div className="panel statePanel">
         <span className="stateIcon danger">!</span>
-        <h2>Command centre unavailable</h2>
+        <h2>{c.dashboardError}</h2>
         <p>{error}</p>
+        <button type="button" className="button" onClick={() => void load()}>
+          {c.retry}
+        </button>
       </div>
     );
   if (!data)
@@ -154,6 +168,18 @@ export default function DashboardPage() {
   ].sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
   return (
     <>
+      {error && (
+        <div className="panel dangerText" role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => void load()}
+          >
+            {c.retry}
+          </button>
+        </div>
+      )}
       <PageHeader
         label={today.toLocaleDateString(undefined, {
           weekday: "long",

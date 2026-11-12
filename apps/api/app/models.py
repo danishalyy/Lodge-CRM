@@ -1043,3 +1043,13 @@ class TaskHistory(Base):
     before: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     after: Mapped[dict] = mapped_column(JSONB)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class LiveEvent(Base):
+    __tablename__ = 'live_events'
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('lodges.id', ondelete='CASCADE'))
+    entity: Mapped[str] = mapped_column(String(24))
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    kind: Mapped[str] = mapped_column(String(40))
+    version: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=text('gen_random_uuid()'))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text('clock_timestamp()'))

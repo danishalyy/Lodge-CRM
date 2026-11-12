@@ -65,7 +65,10 @@ export default function MaintenancePage() {
     [error, setError] = useState(""),
     [canManage, setCanManage] = useState(false);
   const workshop = access.feature("maintenance_workshop"),
-    canAssets = workshop && access.permission("maintenance.assets.manage");
+    canAssets =
+      !access.readOnly &&
+      workshop &&
+      access.permission("maintenance.assets.manage");
   useEffect(() => {
     if (!canAssets && tab === "assets") setTab("tickets");
   }, [canAssets, tab]);
@@ -76,10 +79,12 @@ export default function MaintenancePage() {
       const m = me.memberships?.find(
         (x: any) => x.lodge_id === getActiveLodgeId(),
       );
-      const manage = Boolean(m?.permissions?.includes("maintenance.manage"));
-      const assetManage = Boolean(
-        m?.permissions?.includes("maintenance.assets.manage"),
-      );
+      const manage =
+        !access.readOnly &&
+        Boolean(m?.permissions?.includes("maintenance.manage"));
+      const assetManage =
+        !access.readOnly &&
+        Boolean(m?.permissions?.includes("maintenance.assets.manage"));
       setCanManage(manage);
       const ws = access.feature("maintenance_workshop");
 

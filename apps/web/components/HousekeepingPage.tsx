@@ -60,7 +60,9 @@ export default function HousekeepingPage() {
       const m = me.memberships?.find(
         (x: any) => x.lodge_id === getActiveLodgeId(),
       );
-      const manage = Boolean(m?.permissions?.includes("housekeeping.manage"));
+      const manage =
+        !access.readOnly &&
+        Boolean(m?.permissions?.includes("housekeeping.manage"));
       setCanManage(manage);
 
       const [r, s, j] = await Promise.all([

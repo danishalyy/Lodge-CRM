@@ -1,3 +1,5 @@
+"use client";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { uiCopy as c } from "@/lib/strings/redesign";
@@ -36,12 +38,20 @@ export function KpiCard({
   href?: string;
   attention?: boolean;
 }) {
+  const reduced = useReducedMotion();
   const content = (
     <>
       <div className="metricTop">
         <span>{label}</span>
       </div>
-      <strong>{value == null ? "—" : value.toLocaleString()}</strong>
+      <motion.strong
+        key={String(value)}
+        initial={reduced ? false : { opacity: 0.65, y: 2 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+      >
+        {value == null ? "—" : value.toLocaleString()}
+      </motion.strong>
       <small>{value == null ? c.unavailable : hint}</small>
     </>
   );

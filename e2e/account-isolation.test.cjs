@@ -538,7 +538,7 @@ test('login offers a recovery code after the password challenge',async()=>{
 test('read-only rooms, stays and requests do not call unauthorized lookup endpoints',async()=>{
  for(const [module,feature,permission,title] of [['rooms','units','units.view','Rooms & Units'],['stays','stays','stays.view','Stays'],['requests','guest_requests','requests.view','Guest Requests']]){
   const {context,page,requests}=await accountPage({id:'scoped-'+module,full_name:'Reader',is_super_admin:false,memberships:[{lodge_id:'scope-lodge',permissions:[permission],entitlements:[feature,'guests','units','departments','staff']}]});
-  try{await page.goto(base+'/'+module);await page.getByRole('heading',{name:title,exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^\+ /}).count(),0);assert.deepEqual(requests.filter(x=>!x.endsWith('/branding')&&!x.endsWith('/'+module)),[]);}finally{await context.close()}
+  try{await page.goto(base+'/'+module);await page.getByRole('heading',{name:title,exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^\+ /}).count(),0);assert.deepEqual(requests.filter(x=>!x.endsWith('/branding')&&!x.endsWith('/events')&&!x.endsWith('/'+module)),[]);}finally{await context.close()}
  }
 });
 
@@ -1490,5 +1490,55 @@ test('status board room-status permission allows status updates without room con
  try{
   await page.route('**/api/v1/lodges/room-status-lodge/rooms**',r=>{if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();writes.push(body);status=body.status;return r.fulfill({json:{id:'status-only-room',status}})}return r.fulfill({json:[{id:'status-only-room',name:'Acacia',unit_type:'Suite',status,notes:''}]})});
   await page.goto(base+'/rooms');const menu=page.getByRole('combobox',{name:'Move to… Acacia',exact:true});await menu.waitFor();assert.equal(await page.getByRole('button',{name:'+ Room / Unit',exact:true}).count(),0);assert.equal(await menu.isDisabled(),false);await menu.selectOption('cleaning');await page.getByText('Acacia moved to Cleaning.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'cleaning'}]);
+ }finally{await context.close()}
+});
+
+test('live parser handles chunked frames, checkpoints and cancellation without persisting payloads',async()=>{
+ const source=fs.readFileSync(path.join(web,'lib/live-stream.ts'),'utf8');
+ const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+ const exports={};new Function('exports',js)(exports);const frames=[],abort=new AbortController();
+ const chunks=[': keepalive\r','\nevent: ready\r\ndata: {"version":"scope"}\r\n\r','\nid: opaque\nevent: checkpoint\ndata: {}\n\n'];
+ const response=new Response(new ReadableStream({start(c){for(const chunk of chunks)c.enqueue(new TextEncoder().encode(chunk));c.close()}}),{headers:{'Content-Type':'text/event-stream'}});
+ await exports.readLiveFrames(response,abort.signal,f=>frames.push(f));assert.deepEqual(frames.map(f=>[f.event,f.id]),[['ready',undefined],['checkpoint','opaque']]);
+ await assert.rejects(()=>exports.readLiveFrames(new Response('[]'),abort.signal,()=>{}));
+ abort.abort();await exports.readLiveFrames(new Response('event: change\ndata: {}\n\n',{headers:{'Content-Type':'text/event-stream'}}),abort.signal,()=>assert.fail('late frame delivered'));
+});
+
+test('live room changes queue behind an open form and apply only after editing ends',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());const room='a0000000-0000-4000-8000-000000000001';let release,updated=false,connections=0;
+ try{
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/rooms',r=>r.fulfill({json:[{id:room,name:updated?'Marula updated':'Marula original',status:'available',unit_type:'Suite',notes:''}]}));
+  await page.route('**/api/v1/lodges/premium-lodge/events',async r=>{connections++;assert.equal(r.request().headers()['x-expected-user-id'],'premium-design-owner');assert.equal(r.request().headers()['x-lodge-context'],'premium-lodge');if(connections>1)return r.fulfill({status:503,body:''});await new Promise(resolve=>release=resolve);return r.fulfill({contentType:'text/event-stream',body:`id: safe-cursor\nevent: ready\ndata: {"version":"scope-v1"}\n\nevent: change\ndata: {"type":"room.updated","id":"${room}","version":"b0000000-0000-4000-8000-000000000001"}\n\nevent: checkpoint\nid: next-cursor\ndata: {}\n\n`})});
+  await page.goto(base+'/rooms');await page.getByText('Marula original',{exact:true}).first().waitFor();await page.getByRole('button',{name:'+ Room / Unit',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByLabel('Name',{exact:true}).fill('Keep my draft');
+  await page.waitForFunction(()=>true);updated=true;assert.ok(release);release();await page.locator('.liveUpdatePill').filter({hasText:'1 new update'}).waitFor();assert.equal(await page.getByRole('dialog').getByLabel('Name',{exact:true}).inputValue(),'Keep my draft');assert.equal(await page.getByText('Marula updated',{exact:true}).count(),0);assert.equal(await page.locator('.liveUpdatePill').filter({hasText:'1 new update'}).isDisabled(),true);
+  await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
+  for(const width of [375,768,1366,1440]){await page.setViewportSize({width,height:1000});await page.waitForTimeout(550);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'queued pill must fit at '+width);}
+  await page.setViewportSize({width:375,height:1000});
+  assert.ok(await page.evaluate(()=>{const brand=document.querySelector('.mobileBrandMark').getBoundingClientRect(), controls=document.querySelector('.liveControls').getBoundingClientRect();return brand.right<=controls.left;}),'pending updates must not cover lodge branding');
+  const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>v.id),[]);
+  await page.screenshot({path:'/tmp/safarios-live-queued-mobile.png'});
+  await page.locator('.liveUpdatePill').filter({hasText:'1 new update'}).click();await page.getByText('Marula updated',{exact:true}).first().waitFor();await page.locator(`[data-record-id="${room}"][data-live-updated="true"]`).waitFor();
+ }finally{release?.();await context.close()}
+});
+
+test('live access revocation hides operational data before rechecking authority',async()=>{
+ const user=premiumTestAccount();const {context,page}=await accountPage(user);let release,revoked=false;
+ try{
+  await premiumFixtures(page);await page.route('**/api/v1/auth/me',r=>r.fulfill({json:revoked?{...user,memberships:[{...user.memberships[0],permissions:[]}]}:user}));
+  await page.route('**/api/v1/lodges/premium-lodge/rooms',r=>r.fulfill({json:[{id:'a0000000-0000-4000-8000-000000000001',name:'Private room record',status:'available',unit_type:'Suite'}]}));
+  await page.route('**/api/v1/lodges/premium-lodge/events',async r=>{await new Promise(resolve=>release=resolve);return r.fulfill({contentType:'text/event-stream',body:'event: access\ndata: {"type":"access.changed","id":"premium-lodge","version":"v2"}\n\n'})});
+  await page.goto(base+'/rooms');await page.getByText('Private room record',{exact:true}).first().waitFor();revoked=true;assert.ok(release);release();await page.getByRole('heading',{name:'Access denied',exact:true}).waitFor();assert.equal(await page.getByText('Private room record',{exact:true}).count(),0);
+ }finally{release?.();await context.close()}
+});
+
+test('live dashboard refresh preserves transient data with Retry and clears denied data',async()=>{
+ const {context,page}=await accountPage(premiumTestAccount());let status=200;
+ try{
+  await premiumFixtures(page);
+  await page.route('**/api/v1/lodges/premium-lodge/events',r=>r.fulfill({status:503,body:''}));
+  await page.route('**/api/v1/lodges/premium-lodge/dashboard',r=>status===200?r.fulfill({json:{metrics:{open_tasks:7,overdue_tasks:0,guests_in_house:0,arrivals_today:0},attention:[],events:[]}}):r.fulfill({status,json:{detail:status===403?'Your role does not permit this action':'internal'}}));
+  await page.goto(base+'/dashboard');await page.locator('.premiumMetric strong').filter({hasText:/^7$/}).waitFor();status=500;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('alert').waitFor();assert.equal(await page.locator('.premiumMetric strong').filter({hasText:/^7$/}).count(),1);
+  status=403;await page.getByRole('alert').getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Command Centre unavailable',exact:true}).waitFor();assert.equal(await page.locator('.premiumMetric strong').count(),0);
  }finally{await context.close()}
 });

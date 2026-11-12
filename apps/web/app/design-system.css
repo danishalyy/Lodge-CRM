@@ -3148,3 +3148,19 @@ textarea:focus-visible {
   --material-shadow-small: 0 2px 8px rgba(41,37,30,.04);
   --glass-highlight: inset 0 1px 0 rgba(255,255,255,.85);
 }
+
+/* Live invalidations share the existing semantic palette. */
+.liveControls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.liveConnection { display:inline-flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; white-space:nowrap; }
+.liveConnection[data-state="live"] svg { color:var(--accent); }
+.liveUpdatePill { min-height:32px; padding:4px 12px; font-size:12px; }
+[data-live-updated="true"] { animation:live-record-highlight 1.8s ease-out; }
+@keyframes live-record-highlight { from { background-color:var(--gold-wash, rgba(196,160,103,.18)); } to { background-color:transparent; } }
+@media (max-width:600px) { .liveConnection { font-size:11px; } .liveControls { max-width:140px; } }
+@media (prefers-reduced-motion:reduce) { [data-live-updated="true"] { animation:none; outline:1px solid var(--accent); outline-offset:-1px; } }
+@media (max-width:600px) {
+  .liveControls:has(.liveUpdatePill) { flex-wrap:nowrap; max-width:none; gap:6px; }
+  .liveControls:has(.liveUpdatePill) .liveConnection { font-size:0; gap:0; }
+  .topbar:has(.liveUpdatePill) .mobilePlatformName { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+}
+.topActions .liveUpdatePill { min-height:44px; }

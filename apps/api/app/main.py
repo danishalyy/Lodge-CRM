@@ -66,7 +66,7 @@ app.add_middleware(
     allow_origins=settings.origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id", "X-Lodge-Context"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id", "X-Lodge-Context", "Last-Event-ID"],
 )
 
 redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
@@ -2407,3 +2407,7 @@ app.include_router(guest_profile_router)
 
 from .task_history import router as task_history_router
 app.include_router(task_history_router)
+
+# Payload-free invalidations use ordinary lodge/session authorization.
+from .live_events import router as live_events_router
+app.include_router(live_events_router)

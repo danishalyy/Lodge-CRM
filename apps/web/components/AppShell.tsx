@@ -2,6 +2,8 @@
 import { GroupedNavigation } from "./ui/grouped-navigation";
 import { UserMenu } from "./ui/user-menu";
 import { uiCopy as c } from "@/lib/strings/redesign";
+import LiveUpdates from "./LiveUpdates";
+import { liveCopy } from "@/lib/strings/live";
 import StatusPill from "./StatusPill";
 import MfaPrompt from "./MfaPrompt";
 import { navigationCopy } from "@/lib/strings/navigation";
@@ -15,7 +17,12 @@ import WorkspaceCommand from "./WorkspaceCommand";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { modules, moduleFeature } from "@/lib/modules";
-import { authApi, getActiveLodgeId, setActiveLodgeId } from "@/lib/api";
+import {
+  authApi,
+  getActiveUserId,
+  getActiveLodgeId,
+  setActiveLodgeId,
+} from "@/lib/api";
 import UiIcon, { moduleIcon } from "./UiIcon";
 import NavigationEnhancements from "./NavigationEnhancements";
 import { accessCopy } from "@/lib/strings/access";
@@ -112,6 +119,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [checkingAccess, setCheckingAccess] = useState(false);
+  const [accessError, setAccessError] = useState(false);
+  const recheckAccess = async () => {
+    const actor = getActiveUserId(),
+      lodge = getActiveLodgeId();
+    setCheckingAccess(true);
+    setAccessError(false);
+    try {
+      const fresh = await authApi.me();
+      if (actor !== getActiveUserId() || lodge !== getActiveLodgeId()) return;
+      setMe(fresh);
+      setCheckingAccess(false);
+    } catch {
+      if (actor === getActiveUserId() && lodge === getActiveLodgeId())
+        setAccessError(true);
+    }
+  };
   useEffect(() => {
     authApi
       .me()
@@ -168,6 +192,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   if (!me) return null;
+  if (checkingAccess)
+    return (
+      <main className="content">
+        <AccountChangeGuard />
+        <section className="panel statePanel" role="status">
+          <p>{accessError ? liveCopy.accessError : liveCopy.checking}</p>
+          {accessError && (
+            <button
+              type="button"
+              className="button primary"
+              onClick={() => void recheckAccess()}
+            >
+              {liveCopy.retry}
+            </button>
+          )}
+        </section>
+      </main>
+    );
   if (me.is_super_admin && path !== "/settings")
     return (
       <main className="content">
@@ -429,6 +471,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <strong className="mobilePlatformName">SafariOS</strong>
           </div>
           <div className="topActions">
+            {!me.is_super_admin &&
+              membership &&
+              requestedModule !== "group" &&
+              !blocked && (
+                <LiveUpdates
+                  userId={me.id}
+                  lodgeId={membership.lodge_id}
+                  accessVersion={JSON.stringify([
+                    membership.role_key,
+                    membership.permissions,
+                    membership.entitlements,
+                    membership.subscription_status,
+                    membership.department_id,
+                  ])}
+                  onAccessChange={() => void recheckAccess()}
+                />
+              )}
             <button
               className="searchButton"
               aria-label={navigationCopy.search}

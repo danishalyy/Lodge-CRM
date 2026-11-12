@@ -44,7 +44,7 @@ const next: Record<string, string | undefined> = {
 export default function GuestRequestsPage() {
   const [collectionLoading, setCollectionLoading] = useState(true);
   const access = useWorkspaceAccess();
-  const canManage = access.permission("requests.manage");
+  const canManage = !access.readOnly && access.permission("requests.manage");
   const { rows, setRows, pending, mutate } = useInstantRows<Req>(
     access.scopeKey,
   );

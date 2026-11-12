@@ -191,7 +191,9 @@ git pull
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 ```
 
-Migration `0026_offline_push`, current grants and the updated API image must be applied before running the new workers. The new runtime dependency is `pywebpush==2.5.0`.
+Migration `0026_offline_push`, current grants and the updated API image must be applied before running the new workers. The new runtime dependencies are `pywebpush==2.5.0` and `requests==2.34.2`. Docker installs `apps/api/requirements.lock.txt`; both direct requirements and their full dependency closure must be included there. A regression test checks that every direct requirement has a compatible lock entry. The optional Docker `build_ca` secret supports dependency installation behind a trusted proxy without persisting its certificate in the image.
+
+Dependency-lock correction verification: **826 API tests passed**, frontend production build passed, and a fresh Python 3.12 API Docker build passed its application import smoke test. Inside that image, `pip check` found no broken requirements and the dependency-lock regression test passed with networking disabled.
 
 For optional push, generate keys privately in your own terminal:
 

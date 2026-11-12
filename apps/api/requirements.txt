@@ -19,3 +19,4 @@ Pillow==13.0.0
 pypdf==6.21.2
 defusedxml==0.7.1
 pywebpush==2.5.0
+requests==2.34.2

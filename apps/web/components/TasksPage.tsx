@@ -438,6 +438,12 @@ export default function TasksPage() {
     if (canManage && new URLSearchParams(location.search).get("create") === "1")
       setOpen(true);
   }, [canManage]);
+  useEffect(() => {
+    if (!canManage) return;
+    const show = () => setOpen(true);
+    window.addEventListener("safarios-new-task", show);
+    return () => window.removeEventListener("safarios-new-task", show);
+  }, [canManage]);
   const visibleTasks = rows.filter((r) =>
     taskFilter === "overdue"
       ? !!r.due_at &&

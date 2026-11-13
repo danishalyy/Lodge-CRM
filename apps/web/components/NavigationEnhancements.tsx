@@ -14,7 +14,15 @@ import {
   Building2,
   Settings,
   Menu,
-  Users,
+  Bell,
+  ClipboardCheck,
+  MessageSquare,
+  PawPrint,
+  Truck,
+  Brush,
+  Wrench,
+  UtensilsCrossed,
+  Binoculars,
 } from "lucide-react";
 export default function NavigationEnhancements({
   items,
@@ -69,15 +77,25 @@ export default function NavigationEnhancements({
                       ? "/tasks"
                       : "/dashboard",
           c.fieldDay,
-          LayoutDashboard,
+          role === "ranger"
+            ? Binoculars
+            : role === "driver"
+              ? Truck
+              : role === "housekeeping"
+                ? Brush
+                : role === "maintenance"
+                  ? Wrench
+                  : role === "fb"
+                    ? UtensilsCrossed
+                    : LayoutDashboard,
         ],
-        ["/tasks", "Tasks", LayoutDashboard],
+        ["/tasks", "Tasks", ClipboardCheck],
         [
           role === "ranger" ? "/wildlife" : "/requests",
           role === "ranger" ? "Sightings" : "Requests",
-          Users,
+          role === "ranger" ? PawPrint : MessageSquare,
         ],
-        ["/notifications", "Alerts", Settings],
+        ["/notifications", "Alerts", Bell],
       ] as const);
   const visibleLinks = links.filter(
     ([href]) => platform || !items || items.some(([key]) => href === "/" + key),

@@ -69,6 +69,7 @@ const icons: Record<string, LucideIcon> = {
   ranger: Binoculars,
   memory: History,
   "lodge-ai": Sparkles,
+  ai: Sparkles,
   packages: Package,
   subscriptions: Receipt,
   audit: ScrollText,

@@ -1,0 +1,63 @@
+export const shortcutCopy = {
+  title: "Keyboard shortcuts",
+  description: "Move around SafariOS without leaving the keyboard.",
+  close: "Close",
+  general: "General",
+  goTo: "Go to",
+  create: "Create",
+  then: "then",
+  search: "Search the workspace",
+  searchQuick: "Quick search (when not typing)",
+  help: "Show this list",
+  newTask: "New task",
+  recordSighting: "Record a sighting",
+  closeAny: "Close a panel or dialog",
+  menuShortcuts: "Keyboard shortcuts",
+  menuTour: "Welcome tour",
+  quickCreate: "Quick create",
+  quickActions: "Quick actions",
+  go: {
+    d: "dashboard",
+    t: "tasks",
+    g: "guests",
+    s: "stays",
+    r: "rooms",
+    q: "requests",
+    h: "housekeeping",
+    m: "maintenance",
+    n: "notifications",
+    w: "wildlife",
+    f: "fleet",
+    a: "lodge-ai",
+  } as Record<string, string>,
+};
+export const tourCopy = {
+  title: "Welcome to SafariOS",
+  skip: "Skip tour",
+  next: "Next",
+  back: "Back",
+  done: "Start working",
+  step: (n: number, total: number) => `Step ${n} of ${total}`,
+  steps: {
+    nav: {
+      title: "Everything in six groups",
+      body: "The sidebar groups your lodge into Today, Guests, Operations, Safari & Fleet, People and Insight. You only see what your role allows.",
+    },
+    search: {
+      title: "Find anything fast",
+      body: "Press Ctrl or Cmd + K to search modules and jump to quick actions. Press ? at any time to see every keyboard shortcut.",
+    },
+    tasks: {
+      title: "Your work, one tap away",
+      body: "Tasks and alerts update while you work. Press N to create a task, or use the Quick create button on your phone.",
+    },
+    ai: {
+      title: "Ask Lodge AI",
+      body: "Ask a question about your lodge in plain language. Anything it suggests needs your approval before it changes a record.",
+    },
+    wildlife: {
+      title: "Record sightings anywhere",
+      body: "Sightings are saved on this device if the signal drops, then sent when you are back online.",
+    },
+  },
+};

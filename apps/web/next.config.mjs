@@ -9,12 +9,14 @@ const securityHeaders = [
 
 const nextConfig = {
   output: 'standalone',
+  // Live updates use a server-sent event stream; the built-in compressor buffers it. Compress at the reverse proxy instead.
+  compress: false,
   async rewrites() {
     const backend = (process.env.API_INTERNAL_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
     return [{ source: '/api/:path*', destination: `${backend}/api/:path*` }];
   },
   async headers() {
-    return [{ source: '/(.*)', headers: [...securityHeaders, { key: 'Cache-Control', value: 'private, no-store' }] }, { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Service-Worker-Allowed', value: '/' }] }];
+    return [{ source: '/(.*)', headers: [...securityHeaders, { key: 'Cache-Control', value: 'private, no-store' }] }, { source: '/api/v1/lodges/:lodgeId/events', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, no-transform' }, { key: 'X-Accel-Buffering', value: 'no' }] }, { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Service-Worker-Allowed', value: '/' }] }];
   },
 };
 export default nextConfig;

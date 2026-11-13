@@ -15,6 +15,11 @@ import { Field } from "@/components/ui/field";
 import { WorkspaceAccessContext } from "@/lib/workspace-access";
 import NotificationBell from "./NotificationBell";
 import Link from "next/link";
+import KeyboardShortcuts, { openShortcuts } from "./KeyboardShortcuts";
+import QuickCreate from "./QuickCreate";
+import { goToNewTask } from "@/lib/quick-actions";
+import WelcomeTour, { openTour } from "./WelcomeTour";
+import { shortcutCopy } from "@/lib/strings/shortcuts";
 import WorkspaceCommand from "./WorkspaceCommand";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -298,6 +303,38 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ]),
   ];
 
+  const can = (key: string) =>
+    visible.some((i) => i[0] === key && i[3] !== "locked");
+  const quickActions = [
+    ...(can("tasks")
+      ? [
+          {
+            id: "new-task",
+            label: "New task",
+            run: () => goToNewTask(router, path),
+          },
+        ]
+      : []),
+    ...(can("wildlife")
+      ? [
+          {
+            id: "record-sighting",
+            label: "Record a sighting",
+            run: () => router.push("/wildlife"),
+          },
+        ]
+      : []),
+    ...(membership && !me.is_super_admin
+      ? [
+          {
+            id: "shortcuts",
+            label: shortcutCopy.menuShortcuts,
+            run: openShortcuts,
+          },
+          { id: "tour", label: shortcutCopy.menuTour, run: openTour },
+        ]
+      : []),
+  ];
   const blocked =
     membership &&
     !me.is_super_admin &&
@@ -451,6 +488,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <UserMenu
             name={me.full_name}
             role={membership?.role || "Super Admin"}
+            tools={!!membership && !me.is_super_admin}
           />
         </div>
       </aside>
@@ -512,7 +550,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               membership?.subscription_status,
             ) && <StatusPill value={membership.subscription_status} />}
             <div className="mobileUserMenu">
-              <UserMenu name={me.full_name} role={membership?.role} />
+              <UserMenu
+                name={me.full_name}
+                role={membership?.role}
+                tools={!!membership && !me.is_super_admin}
+              />
             </div>
           </div>
         </header>
@@ -557,7 +599,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         items={visible}
+        actions={quickActions}
       />
+      {membership && !me.is_super_admin && !blocked && (
+        <>
+          <KeyboardShortcuts
+            items={visible}
+            onSearch={() => setSearchOpen(true)}
+          />
+          <QuickCreate items={visible} />
+          <WelcomeTour
+            userId={me.id}
+            lodgeId={membership.lodge_id}
+            items={visible}
+          />
+        </>
+      )}
     </div>
   );
 }

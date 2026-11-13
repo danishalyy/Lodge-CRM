@@ -1372,3 +1372,58 @@ h2,.cardTitle { font-size:18px; letter-spacing:-.015em; }
 .collectionCards .statusBoardItem .taskRow small { display: block; margin-top: 8px; color: var(--text-2); }
 
 .statusKeyboardPreview { border: 1px dashed var(--gold); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: var(--surface); color: var(--text); font-size: 14px; }
+
+/* === Interactivity: shortcuts, quick create, welcome tour === */
+.shortcutDialog,.tourDialog{padding:28px;width:min(520px,calc(100vw - 32px))}
+.shortcutDialog h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-2);margin:22px 0 8px;font-weight:500}
+.shortcutList{list-style:none;margin:0;padding:0}
+.shortcutList li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.shortcutList li:last-child{border-bottom:0}
+.shortcutKeys{display:inline-flex;gap:6px;align-items:center}
+.shortcutKeys small{color:var(--text-2);font-size:11px;margin:0 6px 0 2px}
+.shortcutKeys>span{display:inline-flex;align-items:center}
+.shortcutDialog kbd,.tourDialog kbd{min-width:26px;height:26px;padding:0 8px;display:inline-grid;place-items:center;border:1px solid var(--line);border-bottom-width:2px;border-radius:8px;background:var(--surface-2);color:var(--text);font:500 12px var(--font-body)}
+.tourStep{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-text);margin:0 0 8px}
+.tourDialog [role="heading"],.shortcutDialog [role="heading"]{font-family:var(--font-heading);font-weight:500;letter-spacing:-.02em}
+.tourDialog>p:not(.tourStep),.shortcutDialog>p{color:var(--text-2);line-height:1.6;font-size:15px}
+.tourDots{display:flex;gap:6px;margin:22px 0 4px}
+.tourDots i{width:8px;height:8px;border-radius:99px;background:var(--line);transition:width .2s ease,background .2s ease}
+.tourDots i.on{width:22px;background:var(--gold)}
+.userMenuPanel button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;color:var(--text);padding:10px 12px;border-radius:12px;font:inherit;text-align:left;cursor:pointer}
+.userMenuPanel button:hover{background:var(--surface-2)}
+.quickCreate{display:none}
+@media (max-width:820px){
+  .quickCreate{display:block;position:fixed;right:20px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:60}
+  .quickCreateButton{width:56px;height:56px;border-radius:50%;border:0;background:var(--gold);color:var(--on-gold);display:grid;place-items:center;box-shadow:var(--shadow);cursor:pointer}
+  .quickCreateButton:active{transform:scale(.96)}
+  .quickCreateMenu{position:absolute;right:0;bottom:68px;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:8px;box-shadow:var(--shadow);display:grid;gap:2px}
+  .quickCreateMenu a{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 14px;border-radius:12px;color:var(--text);text-decoration:none;font-size:15px}
+  .quickCreateMenu a:hover{background:var(--surface-2)}
+}
+@media (prefers-reduced-motion:reduce){.tourDots i{transition:none}.quickCreateButton:active{transform:none}}
+
+/* Search icon must never sit on top of typed or placeholder text. */
+.filterBar .collectionSearch svg { top:50%; transform:translateY(-50%); }
+.filterBar .collectionSearch input.field,
+.filterBar .collectionSearch input { padding-left:42px !important; }
+
+/* Status boards: equal-width columns that scroll sideways; quiet, compact card controls on desktop. */
+.statusBoard { display:grid !important; grid-template-columns:none !important; grid-auto-flow:column; grid-auto-columns:minmax(240px,1fr); gap:20px; overflow-x:auto; align-items:start; padding-bottom:8px; }
+.statusBoard > .statusColumn { min-width:0; }
+@media (min-width: 821px) and (not (pointer: coarse)) {
+  .statusCardControls { justify-content:space-between; margin-bottom:6px; gap:6px; }
+  .statusCardControls .select { flex:0 1 150px; min-height:34px; height:34px; font-size:12px; padding:0 10px; border-radius:10px; background:transparent; color:var(--text-2); }
+  .statusCardControls .select:hover, .statusCardControls .select:focus-visible { color:var(--text); background:var(--surface-2); }
+  .statusDragHandle { width:34px; height:34px; min-width:34px; min-height:34px; padding:0; }
+}
+
+/* Phones: compact page header and toolbars so content starts above the fold. */
+@media (max-width: 820px) {
+  .pageHeader { display:flex; flex-direction:row; flex-wrap:wrap; align-items:flex-end; gap:12px; margin-bottom:16px; }
+  .pageHeader > div:first-child { flex:1 1 200px; min-width:0; }
+  .pageHeader > .button, .pageHeader .primary.button, .pageHeader > .primary { width:auto; flex:0 0 auto; }
+  .pageHeader p { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .filterBar { gap:10px; }
+  .filterBar .viewSwitcher { width:100%; display:flex; overflow-x:auto; }
+  .filterBar .viewSwitcher button { flex:1 0 auto; justify-content:center; white-space:nowrap; }
+}

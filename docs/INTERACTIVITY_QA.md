@@ -232,3 +232,38 @@ Phase 5 and later phases require the owner's approval. Production key/HTTPS setu
 Previews use test fixtures: [device sync — desktop dark](screenshots/safarios-device-sync-desktop-dark.png), [device sync — phone light](screenshots/safarios-device-sync-mobile-light.png).
 
 Phase 4 implementation is complete. Remaining setup is installation-specific push keys/contact, HTTPS/worker egress and real-device verification; the existing Phase 3 hosted proxy/live-outbox-retention checks also remain. Phase 5 (speed, shortcuts and quick actions) and later phases await owner approval.
+
+## Phase 5–6 (client-only): shortcuts, quick create, welcome tour
+
+No API, permission, entitlement or data-contract change. Everything is derived from the already permission-filtered module list in `AppShell`; a locked or hidden module never gets a shortcut or action.
+
+- **Keyboard shortcuts** (`components/KeyboardShortcuts.tsx`): `/` opens search, `?` opens the cheat sheet, `N` opens New task (the Tasks page still checks manage permission), `G` then `D/T/G/S/R/Q/H/M/N/W/F/A` jumps to a module. Ignored while typing in a field or while any dialog is open. The `G` prefix expires after 1.2 s. Also reachable from the user menu and the search palette.
+- **Search palette quick actions**: New task, Record a sighting, Keyboard shortcuts, Welcome tour appear above the module list when the user may use them.
+- **Quick create** (`components/QuickCreate.tsx`): mobile-only floating button above the bottom tabs offering New task and Record a sighting.
+- **Welcome tour** (`components/WelcomeTour.tsx`): skippable first-run walkthrough, 3–5 steps filtered to the modules the user can use. Completion is remembered per user and lodge in `localStorage`; replay from the user menu.
+- **Fixes**: mobile bottom-tab icons now match their destination (Tasks, Requests, Sightings, Alerts and field-role home) instead of reusing Dashboard, Users and Settings icons; the pinned "Ask Lodge AI" entry uses the sparkle icon; the authenticator QR dark colour uses the logo ink.
+
+### Manual checks
+1. Press `?` on any lodge page: the list shows only modules you can open. Press `G` then `T`: Tasks opens. Typing `g` or `n` inside any text field does nothing.
+2. Press `N` as a Lodge Admin: Tasks opens with the form. As a role without task management: Tasks opens without the form.
+3. Open search (Ctrl/Cmd+K): quick actions appear and run.
+4. On a 375 px screen: the "+" button sits above the tab bar and opens New task / Record a sighting; Escape or tapping elsewhere closes it.
+5. First login as a new user shows the tour; Skip stops it from returning; user menu → Welcome tour replays it.
+6. Super Admin and suspended lodges: no shortcuts, tour or quick create are rendered.
+
+Not included (needs device testing): swipe gestures, pull-to-refresh, bulk actions.
+
+## Verified in a running stack (headless Chromium, PostgreSQL 16 + pgvector, Redis, FastAPI, `next start`)
+
+Checked with a seeded lodge as Lodge Admin (desktop 1440 px and phone 390 px) and as a Ranger (phone). Screenshots: `docs/screenshots/verified/`.
+
+Confirmed: first-login tour shows once and does not return; `?` cheat sheet; `G` then `T`; palette "Quick actions"; `N`; mobile "+" menu; Ranger lands on "My safari day" with correct bottom-tab icons; Live indicator turns "Live".
+
+Fixed while testing:
+- **Live updates never connected through the web server.** Next.js response compression buffered the server-sent event stream, so the indicator stayed on "Reconnecting" and the app silently fell back to polling. `next.config.mjs` now sets `compress: false` (compress at your reverse proxy instead; enable gzip/brotli there but exclude `text/event-stream`) and marks the events route `no-transform`.
+- **`N` / the "+" menu did nothing when already on `/tasks`** (the page only read `?create=1` once). A small event (`lib/quick-actions.ts`) now opens the form.
+- **Search icon overlapped the placeholder** in list toolbars.
+- **Phones**: list pages now start on Cards instead of a sideways-scrolling table (unless the person chose a view); page header and toolbars are more compact.
+- **Status boards**: columns are equal width; the "Move to…" control and drag handle are compact on desktop and stay large on touch screens.
+
+Known, not changed: sidebar groups scroll when the window is shorter than about 900 px; on a brand-new lodge the setup checklist pushes the KPI cards below the fold; Rooms status is a manual field and does not follow in-house stays.

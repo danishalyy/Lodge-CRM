@@ -145,10 +145,13 @@ export function CollectionView({
   useEffect(() => {
     try {
       const value = localStorage.getItem(viewKey);
+      // Wide tables are hard to use on a phone: start on cards unless the person chose a view.
+      const phone = window.matchMedia("(max-width: 820px)").matches;
+      const fallback = phone && defaultView === "list" ? "cards" : defaultView;
       setView(
         value === "list" || value === "cards" || value === "board"
           ? value
-          : defaultView,
+          : fallback,
       );
     } catch {
       setView(defaultView);

@@ -13,7 +13,7 @@ export default function AuthenticatorQR({ uri }: { uri: string }) {
       width: 256,
       margin: 4,
       errorCorrectionLevel: "M",
-      color: { dark: "#171717", light: "#ffffff" },
+      color: { dark: "#17181c", light: "#ffffff" },
     })
       .then((value) => {
         if (live) setImage(value);

@@ -1,9 +1,9 @@
 export type ModuleKey = 'dashboard'|'guests'|'stays'|'rooms'|'requests'|'feedback'|'staff'|'hr'|'roles'|'departments'|'tasks'|'housekeeping'|'maintenance'|'food-beverage'|'activities'|'transfers'|'fleet'|'fuel'|'wildlife'|'ranger'|'reports'|'memory'|'lodge-ai'|'notifications'|'settings';
 
 export const modules = [
-  ['dashboard','Command Centre','◫'],['guests','Guest CRM','◎'],['stays','Stays','◌'],['rooms','Rooms & Units','▦'],['requests','Guest Requests','✦'],['feedback','Guest Feedback','★'],
-  ['staff','Staff','♙'],['hr','Staff HR','▤'],['roles','Roles & Permissions','⌘'],['departments','Departments','⌘'],['tasks','Tasks','✓'],['housekeeping','Housekeeping','⌂'],['maintenance','Maintenance','⚙'],['food-beverage','Food & Beverage','◍'],
-  ['activities','Activities','◈'],['transfers','Transfers','↔'],['ranger','Ranger View','♞'],['fleet','Fleet','◇'],['fuel','Fuel','◒'],['wildlife','Wildlife','⌖'],['reports','Reports','▥'],['memory','Operational Memory','◷'],
+  ['dashboard','Home','◫'],['guests','Guests','◎'],['stays','Stays','◌'],['rooms','Rooms & Units','▦'],['requests','Guest Requests','✦'],['feedback','Feedback','★'],
+  ['staff','Staff','♙'],['hr','Staff Records','▤'],['roles','Roles & Access','⌘'],['departments','Departments','⌘'],['tasks','Tasks','✓'],['housekeeping','Housekeeping','⌂'],['maintenance','Maintenance','⚙'],['food-beverage','Food & Beverage','◍'],
+  ['activities','Activities','◈'],['transfers','Transfers','↔'],['ranger','Ranger Schedule','♞'],['fleet','Fleet','◇'],['fuel','Fuel','◒'],['wildlife','Wildlife','⌖'],['reports','Reports','▥'],['memory','Activity History','◷'],
   ['lodge-ai','Ask Lodge AI','✧'],['notifications','Notifications','◉'],['settings','Account Security','⚙']
 ] as const;
 

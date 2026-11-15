@@ -1,4 +1,5 @@
 "use client";
+import { AnimatedNumber } from "./animated-number";
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -50,7 +51,7 @@ export function KpiCard({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
       >
-        {value == null ? "—" : value.toLocaleString()}
+        {value == null ? "—" : <AnimatedNumber value={value} />}
       </motion.strong>
       <small>{value == null ? c.unavailable : hint}</small>
     </>

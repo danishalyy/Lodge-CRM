@@ -88,14 +88,11 @@ export default function FleetPage() {
         <div>
           <span className="eyebrow">SAFARI OPERATIONS</span>
           <h1>Fleet</h1>
-          <p>
-            Keep your fleet ready, maintained and available for the next
-            journey.
-          </p>
+          <p>Your vehicles, their status and when they next need a service.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Vehicle
+            Add vehicle
           </button>
         )}
       </div>

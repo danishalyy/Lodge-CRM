@@ -75,13 +75,11 @@ export default function FoodBeveragePage() {
         <div>
           <span className="eyebrow">LODGE OPERATIONS</span>
           <h1>Food & Beverage</h1>
-          <p>
-            Meal services, guest counts and live dietary/allergy requirements.
-          </p>
+          <p>Today’s meals, how many guests, and any allergies or special diets.</p>
         </div>
         {canManage && access.permission("fb.manage") && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Meal service
+            Add meal service
           </button>
         )}
       </div>

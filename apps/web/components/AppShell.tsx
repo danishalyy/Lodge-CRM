@@ -15,7 +15,7 @@ import { Field } from "@/components/ui/field";
 import { WorkspaceAccessContext } from "@/lib/workspace-access";
 import NotificationBell from "./NotificationBell";
 import Link from "next/link";
-import KeyboardShortcuts, { openShortcuts } from "./KeyboardShortcuts";
+import KeyboardShortcuts from "./KeyboardShortcuts";
 import QuickCreate from "./QuickCreate";
 import { goToNewTask } from "@/lib/quick-actions";
 import WelcomeTour, { openTour } from "./WelcomeTour";
@@ -125,6 +125,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // On desktop there is no top bar: the bell lives in the sidebar.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWide(m.matches);
+    sync();
+    m.addEventListener("change", sync);
+    return () => m.removeEventListener("change", sync);
+  }, []);
   const [q, setQ] = useState("");
   const [checkingAccess, setCheckingAccess] = useState(false);
   const [accessError, setAccessError] = useState(false);
@@ -325,14 +334,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         ]
       : []),
     ...(membership && !me.is_super_admin
-      ? [
-          {
-            id: "shortcuts",
-            label: shortcutCopy.menuShortcuts,
-            run: openShortcuts,
-          },
-          { id: "tour", label: shortcutCopy.menuTour, run: openTour },
-        ]
+      ? [{ id: "tour", label: shortcutCopy.menuTour, run: openTour }]
       : []),
   ];
   const blocked =
@@ -399,6 +401,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         items={visible}
         open={navOpen}
         onOpenChange={setNavOpen}
+        ai={{
+          show: allowed("lodge-ai") || locked("lodge-ai"),
+          locked: locked("lodge-ai"),
+        }}
+        knowledge={
+          allowed("lodge-ai") &&
+          membership?.entitlements?.includes("ai_knowledge") &&
+          membership?.entitlements?.includes("document_knowledge") &&
+          membership?.permissions?.includes("knowledge.view")
+        }
+        onSearch={() => setSearchOpen(true)}
       />
       <button
         className="mobileBackdrop"
@@ -443,17 +456,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           ) : (
             <strong>No lodge selected</strong>
           )}
-          <small>
-            {membership?.role || (me.is_super_admin ? "Super Admin" : "")}
-          </small>
-          {membership?.subscription_status && (
-            <small>
-              {membership.package || membership.subscription_status}
-            </small>
-          )}
         </div>
+        <button
+          type="button"
+          className="sidebarSearch"
+          aria-label={navigationCopy.search}
+          onClick={() => setSearchOpen(true)}
+        >
+          <UiIcon name="search" />
+          <span>Search</span>
+        </button>
         {membership && (
           <GroupedNavigation
+            ai={{ show: allowed("lodge-ai") || locked("lodge-ai"), locked: locked("lodge-ai") }}
             items={visible}
             knowledge={
               allowed("lodge-ai") &&
@@ -462,15 +477,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               membership.permissions?.includes("knowledge.view")
             }
           />
-        )}
-        {visible.some(([key]) => key === "lodge-ai") && (
-          <Link className="navItem pinnedAI" href="/lodge-ai">
-            <UiIcon name="ai" />
-            <span>Ask Lodge AI</span>
-            {locked("lodge-ai") && (
-              <LockKeyhole size={14} aria-label="Locked feature" />
-            )}
-          </Link>
         )}
         {me.is_super_admin && (
           <nav className="platformNav">
@@ -484,12 +490,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         )}
         <div className="sidebarFooter">
-          {membership && <SyncChip />}
-          <UserMenu
-            name={me.full_name}
-            role={membership?.role || "Super Admin"}
-            tools={!!membership && !me.is_super_admin}
-          />
+          {membership && <SyncChip quiet />}
+          {wide &&
+            ["Expiring Soon", "Expired"].includes(
+              membership?.subscription_status,
+            ) && <StatusPill value={membership.subscription_status} />}
+          <div className="sidebarUserRow">
+            <UserMenu
+              name={me.full_name}
+              role={membership?.role || "Super Admin"}
+              tools={!!membership && !me.is_super_admin}
+            />
+            {wide && allowed("notifications") && <NotificationBell />}
+          </div>
         </div>
       </aside>
       <main className="mainArea">
@@ -536,17 +549,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   onAccessChange={() => void recheckAccess()}
                 />
               )}
-            <button
-              className="searchButton"
-              aria-label={navigationCopy.search}
-              onClick={() => setSearchOpen(true)}
-            >
-              <UiIcon name="search" />
-              <span>{navigationCopy.search}</span>
-              <kbd>⌘ K</kbd>
-            </button>
-            {allowed("notifications") && <NotificationBell />}
-            {["Expiring Soon", "Expired"].includes(
+            {!wide && allowed("notifications") && <NotificationBell />}
+            {!wide && ["Expiring Soon", "Expired"].includes(
               membership?.subscription_status,
             ) && <StatusPill value={membership.subscription_status} />}
             <div className="mobileUserMenu">
@@ -587,11 +591,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               platform: !!me.is_super_admin,
             }}
           >
-            {requestedFeature && locked(requestedModule) ? (
-              <LockedFeature module={requestedModule} />
-            ) : (
-              children
-            )}
+            <div key={path} className="pageEnter">
+              {requestedFeature && locked(requestedModule) ? (
+                <LockedFeature module={requestedModule} />
+              ) : (
+                children
+              )}
+            </div>
           </WorkspaceAccessContext.Provider>
         </div>
       </main>

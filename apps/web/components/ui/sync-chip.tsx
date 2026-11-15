@@ -4,7 +4,7 @@ import { Wifi, WifiOff, RefreshCw, AlertCircle } from "lucide-react";
 import { getActiveLodgeId, getActiveUserId } from "@/lib/api";
 import { queuedWork } from "@/lib/offlineWildlife";
 import { offlineCopy as c } from "@/lib/strings/offline";
-export function SyncChip() {
+export function SyncChip({ quiet = false }: { quiet?: boolean }) {
   const [online, setOnline] = useState(true),
     [count, setCount] = useState(0),
     [syncing, setSyncing] = useState(false),
@@ -60,6 +60,7 @@ export function SyncChip() {
     };
   }, []);
   if (!available) return null;
+  if (quiet && online && !count && !failed && !syncing) return null;
   const Icon = syncing
     ? RefreshCw
     : failed

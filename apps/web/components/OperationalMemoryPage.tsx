@@ -39,11 +39,8 @@ export default function OperationalMemoryPage() {
       <div className="pageHeader">
         <div>
           <span className="eyebrow">OPERATIONAL MEMORY</span>
-          <h1>Event History</h1>
-          <p>
-            A connected timeline of the decisions and activity across your
-            lodge.
-          </p>
+          <h1>Activity History</h1>
+          <p>A timeline of what happened at your lodge and who did it.</p>
         </div>
       </div>
       <div className="toolbar">

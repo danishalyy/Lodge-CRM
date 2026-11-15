@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ChevronUp, Compass, Keyboard, Settings, UserRound } from "lucide-react";
+import { ChevronUp, Compass, Settings, UserRound } from "lucide-react";
 import { shortcutCopy as sc } from "@/lib/strings/shortcuts";
 import ThemeToggle from "../ThemeToggle";
 import { SyncChip } from "./sync-chip";
@@ -66,16 +66,6 @@ export function UserMenu({
         </Link>
         {tools && (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                if (ref.current) ref.current.open = false;
-                window.dispatchEvent(new Event("safarios-open-shortcuts"));
-              }}
-            >
-              <Keyboard size={16} />
-              {sc.menuShortcuts}
-            </button>
             <button
               type="button"
               onClick={() => {

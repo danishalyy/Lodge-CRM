@@ -206,14 +206,11 @@ export default function GuestsPage() {
         <div>
           <span className="eyebrow">GUEST CRM</span>
           <h1>Guests</h1>
-          <p>
-            Know your guests. Keep preferences, dietary needs and stay history
-            close at hand.
-          </p>
+          <p>Guest details, preferences, dietary needs and past stays.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Guest
+            Add guest
           </button>
         )}
       </div>

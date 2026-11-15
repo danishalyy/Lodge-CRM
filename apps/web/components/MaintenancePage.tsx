@@ -1,4 +1,5 @@
 "use client";
+import { actionLabel } from "@/lib/friendly";
 import { StatusBoard } from "./ui/status-board";
 import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { Skeleton } from "./ui/skeleton";
@@ -249,10 +250,7 @@ export default function MaintenancePage() {
         <div>
           <span className="eyebrow">MAINTENANCE & WORKSHOP</span>
           <h1>Maintenance</h1>
-          <p>
-            Property, vehicle and asset maintenance with scheduling, downtime,
-            parts and recurring service workflows.
-          </p>
+          <p>Report problems and follow repairs for rooms, vehicles and equipment.</p>
         </div>
         {(tab === "assets" ? canAssets : canManage) && (
           <button
@@ -261,7 +259,7 @@ export default function MaintenancePage() {
               tab === "assets" ? setAssetOpen(true) : setCreateOpen(true)
             }
           >
-            {tab === "assets" ? "+ Add asset" : "+ Add ticket"}
+            {tab === "assets" ? "Add equipment" : "Report a problem"}
           </button>
         )}
       </div>
@@ -457,7 +455,7 @@ export default function MaintenancePage() {
                             }
                           >
                             {next[i.status]
-                              ? readableLabel(next[i.status]!)
+                              ? actionLabel("maintenance", next[i.status]!, i.status)
                               : instant.saving}
                           </button>
                         )}{" "}

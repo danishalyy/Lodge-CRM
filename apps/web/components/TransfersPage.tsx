@@ -162,14 +162,11 @@ export default function TransfersPage() {
         <div>
           <span className="eyebrow">GUEST LOGISTICS</span>
           <h1>Transfers</h1>
-          <p>
-            Coordinate every pickup and drop-off, from flight details to driver
-            assignments.
-          </p>
+          <p>Airport and lodge pickups and drop-offs, with flight, driver and vehicle.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Transfer
+            Add transfer
           </button>
         )}
       </div>
@@ -194,7 +191,7 @@ export default function TransfersPage() {
                 <th>Driver</th>
                 <th>Vehicle</th>
                 <th>Status</th>
-                <th>Workflow</th>
+                <th>Next step</th>
               </tr>
             </thead>
             <tbody>

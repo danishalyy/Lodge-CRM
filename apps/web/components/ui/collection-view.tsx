@@ -244,7 +244,7 @@ export function CollectionView({
         )}
         <div className="recordCardFields">
           {cells.slice(1).map((cell, i) =>
-            headers[i + 1] && headers[i + 1] !== "Workflow" ? (
+            headers[i + 1] && headers[i + 1] !== "Next step" ? (
               <div key={i}>
                 <span>{headers[i + 1]}</span>
                 <span>{cell.props.children}</span>
@@ -254,7 +254,7 @@ export function CollectionView({
         </div>
         <div className="recordActions">
           {cells.map((cell, i) =>
-            !headers[i] || headers[i] === "Workflow" ? (
+            !headers[i] || headers[i] === "Next step" ? (
               <React.Fragment key={i}>{cell.props.children}</React.Fragment>
             ) : null,
           )}

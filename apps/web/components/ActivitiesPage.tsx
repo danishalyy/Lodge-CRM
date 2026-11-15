@@ -123,14 +123,11 @@ export default function ActivitiesPage() {
         <div>
           <span className="eyebrow">DAILY OPERATIONS</span>
           <h1>Activities & game drives</h1>
-          <p>
-            Plan memorable experiences. Coordinate guests, guides and vehicles
-            without scheduling conflicts.
-          </p>
+          <p>Plan game drives and activities, with the guide and vehicle for each.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Activity
+            Add activity
           </button>
         )}
       </div>
@@ -155,7 +152,7 @@ export default function ActivitiesPage() {
                 <th>Vehicle</th>
                 <th>Guests</th>
                 <th>Status</th>
-                <th>Workflow</th>
+                <th>Next step</th>
               </tr>
             </thead>
             <tbody>

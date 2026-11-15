@@ -7,6 +7,7 @@ import UiIcon, { moduleIcon } from "./UiIcon";
 import Link from "next/link";
 import { LockKeyhole } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { GroupedNavigation } from "./ui/grouped-navigation";
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -29,11 +30,17 @@ export default function NavigationEnhancements({
   role,
   open,
   onOpenChange,
+  ai,
+  knowledge,
+  onSearch,
 }: {
   items?: readonly (readonly string[])[];
   role?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  ai?: { show: boolean; locked: boolean };
+  knowledge?: boolean;
+  onSearch?: () => void;
 }) {
   const [internalMore, setInternalMore] = useState(false);
   const more = open ?? internalMore;
@@ -133,6 +140,26 @@ export default function NavigationEnhancements({
               Close
             </button>
           </div>
+          {items ? (
+            <>
+              {onSearch && (
+                <button
+                  type="button"
+                  className="sidebarSearch"
+                  onClick={() => {
+                    setMore(false);
+                    onSearch();
+                  }}
+                >
+                  <UiIcon name="search" />
+                  <span>Search</span>
+                </button>
+              )}
+              <div onClick={(e) => (e.target as HTMLElement).closest("a") && setMore(false)}>
+                <GroupedNavigation items={items} ai={ai} knowledge={knowledge} />
+              </div>
+            </>
+          ) : (
           <nav aria-label="All screens">
             {(
               items || [
@@ -161,6 +188,7 @@ export default function NavigationEnhancements({
               </Link>
             ))}
           </nav>
+          )}
           <UserMenu />
         </Drawer>
       )}

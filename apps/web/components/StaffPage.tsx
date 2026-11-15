@@ -196,14 +196,11 @@ export default function StaffPage() {
         <div>
           <span className="eyebrow">PEOPLE</span>
           <h1>Staff</h1>
-          <p>
-            Your team, organised. Manage responsibilities, account access and
-            day-to-day availability.
-          </p>
+          <p>Your team, their roles and whether they can sign in.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Staff member
+            Add staff member
           </button>
         )}
       </div>

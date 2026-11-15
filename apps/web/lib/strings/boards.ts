@@ -1,15 +1,15 @@
 export const boardCopy = {
   board: "Status board",
   cards: "Cards",
-  view: "Workflow view",
+  view: "Board view",
   move: (title: string) => `Move ${title}`,
-  moveTo: (title: string) => `Move to… ${title}`,
-  choose: "Move to…",
+  moveTo: (title: string) => `Change status… ${title}`,
+  choose: "Change status…",
   collapse: (label: string) => `Collapse ${label}`,
   expand: (label: string) => `Expand ${label}`,
-  empty: "No records",
+  empty: "Nothing here yet",
   instructions:
-    "Press Space to pick up a card. Use Left and Right arrows to choose a column. Press Space to drop, or Escape to cancel. You can also use the Move to menu.",
+    "Press Space to pick up a card. Use Left and Right arrows to choose a column. Press Space to drop, or Escape to cancel. You can also use the Change status menu.",
   picked: (title: string) =>
     `${title} picked up. Use Left and Right arrows to choose a column.`,
   over: (label: string) => `Destination: ${label}. Press Space to drop.`,

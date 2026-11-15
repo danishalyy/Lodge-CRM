@@ -93,14 +93,11 @@ export default function FeedbackPage() {
         <div>
           <span className="eyebrow">GUEST EXPERIENCE</span>
           <h1>Feedback & Complaints</h1>
-          <p>
-            Track compliments, feedback and complaints through follow-up and
-            resolution.
-          </p>
+          <p>Compliments, feedback and complaints, and what was done about them.</p>
         </div>
         {canManage && access.permission("feedback.manage") && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Feedback
+            Add feedback
           </button>
         )}
       </div>

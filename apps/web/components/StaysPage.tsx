@@ -1,4 +1,5 @@
 "use client";
+import { actionLabel } from "@/lib/friendly";
 import { useDataRefresh } from "@/lib/use-instant-actions";
 import { CollectionView } from "@/components/ui/collection-view";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -123,10 +124,7 @@ export default function StaysPage() {
         <div>
           <span className="eyebrow">ARRIVALS & DEPARTURES</span>
           <h1>Stays</h1>
-          <p>
-            Coordinate arrivals, room assignments and departures with
-            confidence.
-          </p>
+          <p>Who is arriving, who is staying and who is leaving, and in which room.</p>
         </div>
         {canManage && (
           <button
@@ -134,7 +132,7 @@ export default function StaysPage() {
             onClick={() => setOpen(true)}
             disabled={!guests.length || !rooms.length}
           >
-            + Stay
+            Add stay
           </button>
         )}
       </div>
@@ -183,7 +181,7 @@ export default function StaysPage() {
                 <th>Departure</th>
                 <th>Party</th>
                 <th>Status</th>
-                <th>Workflow</th>
+                <th>Next step</th>
               </tr>
             </thead>
             <tbody>
@@ -207,7 +205,7 @@ export default function StaysPage() {
                         className="button secondary"
                         onClick={() => advance(r)}
                       >
-                        Mark {readableLabel(next[r.status]!)}
+                        {actionLabel("stays", next[r.status]!, r.status)}
                       </button>
                     ) : (
                       <span>—</span>

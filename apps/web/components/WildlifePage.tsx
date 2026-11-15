@@ -192,10 +192,7 @@ export default function WildlifePage() {
         <div>
           <span className="eyebrow">WILDLIFE</span>
           <h1>Wildlife sightings</h1>
-          <p>
-            Capture the moment. Record sightings, photos and locations, even
-            beyond the signal.
-          </p>
+          <p>Record animals you see with a photo and location. Works without signal.</p>
         </div>
         <div className="headerActions">
           {queued > 0 && canManage && (
@@ -205,7 +202,7 @@ export default function WildlifePage() {
           )}
           {canManage && (
             <button className="button primary" onClick={() => setOpen(true)}>
-              + Sighting
+              Record sighting
             </button>
           )}
         </div>

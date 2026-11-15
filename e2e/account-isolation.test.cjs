@@ -344,7 +344,7 @@ test('staff creation queues an invitation without choosing an owner password and
    if(p.endsWith('/branding'))return route.fulfill({json:{display_name:'Acacia Lodge',logo_url:null}});
    return route.fulfill({json:[]});
   });
-  await page.goto(base+'/staff');await page.getByRole('button',{name:'+ Staff member'}).click();
+  await page.goto(base+'/staff');await page.getByRole('button',{name:'Add staff member'}).click();
   assert.equal(await page.locator('select[name="role_key"] option[value="department_manager"]').count(),0);
   await page.locator('input[name="full_name"]').fill('Staff Owner');await page.locator('input[name="email"]').fill('owner@business.example');
   assert.equal(await page.locator('input[type="password"]').count(),0);
@@ -366,7 +366,7 @@ test('locked modules and hidden HR subfeatures avoid forbidden requests; saving 
    if(p.endsWith('/hr/leaves')){if(route.request().method()==='POST'){saved=true;return route.fulfill({json:{id:'leave-1',status:'pending'}})}return route.fulfill({json:saved?[{id:'leave-1',staff_name:'Team Member',leave_type:'annual',start_date:'2026-11-01',end_date:'2026-11-02',status:'pending'}]:[]})}
    return route.fulfill({json:[]});
   });
-  await page.goto(base+'/hr');await page.getByRole('heading',{name:'Staff HR',exact:true}).waitFor();
+  await page.goto(base+'/hr');await page.getByRole('heading',{name:'Staff Records',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Roster',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Performance',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Incidents',exact:true}).count(),0);
   await page.getByRole('button',{name:'Safari & Fleet',exact:true}).click();assert.equal(await page.getByRole('link',{name:'Fuel',exact:true}).count(),1);
   await page.locator('select[name="staff_id"]').selectOption('staff-1');await page.locator('input[name="start_date"]').fill('2026-11-01');await page.locator('input[name="end_date"]').fill('2026-11-02');
@@ -457,7 +457,7 @@ test('guest drawer labels, inline server validation and focus return',async()=>{
     await page.route('**/api/v1/lodges/guest-lodge/guests',async route=>{
       if(route.request().method()==='POST'){calls++;await route.fulfill({status:422,json:{detail:[{loc:['body','email'],type:'value_error',msg:'invalid email'}]}})}else await route.fulfill({json:[]});
     });
-    await page.goto(base+'/guests');await page.getByRole('button',{name:'+ Guest',exact:true}).click();
+    await page.goto(base+'/guests');await page.getByRole('button',{name:'Add guest',exact:true}).click();
     await page.getByRole('button',{name:'Create guest',exact:true}).click();
     await page.getByText('This field is required.').first().waitFor();assert.equal(calls,0);
     await page.getByLabel('First name',{exact:false}).fill('Maya');await page.getByLabel('Last name',{exact:false}).fill('Laurent');
@@ -466,7 +466,7 @@ test('guest drawer labels, inline server validation and focus return',async()=>{
     await page.getByRole('button',{name:'Create guest',exact:true}).click();
     await page.getByText('Enter a valid email address.',{exact:true}).waitFor();
     await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
-    await page.waitForFunction(()=>document.activeElement?.textContent==='+ Guest');
+    await page.waitForFunction(()=>document.activeElement?.textContent==='Add guest');
   } finally {await context.close()}
 });
 
@@ -498,7 +498,7 @@ test('empty lodge shows permission-aware setup and hides single-lodge selector',
 
 test('maintenance creation uses a focus-managed drawer',async()=>{
  const {context,page}=await accountPage({id:'maintenance-owner',full_name:'Owner',is_super_admin:false,memberships:[{lodge_id:'maintenance-lodge',permissions:['maintenance.view','maintenance.manage'],entitlements:['maintenance']}]});
- try {await page.goto(base+'/maintenance');await page.getByRole('button',{name:'+ Add ticket',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByLabel('Title',{exact:true}).fill('Inspect pump');await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.activeElement?.textContent==='+ Add ticket');} finally {await context.close()}
+ try {await page.goto(base+'/maintenance');await page.getByRole('button',{name:'Report a problem',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByLabel('Title',{exact:true}).fill('Inspect pump');await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.activeElement?.textContent==='Report a problem');} finally {await context.close()}
 });
 
 test('MFA enrolment renders a local QR, shows codes once, downloads and regenerates',async()=>{
@@ -569,7 +569,7 @@ test('guest creation uses a country picker and a specific confirmation',async()=
  const {context,page}=await accountPage({id:'guest-writer',full_name:'Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'guest-create',permissions:['guests.view','guests.manage'],entitlements:['guests']}]});let created;
  try{
   await page.route('**/api/v1/lodges/guest-create/guests',async r=>{if(r.request().method()==='POST'){created=r.request().postDataJSON();return r.fulfill({json:{id:'guest-1',...created}})}return r.fulfill({json:created?[{id:'guest-1',...created,name:created.first_name+' '+created.last_name,completed_stays:0}]:[]})});
-  await page.goto(base+'/guests');await page.getByRole('button',{name:'+ Guest',exact:true}).click();await page.getByLabel('First name',{exact:true}).fill('Maya');await page.getByLabel('Last name',{exact:true}).fill('Laurent');await page.getByLabel('Nationality',{exact:true}).selectOption('Kenya');await page.getByRole('button',{name:'Create guest',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Guest created',{exact:true}).waitFor();await page.getByText('Maya Laurent',{exact:true}).waitFor();assert.equal(created.nationality,'Kenya');
+  await page.goto(base+'/guests');await page.getByRole('button',{name:'Add guest',exact:true}).click();await page.getByLabel('First name',{exact:true}).fill('Maya');await page.getByLabel('Last name',{exact:true}).fill('Laurent');await page.getByLabel('Nationality',{exact:true}).selectOption('Kenya');await page.getByRole('button',{name:'Create guest',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Guest created',{exact:true}).waitFor();await page.getByText('Maya Laurent',{exact:true}).waitFor();assert.equal(created.nationality,'Kenya');
  }finally{await context.close()}
 });
 
@@ -616,7 +616,7 @@ test('premium shared surfaces stay accessible at all requested widths and both t
  const {context:guestContext,page:guestPage}=await accountPage({id:'visual-lodge',full_name:'Lodge Admin',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'visual-lodge',role_key:'lodge_admin',permissions:['guests.view','guests.manage'],entitlements:['guests']}]});
  try{
   for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
-   await guestPage.setViewportSize({width,height:1000});await guestPage.addInitScript(theme=>localStorage.setItem('theme',theme),theme);await guestPage.goto(base+'/guests');await guestPage.getByRole('button',{name:'+ Guest',exact:true}).click();await guestPage.getByLabel('Nationality',{exact:true}).waitFor();await guestPage.waitForTimeout(450);
+   await guestPage.setViewportSize({width,height:1000});await guestPage.addInitScript(theme=>localStorage.setItem('theme',theme),theme);await guestPage.goto(base+'/guests');await guestPage.getByRole('button',{name:'Add guest',exact:true}).click();await guestPage.getByLabel('Nationality',{exact:true}).waitFor();await guestPage.waitForTimeout(450);
    assert.ok(await guestPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`guest page overflow at ${width}/${theme}`);
    const guestAction=await guestPage.getByRole('button',{name:'Create guest',exact:true}).boundingBox();assert.ok(guestAction&&guestAction.y>=0&&guestAction.y+guestAction.height<=1001,`guest sticky action offscreen at ${width}/${theme}`);
    await guestPage.screenshot({path:path.join(web,`../../docs/screenshots/safarios-guest-${width}-${theme}.png`),fullPage:true});
@@ -634,7 +634,7 @@ test('guest profile edits show inline errors and read-only accounts cannot edit'
    await page.route('**/api/v1/lodges/profile-lodge/guests**',async r=>{if(r.request().url().includes('/communications'))return r.fulfill({json:{items:[],has_more:false}});if(r.request().method()==='PATCH'){writes++;return r.fulfill({status:422,json:{detail:[{loc:['body','notes'],type:'string_too_long',ctx:{max_length:4000}}]}})}return r.fulfill({json:[guest]})});
    await page.goto(base+'/guests');await page.getByRole('button',{name:'Maya Laurent',exact:true}).click();await page.getByRole('dialog').waitFor();
    if(manage){await page.getByLabel('Internal notes',{exact:true}).fill('Updated notes');await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByText('Use no more than 4000 characters.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Internal notes',{exact:true}).getAttribute('aria-invalid'),'true');assert.equal(writes,1)}
-   else {assert.equal(await page.getByRole('button',{name:'Save profile',exact:true}).count(),0);assert.equal(await page.getByLabel('Internal notes',{exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'+ Guest',exact:true}).count(),0);assert.equal(writes,0)}
+   else {assert.equal(await page.getByRole('button',{name:'Save profile',exact:true}).count(),0);assert.equal(await page.getByLabel('Internal notes',{exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Add guest',exact:true}).count(),0);assert.equal(writes,0)}
   }finally{await context.close()}
  }
 });
@@ -873,7 +873,7 @@ test('guest profile occasions and private communication log use guarded forms',a
    if(req.method()==='PATCH'){updated=req.postDataJSON();created={...created,...updated};return route.fulfill({json:{id:'profile-guest',...created}})}
    return route.fulfill({json:created?[{id:'profile-guest',...created,name:created.first_name+' '+created.last_name,completed_stays:2}]:[]});
   });
-  await page.goto(base+'/guests');await page.getByRole('button',{name:'+ Guest',exact:true}).click();
+  await page.goto(base+'/guests');await page.getByRole('button',{name:'Add guest',exact:true}).click();
   await page.getByLabel('First name',{exact:true}).fill('Maya');await page.getByLabel('Last name',{exact:true}).fill('Laurent');
   await page.getByLabel('Birthday',{exact:true}).fill('1985-03-21');await page.getByLabel('Anniversary',{exact:true}).fill('2012-09-18');
   await page.getByLabel('Repeat guest / previous visits',{exact:true}).check();await page.getByLabel('Safari preferences',{exact:true}).fill('Birding at sunrise');
@@ -927,7 +927,7 @@ test('task assignment, linked work and lifecycle history use guarded accessible 
    if(p.endsWith('/maintenance'))return route.fulfill({json:[{id:'ticket-1',title:'Brake inspection'}]});
    return route.fulfill({json:[]});
   });
-  await page.goto(base+'/tasks');await page.getByRole('button',{name:'+ Task',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Inspect Cruiser');await page.getByLabel('Assign staff',{exact:true}).selectOption('staff-1');await page.getByLabel('Department',{exact:true}).selectOption('dep-1');await page.getByLabel('Vehicle',{exact:true}).selectOption('vehicle-1');await page.getByLabel('Maintenance ticket',{exact:true}).selectOption('ticket-1');
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Add task',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Inspect Cruiser');await page.getByLabel('Assign staff',{exact:true}).selectOption('staff-1');await page.getByLabel('Department',{exact:true}).selectOption('dep-1');await page.getByLabel('Vehicle',{exact:true}).selectOption('vehicle-1');await page.getByLabel('Maintenance ticket',{exact:true}).selectOption('ticket-1');
   await page.getByRole('button',{name:'Create task',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(created.vehicle_id,'vehicle-1');assert.equal(created.maintenance_ticket_id,'ticket-1');assert.equal(created.priority,'normal');
   await page.getByRole('button',{name:'Inspect Cruiser',exact:true}).click();await page.getByRole('heading',{name:'Task history',exact:true}).waitFor();await page.getByRole('heading',{name:'Lifecycle timing',exact:true}).waitFor();await page.getByText('Cruiser 02',{exact:true}).first().waitFor();
   await page.getByLabel('Assign staff',{exact:true}).selectOption('staff-2');await page.getByRole('button',{name:'Save task details',exact:true}).click();await page.getByText('Assigned to: Lerato → Sipho',{exact:true}).waitFor();assert.equal(updated.assigned_staff_id,'staff-2');
@@ -953,7 +953,7 @@ test('task read-only views avoid forbidden lookups and discard late history afte
    if(p.endsWith('/history')){await new Promise(resolve=>release=resolve);return route.fulfill({json:{items:[{id:'late-history',kind:'created',actor:'Private former context',occurred_at:'2026-11-09T06:00:00Z',changed_fields:[],after:{status:'assigned'}}],has_more:false,timing:{}}})}
    return route.fulfill({json:[]});
   });
-  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Read-only task',exact:true}).click();await page.getByText('Loading task history…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'+ Task',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Accepted',exact:true}).count(),0);assert.deepEqual(forbidden,[]);
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Read-only task',exact:true}).click();await page.getByText('Loading task history…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Add task',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Accepted',exact:true}).count(),0);assert.deepEqual(forbidden,[]);
   await page.evaluate(()=>{localStorage.setItem('active_lodge_id','other-property');window.dispatchEvent(new StorageEvent('storage',{key:'active_lodge_id',newValue:'other-property'}))});release();await page.getByRole('dialog').waitFor({state:'hidden'});assert.equal(await page.getByText('Private former context',{exact:false}).count(),0);
  }finally{release?.();await context.close()}
 });
@@ -1057,7 +1057,7 @@ test('read-only module screens hide write controls and avoid forbidden reference
  const {context,page,requests}=await accountPage(user);
  try{
   await premiumFixtures(page);
-  for(const [route,button] of [['activities','+ Activity'],['transfers','+ Transfer'],['fuel','+ Fuel record'],['fleet','+ Vehicle'],['departments','+ Department'],['wildlife','+ Sighting'],['feedback','+ Feedback'],['food-beverage','+ Meal service'],['ranger','Pre-drive checklist']]){
+  for(const [route,button] of [['activities','Add activity'],['transfers','Add transfer'],['fuel','Add fuel record'],['fleet','Add vehicle'],['departments','Add department'],['wildlife','Record sighting'],['feedback','Add feedback'],['food-beverage','Add meal service'],['ranger','Pre-drive checklist']]){
    requests.length=0;const forbidden=[];
    const monitor=request=>{const path=new URL(request.url()).pathname;if(path.startsWith('/api/v1/lodges/')&&/\/(staff|guests|stays|departments|vehicles)$/.test(path)&&!((route==='departments'&&path.endsWith('/departments'))||(route==='fleet'&&path.endsWith('/vehicles'))))forbidden.push(path)};
    page.on('request',monitor);
@@ -1083,7 +1083,7 @@ test('assigned guide and driver see only server-authorized workflow actions with
    page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/v1/lodges/')&&/\/(staff|guests|stays|vehicles)$/.test(new URL(r.url()).pathname))lookups.push(r.url())});
    await page.goto(base+'/'+module);await page.locator('.content h1').first().waitFor();
    await page.getByRole('button',{name:'Confirmed',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Confirmed',exact:true}).count(),1);
-   assert.equal(await page.getByRole('button',{name:module==='activities'?'+ Activity':'+ Transfer',exact:true}).count(),0);
+   assert.equal(await page.getByRole('button',{name:module==='activities'?'Add activity':'Add transfer',exact:true}).count(),0);
    await page.getByRole('button',{name:'Confirmed',exact:true}).click();await page.waitForTimeout(150);
    assert.deepEqual(mutations,[{path:'/api/v1/lodges/premium-lodge/'+module+'/own',body:{status:'confirmed'}}]);assert.deepEqual(lookups,[]);
   }finally{await context.close()}
@@ -1096,11 +1096,11 @@ test('revoking lookup access closes the editor and discards a late staff respons
  try{
   await premiumFixtures(page);
   await page.route('**/api/v1/lodges/premium-lodge/staff',async route=>{staffRequests++;await new Promise(resolve=>release=resolve);return route.fulfill({json:[{id:'old-staff',full_name:'Private staff from previous access',employment_status:'active'}]})});
-  await page.goto(base+'/activities');await page.getByRole('button',{name:'+ Activity',exact:true}).click();await page.getByRole('dialog').waitFor();
+  await page.goto(base+'/activities');await page.getByRole('button',{name:'Add activity',exact:true}).click();await page.getByRole('dialog').waitFor();
   await page.waitForFunction(()=>document.querySelector('select[name="guide_staff_id"]'));
   assert.equal(staffRequests,1);
   user.memberships[0].permissions=['activities.view','activities.manage'];await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByRole('button',{name:'+ Activity',exact:true}).click();await page.getByRole('dialog').waitFor();
+  await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByRole('button',{name:'Add activity',exact:true}).click();await page.getByRole('dialog').waitFor();
   release();await page.waitForTimeout(200);
   assert.equal(await page.getByText('Private staff from previous access',{exact:true}).count(),0);assert.equal(staffRequests,1);
  }finally{release?.();await context.close()}
@@ -1113,7 +1113,7 @@ test('canvas record views search, filter, save and review existing authorized re
   await premiumFixtures(page);
   await page.route('**/api/v1/lodges/premium-lodge/vehicles',r=>{if(r.request().method()!=='GET')writes.push(r.request().method());return r.fulfill({json:[{id:'v1',name:'Vehicle 01',registration:'NDL 01',make:'Toyota',model:'Cruiser',odometer_km:1000,status:'ready',notes:''},{id:'v2',name:'Vehicle 02',registration:'NDL 02',make:'Toyota',model:'Cruiser',odometer_km:2000,status:'maintenance',notes:''}]})});
   await page.goto(base+'/fleet');const collection=page.locator('[data-collection="FleetPage"]');await collection.locator('.recordCard').first().waitFor();assert.equal(await collection.locator('.recordCard').count(),2);
-  await page.getByRole('searchbox',{name:'Search records',exact:true}).fill('Vehicle 01');assert.equal(await collection.locator('.recordCard').count(),1);
+  await page.getByRole('searchbox',{name:'Search…',exact:true}).fill('Vehicle 01');assert.equal(await collection.locator('.recordCard').count(),1);
   await page.getByRole('combobox',{name:'Saved views',exact:true}).selectOption('save');
   await page.getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await collection.locator('.recordCard').count(),2);
   await page.getByRole('combobox',{name:'Saved views',exact:true}).selectOption('saved');assert.equal(await collection.locator('.recordCard').count(),1);
@@ -1130,7 +1130,7 @@ test('canvas navigation persists collapsed groups and keeps the active group ope
   await premiumFixtures(page);await page.goto(base+'/fleet');await page.getByRole('heading',{name:'Fleet',exact:true}).waitFor();
   const guests=page.getByRole('button',{name:'Guests',exact:true}),safari=page.getByRole('button',{name:'Safari & Fleet',exact:true});
   assert.equal(await guests.getAttribute('aria-expanded'),'false');assert.equal(await safari.getAttribute('aria-expanded'),'true');
-  await guests.click();await page.reload();await page.getByRole('heading',{name:'Fleet',exact:true}).waitFor();assert.equal(await guests.getAttribute('aria-expanded'),'true');
+  await guests.click();assert.equal(await guests.getAttribute('aria-expanded'),'true');await page.reload();await page.getByRole('heading',{name:'Fleet',exact:true}).waitFor();assert.equal(await guests.getAttribute('aria-expanded'),'false');
   await safari.click();assert.equal(await safari.getAttribute('aria-expanded'),'true');
   await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();assert.equal(await safari.getAttribute('aria-expanded'),'true');
  }finally{await context.close()}
@@ -1152,7 +1152,7 @@ test('canvas task calendar opens the existing protected task detail without writ
  try{
   await premiumFixtures(page);const due=new Date();due.setHours(12,0,0,0);
   await page.route('**/api/v1/lodges/premium-lodge/tasks**',r=>{const p=new URL(r.request().url()).pathname;if(r.request().method()!=='GET')writes.push(r.request().method());if(p.endsWith('/tasks'))return r.fulfill({json:[{id:'calendar-task',title:'Inspect Unit 4',description:'Room inspection',status:'assigned',priority:'high',due_at:due.toISOString(),can_transition:false}]});if(p.endsWith('/history'))return r.fulfill({json:{items:[],has_more:false,timing:{}}});return r.fulfill({json:[]})});
-  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.locator('.calendarAgenda').getByRole('button',{name:'Inspect Unit 4',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByRole('heading',{name:'Inspect Unit 4',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'+ Task',exact:true}).count(),0);assert.deepEqual(writes,[]);
+  await page.goto(base+'/tasks');await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.locator('.calendarAgenda').getByRole('button',{name:'Inspect Unit 4',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByRole('heading',{name:'Inspect Unit 4',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Save task details',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Add task',exact:true}).count(),0);assert.deepEqual(writes,[]);
  }finally{await context.close()}
 });
 
@@ -1162,7 +1162,7 @@ test('canvas wildlife shows real scoped pending records while offline without is
  try{
   await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/wildlife',r=>{if(r.request().method()!=='GET')writes.push(r.request().method());return r.fulfill({json:[]})});
   await page.goto(base+'/wildlife');await page.getByRole('heading',{name:'Wildlife sightings',exact:true}).waitFor();await context.setOffline(true);
-  await page.getByRole('button',{name:'+ Sighting',exact:true}).click();await page.getByLabel('Species',{exact:true}).fill('Elephant');await page.getByLabel('Observed at',{exact:true}).fill('2026-11-10T09:00');await page.getByRole('button',{name:'Save offline',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Record sighting',exact:true}).click();await page.getByLabel('Species',{exact:true}).fill('Elephant');await page.getByLabel('Observed at',{exact:true}).fill('2026-11-10T09:00');await page.getByRole('button',{name:'Save offline',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.locator('.queuedRecord').getByRole('heading',{name:'Elephant',exact:true}).waitFor();assert.equal(await page.locator('.queuedRecord').getByText('Queued',{exact:true}).count(),1);assert.deepEqual(writes,[]);
  }finally{await context.setOffline(false);await context.close()}
 });
@@ -1249,9 +1249,9 @@ test('instant room and housekeeping changes retain pending controls and roll bac
     return r.fulfill({json:module==='rooms'?[{id:'room-instant',name:'Marula',unit_type:'Suite',status:'available',notes:''}]:[{id:'hk-instant',unit_id:'room-instant',unit_name:'Marula',job_type:'cleaning',status:'assigned',notes:''}]});
    });
    await page.goto(base+'/'+module);
-   if(module==='rooms')await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cleaning');else await page.getByRole('button',{name:'Accepted',exact:true}).click();
+   if(module==='rooms')await page.getByRole('combobox',{name:/^Change status…/}).selectOption('cleaning');else await page.getByRole('button',{name:'Accepted',exact:true}).click();
    await page.getByText('Saving…',{exact:true}).waitFor();assert.equal(writes,1);
-   if(module==='rooms')assert.equal(await page.getByRole('combobox',{name:/^Move to…/}).isDisabled(),true);else assert.equal(await page.getByRole('button',{name:'In progress',exact:true}).isDisabled(),true);
+   if(module==='rooms')assert.equal(await page.getByRole('combobox',{name:/^Change status…/}).isDisabled(),true);else assert.equal(await page.getByRole('button',{name:'In progress',exact:true}).isDisabled(),true);
    release();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();
    if(module==='rooms')assert.equal(await page.locator('.roomCard .statusPill').innerText(),'Available');else await page.getByRole('button',{name:'Accepted',exact:true}).waitFor();
   }finally{release?.();await context.close()}
@@ -1315,7 +1315,7 @@ test('instant focus refresh waits for a creation drawer to close and preserves t
  const {context,page}=await accountPage(premiumTestAccount());let name='Marula',reads=0;
  try{
   await premiumFixtures(page);await page.route('**/api/v1/lodges/premium-lodge/rooms',r=>{reads++;return r.fulfill({json:[{id:'refresh-room',name,unit_type:'Suite',status:'available',notes:''}]})});
-  await page.goto(base+'/rooms');await page.getByText('Marula',{exact:true}).waitFor();await page.getByRole('button',{name:'+ Room / Unit',exact:true}).click();const input=page.getByRole('dialog').getByLabel('Name',{exact:true});await input.fill('Draft room name');const before=reads;name='Updated on server';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForTimeout(100);assert.equal(await input.inputValue(),'Draft room name');assert.equal(reads,before);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Updated on server',{exact:true}).waitFor();assert.ok(reads>before);
+  await page.goto(base+'/rooms');await page.getByText('Marula',{exact:true}).waitFor();await page.getByRole('button',{name:'Add room',exact:true}).click();const input=page.getByRole('dialog').getByLabel('Name',{exact:true});await input.fill('Draft room name');const before=reads;name='Updated on server';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForTimeout(100);assert.equal(await input.inputValue(),'Draft room name');assert.equal(reads,before);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.getByText('Updated on server',{exact:true}).waitFor();assert.ok(reads>before);
  }finally{await context.close()}
 });
 
@@ -1348,7 +1348,7 @@ async function statusBoardFixture(module,{initial,deny=false,readOnly=false,expi
   }
   return r.fallback();
  });
- await page.goto(base+'/'+module);await page.getByRole('heading',{name:({tasks:'Tasks',requests:'Guest Requests',maintenance:'Maintenance',housekeeping:'Housekeeping workflow',rooms:'Rooms & Units'})[module],exact:true}).waitFor();
+ await page.goto(base+'/'+module);await page.getByRole('heading',{name:({tasks:'Tasks',requests:'Guest Requests',maintenance:'Maintenance',housekeeping:'Housekeeping',rooms:'Rooms & Units'})[module],exact:true}).waitFor();
  if(module==='tasks')await page.getByRole('button',{name:'Board',exact:true}).click();
  await page.locator('.statusBoardItem').first().waitFor();
  return {context,page,state};
@@ -1380,7 +1380,7 @@ test('status board Move to works on phone widths in all workflows and required r
   try{
    await page.setViewportSize({width:375,height:1000});
    if(['requests','maintenance'].includes(module))page.once('dialog',dialog=>dialog.accept('Verified work and recorded resolution.'));
-   const response=page.waitForResponse(r=>r.request().method()==='PATCH'&&r.url().endsWith('/board-record'));await page.getByRole('combobox',{name:/^Move to…/}).selectOption(target);await response;await page.getByRole('status').filter({hasText:/ moved to /}).waitFor();
+   const response=page.waitForResponse(r=>r.request().method()==='PATCH'&&r.url().endsWith('/board-record'));await page.getByRole('combobox',{name:/^Change status…/}).selectOption(target);await response;await page.getByRole('status').filter({hasText:/ moved to /}).waitFor();
    assert.equal(state.writes.length,1,module);assert.equal(state.writes[0].status,target,module);if(['requests','maintenance'].includes(module))assert.equal(state.writes[0].resolution,'Verified work and recorded resolution.');await page.locator(`.statusColumn[data-status="${target}"] .statusBoardItem`).waitFor();await page.waitForFunction(()=>{const node=document.querySelector('.statusBoardItem'),rect=node?.getBoundingClientRect();return rect&&rect.left>=0&&rect.right<=innerWidth+1});
    await page.waitForFunction(()=>document.querySelectorAll('[data-sonner-toast]').length===0);
    for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(450);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${module} ${width}/${theme}`);if((width===375&&theme==='light')||(width===1440&&theme==='dark')){const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[],`${module} ${width}/${theme}`);if(module==='rooms'&&width===375)await page.screenshot({path:'/tmp/safarios-status-board-mobile-light.png',fullPage:true});if(module==='maintenance'&&width===1440)await page.screenshot({path:'/tmp/safarios-status-board-desktop-dark.png',fullPage:true});}}
@@ -1398,15 +1398,15 @@ test('status board persists collapse and view without storing records and read-o
  }finally{await context.close()}
  for(const option of [{readOnly:true},{expired:true}]){
   const {context,page,state}=await statusBoardFixture('rooms',option);
-  try{assert.equal(await page.getByRole('combobox',{name:/^Move to…/}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Move Marula',exact:true}).isDisabled(),true);assert.deepEqual(state.writes,[])}finally{await context.close()}
+  try{assert.equal(await page.getByRole('combobox',{name:/^Change status…/}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Move Marula',exact:true}).isDisabled(),true);assert.deepEqual(state.writes,[])}finally{await context.close()}
  }
 });
 
 test('status board cancellation requires confirmation and Escape leaves the record unchanged',async()=>{
  const {context,page,state}=await statusBoardFixture('tasks');
  try{
-  await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cancelled');await page.getByRole('dialog').getByRole('heading',{name:'Cancel this record?',exact:true}).waitFor();assert.deepEqual(state.writes,[]);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});assert.deepEqual(state.writes,[]);
-  await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cancelled');await page.getByRole('dialog').getByRole('button',{name:'Cancel record',exact:true}).click();await page.getByText('Board work moved to Cancelled.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'cancelled'}]);
+  await page.getByRole('combobox',{name:/^Change status…/}).selectOption('cancelled');await page.getByRole('dialog').getByRole('heading',{name:'Cancel this record?',exact:true}).waitFor();assert.deepEqual(state.writes,[]);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});assert.deepEqual(state.writes,[]);
+  await page.getByRole('combobox',{name:/^Change status…/}).selectOption('cancelled');await page.getByRole('dialog').getByRole('button',{name:'Cancel record',exact:true}).click();await page.getByText('Board work moved to Cancelled.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'cancelled'}]);
  }finally{await context.close()}
 });
 
@@ -1422,10 +1422,10 @@ test('status board touch sensor moves a card and keyboard Escape cancels without
 test('status board requires an assignee for task assignment and inspection before housekeeping completion',async()=>{
  const {context,page,state}=await statusBoardFixture('tasks',{initial:'created'});
  try{
-  state.row.assigned_staff_id=null;await page.reload();await page.getByRole('combobox',{name:/^Move to…/}).waitFor();assert.equal(await page.getByRole('combobox',{name:/^Move to…/}).locator('option[value="assigned"]').isDisabled(),true);assert.deepEqual(state.writes,[]);
+  state.row.assigned_staff_id=null;await page.reload();await page.getByRole('combobox',{name:/^Change status…/}).waitFor();assert.equal(await page.getByRole('combobox',{name:/^Change status…/}).locator('option[value="assigned"]').isDisabled(),true);assert.deepEqual(state.writes,[]);
  }finally{await context.close()}
  const hk=await statusBoardFixture('housekeeping',{initial:'in_progress'});
- try{hk.state.row.inspector_staff_id='named-inspector';await hk.page.reload();await hk.page.getByRole('combobox',{name:/^Move to…/}).waitFor();assert.equal(await hk.page.getByRole('combobox',{name:/^Move to…/}).locator('option[value="completed"]').isDisabled(),true);assert.equal(await hk.page.getByRole('combobox',{name:/^Move to…/}).locator('option[value="awaiting_inspection"]').isDisabled(),false);assert.deepEqual(hk.state.writes,[])}finally{await hk.context.close()}
+ try{hk.state.row.inspector_staff_id='named-inspector';await hk.page.reload();await hk.page.getByRole('combobox',{name:/^Change status…/}).waitFor();assert.equal(await hk.page.getByRole('combobox',{name:/^Change status…/}).locator('option[value="completed"]').isDisabled(),true);assert.equal(await hk.page.getByRole('combobox',{name:/^Change status…/}).locator('option[value="awaiting_inspection"]').isDisabled(),false);assert.deepEqual(hk.state.writes,[])}finally{await hk.context.close()}
 });
 
 test('status board changing lodge during a drag cancels the old gesture without submitting',async()=>{
@@ -1440,7 +1440,7 @@ test('status board changing lodge during a drag cancels the old gesture without 
 test('status board card view retains its Move menu and persists the selected presentation',async()=>{
  const {context,page,state}=await statusBoardFixture('tasks');
  try{
-  await page.getByRole('button',{name:'Cards',exact:true}).click();await page.reload();await page.getByRole('combobox',{name:/^Move to…/}).waitFor();assert.equal(await page.getByRole('button',{name:'Cards',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.statusColumn').count(),0);assert.equal(await page.getByRole('button',{name:'Move Board work',exact:true}).isDisabled(),true);await page.getByRole('combobox',{name:/^Move to…/}).selectOption('accepted');await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);
+  await page.getByRole('button',{name:'Cards',exact:true}).click();await page.reload();await page.getByRole('combobox',{name:/^Change status…/}).waitFor();assert.equal(await page.getByRole('button',{name:'Cards',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.statusColumn').count(),0);assert.equal(await page.getByRole('button',{name:'Move Board work',exact:true}).isDisabled(),true);await page.getByRole('combobox',{name:/^Change status…/}).selectOption('accepted');await page.getByText('Board work moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(state.writes,[{status:'accepted'}]);
  }finally{await context.close()}
 });
 
@@ -1464,7 +1464,7 @@ test('status board a delayed move does not steal focus or overwrite a newly open
    if(r.request().method()==='PATCH'){await new Promise(resolve=>release=resolve);status=r.request().postDataJSON().status;return r.fulfill({json:{id:'focus-room',status}})}
    return r.fulfill({json:[{id:'focus-room',name:'Marula',unit_type:'Suite',status,notes:''}]});
   });
-  await page.goto(base+'/rooms');await page.getByRole('combobox',{name:/^Move to…/}).selectOption('cleaning');await page.getByRole('button',{name:'+ Room / Unit',exact:true}).click();const input=page.getByRole('dialog').getByLabel('Name',{exact:true});await input.fill('New room draft');release();await page.getByText('Marula moved to Cleaning.',{exact:true}).waitFor();assert.equal(await input.inputValue(),'New room draft');assert.equal(await input.evaluate(node=>node===document.activeElement),true);
+  await page.goto(base+'/rooms');await page.getByRole('combobox',{name:/^Change status…/}).selectOption('cleaning');await page.getByRole('button',{name:'Add room',exact:true}).click();const input=page.getByRole('dialog').getByLabel('Name',{exact:true});await input.fill('New room draft');release();await page.getByText('Marula moved to Cleaning.',{exact:true}).waitFor();assert.equal(await input.inputValue(),'New room draft');assert.equal(await input.evaluate(node=>node===document.activeElement),true);
  }finally{release?.();await context.close()}
 });
 
@@ -1473,7 +1473,7 @@ test('status board assigned staff can progress owned work but cannot assign or c
  const {context,page,requests}=await accountPage(user);let status='assigned';const writes=[];
  try{
   await page.route('**/api/v1/lodges/owned-board-lodge/tasks**',r=>{if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();writes.push(body);status=body.status;return r.fulfill({json:{id:'own-board-task',status}})}return r.fulfill({json:[{id:'own-board-task',title:'Owned task',description:'',priority:'normal',status,assigned_staff_id:'staff-a',can_transition:true}]})});
-  await page.goto(base+'/tasks');const menu=page.getByRole('combobox',{name:/^Move to…/});await menu.waitFor();assert.equal(await menu.locator('option[value="cancelled"]').isDisabled(),true);await page.getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Move Owned task',exact:true}).focus();await page.keyboard.press('Space');for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');await page.keyboard.press('Space');await page.getByText('Cannot move to Cancelled.',{exact:true}).waitFor();await page.waitForFunction(()=>{const r=document.querySelector('.statusBoardItem')?.getBoundingClientRect();return r&&r.left>=0&&r.right<=innerWidth+1});assert.deepEqual(writes,[]);await menu.selectOption('accepted');await page.getByText('Owned task moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'accepted'}]);status='created';await page.reload();await menu.waitFor();assert.equal(await menu.isDisabled(),true);assert.equal(await menu.locator('option[value="assigned"]').isDisabled(),true);assert.equal(requests.some(p=>/\/(staff|guests|departments|rooms)$/.test(p)),false);
+  await page.goto(base+'/tasks');const menu=page.getByRole('combobox',{name:/^Change status…/});await menu.waitFor();assert.equal(await menu.locator('option[value="cancelled"]').isDisabled(),true);await page.getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Move Owned task',exact:true}).focus();await page.keyboard.press('Space');for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');await page.keyboard.press('Space');await page.getByText('Cannot move to Cancelled.',{exact:true}).waitFor();await page.waitForFunction(()=>{const r=document.querySelector('.statusBoardItem')?.getBoundingClientRect();return r&&r.left>=0&&r.right<=innerWidth+1});assert.deepEqual(writes,[]);await menu.selectOption('accepted');await page.getByText('Owned task moved to Accepted.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'accepted'}]);status='created';await page.reload();await menu.waitFor();assert.equal(await menu.isDisabled(),true);assert.equal(await menu.locator('option[value="assigned"]').isDisabled(),true);assert.equal(requests.some(p=>/\/(staff|guests|departments|rooms)$/.test(p)),false);
  }finally{await context.close()}
 });
 
@@ -1489,7 +1489,7 @@ test('status board room-status permission allows status updates without room con
  const {context,page}=await accountPage({id:'room-status-user',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'room-status-lodge',permissions:['units.view','units.status.manage'],entitlements:['units'],subscription_status:'Active'}]});let status='available';const writes=[];
  try{
   await page.route('**/api/v1/lodges/room-status-lodge/rooms**',r=>{if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();writes.push(body);status=body.status;return r.fulfill({json:{id:'status-only-room',status}})}return r.fulfill({json:[{id:'status-only-room',name:'Acacia',unit_type:'Suite',status,notes:''}]})});
-  await page.goto(base+'/rooms');const menu=page.getByRole('combobox',{name:'Move to… Acacia',exact:true});await menu.waitFor();assert.equal(await page.getByRole('button',{name:'+ Room / Unit',exact:true}).count(),0);assert.equal(await menu.isDisabled(),false);await menu.selectOption('cleaning');await page.getByText('Acacia moved to Cleaning.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'cleaning'}]);
+  await page.goto(base+'/rooms');const menu=page.getByRole('combobox',{name:'Change status… Acacia',exact:true});await menu.waitFor();assert.equal(await page.getByRole('button',{name:'Add room',exact:true}).count(),0);assert.equal(await menu.isDisabled(),false);await menu.selectOption('cleaning');await page.getByText('Acacia moved to Cleaning.',{exact:true}).waitFor();assert.deepEqual(writes,[{status:'cleaning'}]);
  }finally{await context.close()}
 });
 
@@ -1510,7 +1510,7 @@ test('live room changes queue behind an open form and apply only after editing e
   await premiumFixtures(page);
   await page.route('**/api/v1/lodges/premium-lodge/rooms',r=>r.fulfill({json:[{id:room,name:updated?'Marula updated':'Marula original',status:'available',unit_type:'Suite',notes:''}]}));
   await page.route('**/api/v1/lodges/premium-lodge/events',async r=>{connections++;assert.equal(r.request().headers()['x-expected-user-id'],'premium-design-owner');assert.equal(r.request().headers()['x-lodge-context'],'premium-lodge');if(connections>1)return r.fulfill({status:503,body:''});await new Promise(resolve=>release=resolve);return r.fulfill({contentType:'text/event-stream',body:`id: safe-cursor\nevent: ready\ndata: {"version":"scope-v1"}\n\nevent: change\ndata: {"type":"room.updated","id":"${room}","version":"b0000000-0000-4000-8000-000000000001"}\n\nevent: checkpoint\nid: next-cursor\ndata: {}\n\n`})});
-  await page.goto(base+'/rooms');await page.getByText('Marula original',{exact:true}).first().waitFor();await page.getByRole('button',{name:'+ Room / Unit',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByLabel('Name',{exact:true}).fill('Keep my draft');
+  await page.goto(base+'/rooms');await page.getByText('Marula original',{exact:true}).first().waitFor();await page.getByRole('button',{name:'Add room',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('dialog').getByLabel('Name',{exact:true}).fill('Keep my draft');
   await page.waitForFunction(()=>true);updated=true;assert.ok(release);release();await page.locator('.liveUpdatePill').filter({hasText:'1 new update'}).waitFor();assert.equal(await page.getByRole('dialog').getByLabel('Name',{exact:true}).inputValue(),'Keep my draft');assert.equal(await page.getByText('Marula updated',{exact:true}).count(),0);assert.equal(await page.locator('.liveUpdatePill').filter({hasText:'1 new update'}).isDisabled(),true);
   await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
   for(const width of [375,768,1366,1440]){await page.setViewportSize({width,height:1000});await page.waitForTimeout(550);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'queued pill must fit at '+width);}
@@ -1539,7 +1539,7 @@ test('live dashboard refresh preserves transient data with Retry and clears deni
   await page.route('**/api/v1/lodges/premium-lodge/events',r=>r.fulfill({status:503,body:''}));
   await page.route('**/api/v1/lodges/premium-lodge/dashboard',r=>status===200?r.fulfill({json:{metrics:{open_tasks:7,overdue_tasks:0,guests_in_house:0,arrivals_today:0},attention:[],events:[]}}):r.fulfill({status,json:{detail:status===403?'Your role does not permit this action':'internal'}}));
   await page.goto(base+'/dashboard');await page.locator('.premiumMetric strong').filter({hasText:/^7$/}).waitFor();status=500;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('alert').waitFor();assert.equal(await page.locator('.premiumMetric strong').filter({hasText:/^7$/}).count(),1);
-  status=403;await page.getByRole('alert').getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Command Centre unavailable',exact:true}).waitFor();assert.equal(await page.locator('.premiumMetric strong').count(),0);
+  status=403;await page.getByRole('alert').getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Home unavailable',exact:true}).waitFor();assert.equal(await page.locator('.premiumMetric strong').count(),0);
  }finally{await context.close()}
 });
 

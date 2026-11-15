@@ -14,7 +14,7 @@ import { ArrowUpDown } from "lucide-react";
 export function DataTable<T>({
   columns,
   data,
-  empty = "No records yet.",
+  empty = "Nothing here yet.",
 }: {
   columns: ColumnDef<T, any>[];
   data: T[];

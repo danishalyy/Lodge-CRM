@@ -74,11 +74,11 @@ export default function DepartmentsPage() {
         <div>
           <span className="eyebrow">LODGE STRUCTURE</span>
           <h1>Departments</h1>
-          <p>Give every team a clear place in your lodge’s daily operations.</p>
+          <p>The teams in your lodge and who looks after each one.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Department
+            Add department
           </button>
         )}
       </div>

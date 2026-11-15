@@ -12,7 +12,6 @@ export const shortcutCopy = {
   newTask: "New task",
   recordSighting: "Record a sighting",
   closeAny: "Close a panel or dialog",
-  menuShortcuts: "Keyboard shortcuts",
   menuTour: "Welcome tour",
   quickCreate: "Quick create",
   quickActions: "Quick actions",
@@ -41,15 +40,15 @@ export const tourCopy = {
   steps: {
     nav: {
       title: "Everything in six groups",
-      body: "The sidebar groups your lodge into Today, Guests, Operations, Safari & Fleet, People and Insight. You only see what your role allows.",
+      body: "Pick a section in the sidebar to see its pages. You only see what your role allows.",
     },
     search: {
       title: "Find anything fast",
-      body: "Press Ctrl or Cmd + K to search modules and jump to quick actions. Press ? at any time to see every keyboard shortcut.",
+      body: "Use Search in the sidebar to jump to any page or start something new.",
     },
     tasks: {
       title: "Your work, one tap away",
-      body: "Tasks and alerts update while you work. Press N to create a task, or use the Quick create button on your phone.",
+      body: "Tasks and alerts update while you work. Use Add task, or the + button on your phone.",
     },
     ai: {
       title: "Ask Lodge AI",

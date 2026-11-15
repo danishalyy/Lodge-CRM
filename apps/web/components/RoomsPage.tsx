@@ -100,11 +100,11 @@ export default function RoomsPage() {
         <div>
           <span className="eyebrow">ACCOMMODATION</span>
           <h1>Rooms & Units</h1>
-          <p>Authoritative room inventory and live operational status.</p>
+          <p>See which rooms are free, occupied, being cleaned or ready for the next guest.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Room / Unit
+            Add room
           </button>
         )}
       </div>

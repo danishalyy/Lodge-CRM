@@ -1,4 +1,5 @@
 "use client";
+import { actionLabel } from "@/lib/friendly";
 import { queueChange } from "@/lib/offline-sync";
 import { StatusBoard } from "./ui/status-board";
 import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
@@ -173,18 +174,15 @@ export default function HousekeepingPage() {
       <div className="pageHeader">
         <div>
           <span className="eyebrow">HOUSEKEEPING</span>
-          <h1>Housekeeping workflow</h1>
-          <p>
-            Cleaning, turndown, linen and inspections use assigned jobs and
-            authoritative room readiness states.
-          </p>
+          <h1>Housekeeping</h1>
+          <p>Cleaning jobs and room checks, from assigned to ready for the next guest.</p>
         </div>
         {canManage && (
           <button
             className="button primary"
             onClick={() => setCreateOpen(true)}
           >
-            + Add job
+            Add cleaning job
           </button>
         )}
       </div>
@@ -357,7 +355,7 @@ export default function HousekeepingPage() {
                         onClick={() => update(j.id, next[j.status]!)}
                       >
                         {next[j.status]
-                          ? readableLabel(next[j.status]!)
+                          ? actionLabel("housekeeping", next[j.status]!, j.status)
                           : instant.saving}
                       </button>
                     </div>

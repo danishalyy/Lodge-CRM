@@ -113,10 +113,7 @@ export default function RangerPage() {
         <div>
           <span className="eyebrow">RANGER / GUIDE</span>
           <h1>My safari day</h1>
-          <p>
-            Your live assigned activities, operational tasks and pre-drive
-            workflow.
-          </p>
+          <p>Your drives, tasks and pre-drive checks for today.</p>
         </div>
         <SyncChip />
       </div>

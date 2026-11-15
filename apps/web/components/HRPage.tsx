@@ -93,11 +93,8 @@ export default function HRPage() {
       <div className="pageHeader">
         <div>
           <span className="eyebrow">PEOPLE OPERATIONS</span>
-          <h1>Staff HR</h1>
-          <p>
-            Support your people with coordinated leave, rosters, training and
-            confidential staff records.
-          </p>
+          <h1>Staff Records</h1>
+          <p>Leave, work rosters, training certificates and staff records.</p>
         </div>
       </div>
       {error && <div className="panel dangerText">{error}</div>}

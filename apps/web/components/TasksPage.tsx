@@ -1,4 +1,5 @@
 "use client";
+import { actionLabel } from "@/lib/friendly";
 import { queueChange } from "@/lib/offline-sync";
 import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
@@ -463,14 +464,11 @@ export default function TasksPage() {
         <div>
           <span className="eyebrow">OPERATIONS</span>
           <h1>Tasks</h1>
-          <p>
-            Tasks support lifecycle timestamps, recurring work, required
-            checklists and comments.
-          </p>
+          <p>Everything that needs doing, who is doing it and when it is due.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Task
+            Add task
           </button>
         )}
       </div>
@@ -500,8 +498,6 @@ export default function TasksPage() {
             </button>
           ))}
         </div>
-      </div>
-      <div className="filterBar">
         <button
           type="button"
           className="button secondary"
@@ -574,7 +570,7 @@ export default function TasksPage() {
                   <th>Priority</th>
                   <th>Due</th>
                   <th>Status</th>
-                  <th></th>
+                  <th>Next step</th>
                 </tr>
               </thead>
               <tbody>
@@ -620,7 +616,7 @@ export default function TasksPage() {
                             }
                           >
                             {next[r.status]
-                              ? readableLabel(next[r.status]!)
+                              ? actionLabel("tasks", next[r.status]!, r.status)
                               : instant.saving}
                           </button>
                         )}

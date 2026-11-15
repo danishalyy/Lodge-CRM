@@ -102,11 +102,11 @@ export default function FuelPage() {
         <div>
           <span className="eyebrow">FLEET</span>
           <h1>Fuel</h1>
-          <p>Track refuelling, mileage and costs across your fleet.</p>
+          <p>Fuel added to each vehicle, distance driven and cost.</p>
         </div>
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
-            + Fuel record
+            Add fuel record
           </button>
         )}
       </div>

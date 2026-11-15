@@ -1,4 +1,5 @@
 "use client";
+import { actionLabel } from "@/lib/friendly";
 import { workflowColumns, nextStatuses } from "@/lib/status-transitions";
 import { useInstantRows, useDataRefresh } from "@/lib/use-instant-actions";
 import { instantCopy as instant } from "@/lib/strings/interactivity";
@@ -175,10 +176,7 @@ export default function GuestRequestsPage() {
         <div>
           <span className="eyebrow">GUEST SERVICE</span>
           <h1>Guest Requests</h1>
-          <p>
-            Turn every guest request into a clear assignment, and follow it
-            through to completion.
-          </p>
+          <p>Requests from guests. Give each one to a team member and follow it until it is done.</p>
         </div>
         {canManage && (
           <button
@@ -186,7 +184,7 @@ export default function GuestRequestsPage() {
             onClick={() => setOpen(true)}
             disabled={!guests.length}
           >
-            + Request
+            Add request
           </button>
         )}
       </div>
@@ -315,7 +313,9 @@ export default function GuestRequestsPage() {
                               update(r.id, { status: next[r.status] })
                             }
                           >
-                            {next[r.status]?.replaceAll("_", " ") || "Update"}
+                            {next[r.status]
+                              ? actionLabel("requests", next[r.status]!, r.status)
+                              : "Update"}
                           </button>{" "}
                           <button
                             className="button secondary"

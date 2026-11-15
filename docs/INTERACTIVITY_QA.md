@@ -237,14 +237,14 @@ Phase 4 implementation is complete. Remaining setup is installation-specific pus
 
 No API, permission, entitlement or data-contract change. Everything is derived from the already permission-filtered module list in `AppShell`; a locked or hidden module never gets a shortcut or action.
 
-- **Keyboard shortcuts** (`components/KeyboardShortcuts.tsx`): `/` opens search, `?` opens the cheat sheet, `N` opens New task (the Tasks page still checks manage permission), `G` then `D/T/G/S/R/Q/H/M/N/W/F/A` jumps to a module. Ignored while typing in a field or while any dialog is open. The `G` prefix expires after 1.2 s. Also reachable from the user menu and the search palette.
+- **Keyboard shortcuts** (`components/KeyboardShortcuts.tsx`, silent: no guide, hint or badge is shown anywhere): `/` opens search, `N` opens New task (the Tasks page still checks manage permission), `G` then `D/T/G/S/R/Q/H/M/N/W/F/A` jumps to a module. Ignored while typing in a field or while any dialog is open. The `G` prefix expires after 1.2 s. Also reachable from the user menu and the search palette.
 - **Search palette quick actions**: New task, Record a sighting, Keyboard shortcuts, Welcome tour appear above the module list when the user may use them.
 - **Quick create** (`components/QuickCreate.tsx`): mobile-only floating button above the bottom tabs offering New task and Record a sighting.
 - **Welcome tour** (`components/WelcomeTour.tsx`): skippable first-run walkthrough, 3–5 steps filtered to the modules the user can use. Completion is remembered per user and lodge in `localStorage`; replay from the user menu.
 - **Fixes**: mobile bottom-tab icons now match their destination (Tasks, Requests, Sightings, Alerts and field-role home) instead of reusing Dashboard, Users and Settings icons; the pinned "Ask Lodge AI" entry uses the sparkle icon; the authenticator QR dark colour uses the logo ink.
 
 ### Manual checks
-1. Press `?` on any lodge page: the list shows only modules you can open. Press `G` then `T`: Tasks opens. Typing `g` or `n` inside any text field does nothing.
+1. Press `G` then `T`: Tasks opens. Press `/`: search opens. Nothing on screen mentions shortcuts. Typing `g` or `n` inside any text field does nothing.
 2. Press `N` as a Lodge Admin: Tasks opens with the form. As a role without task management: Tasks opens without the form.
 3. Open search (Ctrl/Cmd+K): quick actions appear and run.
 4. On a 375 px screen: the "+" button sits above the tab bar and opens New task / Record a sighting; Escape or tapping elsewhere closes it.
@@ -267,3 +267,16 @@ Fixed while testing:
 - **Status boards**: columns are equal width; the "Move to…" control and drag handle are compact on desktop and stay large on touch screens.
 
 Known, not changed: sidebar groups scroll when the window is shorter than about 900 px; on a brand-new lodge the setup checklist pushes the KPI cards below the fold; Rooms status is a manual field and does not follow in-house stays.
+
+
+## Calm shell (sidebar and top bar)
+- **Sidebar**: lodge name as one quiet line, a Search row, then Home, Tasks and Ask Lodge AI, then five sections (Guests, Operations, Safari & Fleet, People, Reports & History) that behave like menu items. The section you are in opens by itself; opening another closes the previous one. Notifications live behind the bell. The sync chip shows only when offline, syncing or failed.
+- **Top bar**: only the bell (and the menu button on phones). No search box, no "Live" indicator. A connection notice appears only if the live connection stays down for about 8 seconds.
+- **Phone menu**: same short grouped list with a Search row, instead of a flat list of every page.
+- **Shortcuts stay**, silently: `/` or Ctrl/Cmd+K search, `N` add task, `G` then a letter jumps to a page.
+
+## Layout fixes and motion (latest pass)
+- **No empty top bar on desktop (≥1024 px).** The bell and the "expiring/expired" pill moved to the sidebar footer, next to the account menu; content starts at the top. The top bar remains on phones/tablets.
+- **Collapsed sidebar (icon rail):** the expand button no longer overlaps Search. The rail shows logo, expand, Search, Home, Tasks, Ask Lodge AI, one icon per section (clicking one opens the full sidebar on that section), then the bell and your account.
+- **Motion** (all disabled when the device asks for reduced motion): page fade/rise on every navigation, staggered reveal of KPI cards, record cards, board columns and table rows; KPI numbers count up; smooth sidebar section open/close and sidebar collapse; button hover lift and press feedback; card hover; checklist progress bar fills; sign-in card rises in.
+- Manual checks: collapse and expand the sidebar at 1440 px (nothing overlaps; bell and account stay visible); navigate between pages (content eases in, no flicker); turn on "Reduce motion" in the OS (animations stop).

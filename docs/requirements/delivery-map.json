@@ -1,5 +1,5 @@
 {
-  "reviewed": "2026-11-09",
+  "reviewed": "2026-11-16",
   "sources": [
     {
       "file": "Lodge_CRM_Packages_and_Features.docx",
@@ -310,7 +310,7 @@
       "package_reference": "§4.15",
       "workflow_reference": "§20.3",
       "status": "partial",
-      "acceptance_gap": "Assigned tasks, essential lodge/emergency information, notes and inspections are not delivered by the wildlife queue alone."
+      "acceptance_gap": "Assigned task/checklist, housekeeping, transfer and wildlife queues exist with account-scoped replay. Complete the documented essential/emergency information, notes and inspection subset, and real-device reconnect/storage acceptance."
     },
     {
       "id": "S16",
@@ -318,8 +318,8 @@
       "title": "Push notifications",
       "package_reference": "§4.16",
       "workflow_reference": "§21",
-      "status": "missing",
-      "acceptance_gap": "Deliver browser push for the web release where supported; native delivery stays deferred."
+      "status": "partial",
+      "acceptance_gap": "Browser push subscriptions, private preferences, encrypted durable delivery/retries and generic notification payloads are implemented for the web release. Accept actual VAPID/HTTPS/provider delivery on supported desktop/mobile devices; native apps remain deferred."
     },
     {
       "id": "S17",
@@ -391,7 +391,7 @@
       "package_reference": "§5.1",
       "workflow_reference": "owner override; §26–27",
       "status": "partial",
-      "acceptance_gap": "Explicit assignments/switching exist; reconcile Premium availability and per-property overrides with the package guide."
+      "acceptance_gap": "Explicit group memberships and lodge switching exist. Complete the connected cross-property journey and each lodge subscription/access acceptance."
     },
     {
       "id": "P02",
@@ -400,7 +400,7 @@
       "package_reference": "§5.2",
       "workflow_reference": "operating-system p24",
       "status": "partial",
-      "acceptance_gap": "Current scoped totals exist; finish package and documented guest/staff/fleet/alert coverage acceptance."
+      "acceptance_gap": "Group overview exists. Accept scoped operational metrics and denied/expired-property behavior across the complete documented journey."
     },
     {
       "id": "P03",

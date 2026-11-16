@@ -1,6 +1,6 @@
 # Document-led delivery and acceptance map
 
-Reviewed 9 November 2026 against the three original attachments and the current source, including verified scheduled-report implementation. This replaces stale completion assumptions in earlier milestone inventories. `requirements/delivery-map.json` contains all 63 named package items, their document references and outstanding acceptance; this file summarises the same register. No feature is considered commercially accepted merely because a model, endpoint, screen or feature flag exists.
+Reviewed 16 November 2026 against the three original attachments and the current source, including verified scheduled-report implementation. This replaces stale completion assumptions in earlier milestone inventories. `requirements/delivery-map.json` contains all 63 named package items, their document references and outstanding acceptance; this file summarises the same register. No feature is considered commercially accepted merely because a model, endpoint, screen or feature flag exists.
 
 ## Source precedence and confirmed owner decisions
 
@@ -66,8 +66,8 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | S12 / §4.12 | Vehicle maintenance reminders | partial | Reconcile and accept all date/mileage, tyre/brake/battery service rules; existing fixed reminders are a subset. |
 | S13 / §4.13 | Wildlife sightings | implemented core | Accept authorised species/photo/GPS capture, protected-species visibility, storage and history. |
 | S14 / §4.14 | Offline photo/GPS capture | partial | Wildlife queue exists; verify real-device persistence, photos, reconnect, duplicate replay and account isolation. |
-| S15 / §4.15 | Offline mobile mode | partial | Assigned tasks, essential lodge/emergency information, notes and inspections are not delivered by the wildlife queue alone. |
-| S16 / §4.16 | Push notifications | missing | Deliver browser push for the web release where supported; native delivery stays deferred. |
+| S15 / §4.15 | Offline mobile mode | partial | Assigned task/checklist, housekeeping, transfer and wildlife queues exist with account-scoped replay. Complete the documented essential/emergency information, notes and inspection subset, and real-device reconnect/storage acceptance. |
+| S16 / §4.16 | Push notifications | partial | Browser push subscriptions, private preferences, encrypted durable delivery/retries and generic notification payloads are implemented for the web release. Accept actual VAPID/HTTPS/provider delivery on supported desktop/mobile devices; native apps remain deferred. |
 | S17 / §4.17 | Lodge AI chatbot | partial | Management chat/tools exist; complete default staff access, guest access and the documented operational question set. |
 | S18 / §4.18 | AI knowledge base | implemented core | Private scoped retrieval exists; real-model grounding and complete live ingestion acceptance remain. |
 | S19 / §4.19 | Document knowledge uploads | implemented core | Extraction/vector/ACL boundaries are tested; verify the full real storage/worker/embedding pipeline. |
@@ -80,8 +80,8 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 
 | ID / source | Requirement | Current state | Work needed for acceptance |
 | --- | --- | --- | --- |
-| P01 / §5.1 | Multi-lodge/group management | partial | Explicit assignments/switching exist; reconcile Premium availability and per-property overrides with the package guide. |
-| P02 / §5.2 | Group dashboard | partial | Current scoped totals exist; finish package and documented guest/staff/fleet/alert coverage acceptance. |
+| P01 / §5.1 | Multi-lodge/group management | partial | Explicit group memberships and lodge switching exist. Complete the connected cross-property journey and each lodge subscription/access acceptance. |
+| P02 / §5.2 | Group dashboard | partial | Group overview exists. Accept scoped operational metrics and denied/expired-property behavior across the complete documented journey. |
 | P03 / §5.3 | Cross-property reporting | partial | Read-only comparisons exist; finish the complete selected report set and acceptance. |
 | P04 / §5.4 | Live vehicle GPS tracking | provider dependent | Select compatible devices/provider API and implement/accept actual ingestion and live status. |
 | P05 / §5.5 | Trip history/route playback | provider dependent | Needs real tracking ingestion, scoped route storage and playback; entitlement flags are not an implementation. |

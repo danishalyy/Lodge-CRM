@@ -266,7 +266,7 @@ Fixed while testing:
 - **Phones**: list pages now start on Cards instead of a sideways-scrolling table (unless the person chose a view); page header and toolbars are more compact.
 - **Status boards**: columns are equal width; the "Move to…" control and drag handle are compact on desktop and stay large on touch screens.
 
-Known, not changed: sidebar groups scroll when the window is shorter than about 900 px; on a brand-new lodge the setup checklist pushes the KPI cards below the fold; Rooms status is a manual field and does not follow in-house stays.
+Known, not changed: sidebar groups scroll when the window is shorter than about 900 px; on a brand-new lodge the setup checklist pushes the KPI cards below the fold; Room readiness now follows authoritative occupancy, housekeeping and maintenance; manual overrides cannot release occupied or maintenance-blocked rooms.
 
 
 ## Calm shell (sidebar and top bar)

@@ -42,7 +42,8 @@ def test_activity_vehicle_is_conditional():
     assert 'requires_vehicle' in MODELS and 'if requires_vehicle and not vehicle' in MAIN
 
 def test_schedule_races_hardened():
-    assert 'pg_advisory_xact_lock' in MAIN
+    assert 'lock_resources(db,lodge_id' in MAIN
+    assert 'pg_advisory_xact_lock' in (ROOT/'app'/'services'/'state.py').read_text()
     assert 'ex_activity_vehicle_overlap' in MIG and 'ex_transfer_vehicle_overlap' in MIG
 
 def test_task_upload_gate_and_subresource_scope():

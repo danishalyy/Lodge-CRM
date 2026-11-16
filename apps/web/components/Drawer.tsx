@@ -6,6 +6,12 @@ import { Drawer as Vaul } from "vaul";
 // Dismiss a focused combobox popup before closing its containing dialog.
 function keepOpenForCombobox(event: KeyboardEvent) {
   const active = document.activeElement;
+  // Responsive drawer layers may mount after a nested confirmation. Let that
+  // confirmation handle Escape without dismissing its underlying editor.
+  if (active?.closest('.confirmationDialog[data-state="open"]')) {
+    event.preventDefault();
+    return;
+  }
   if (
     active?.getAttribute("role") === "combobox" &&
     active.getAttribute("aria-expanded") === "true"

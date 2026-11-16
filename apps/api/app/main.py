@@ -50,7 +50,7 @@ from .security import (
     verify_password, access_context, membership_for, has_permission, ensure_feature, entitlement_enabled,
     encrypt_mfa_secret, decrypt_mfa_secret,
 )
-from .services.state import housekeeping_job_created, housekeeping_awaiting_inspection, housekeeping_completed, maintenance_opened, maintenance_released, unit_is_occupied, lock_asset_state, OCCUPYING_STAY_STATES, require_room_readiness, room_checked_out, require_asset_release, vehicle_returned, require_asset_fault_clear
+from .services.state import housekeeping_job_created, housekeeping_awaiting_inspection, housekeeping_completed, maintenance_opened, maintenance_released, unit_is_occupied, lock_asset_state, OCCUPYING_STAY_STATES, require_room_readiness, room_checked_out, require_asset_release, vehicle_returned, require_asset_fault_clear, lock_resources
 from .notification_service import create_notification, staff_user_id, user_ids_with_permission
 from .email_service import issue_invitation, account_email_status, queue_account_email, validate_email_configuration
 
@@ -1136,7 +1136,7 @@ def stays(lodge_id:str,limit:int=Query(50,ge=1,le=250),offset:int=Query(0,ge=0),
 
 
 def check_unit_conflict(db:Session,lodge_id,unit_id,arrival,departure,exclude_id=None):
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),{"key":f"{lodge_id}:unit:{unit_id}"})
+    lock_resources(db,lodge_id,("unit",unit_id))
     q=select(Stay).where(Stay.lodge_id==lodge_id,Stay.unit_id==unit_id,Stay.status!="cancelled",Stay.arrival_date<departure,Stay.departure_date>arrival)
     if exclude_id:q=q.where(Stay.id!=exclude_id)
     if db.scalar(q.limit(1)):
@@ -1492,8 +1492,7 @@ def _assert_staff_operational(staff:StaffProfile,label="Staff member"):
         raise HTTPException(409,f"{label} is not operationally available")
 
 def _lock_schedule_resources(db:Session,lodge_id,*resources):
-    keys=sorted({f"{lodge_id}:{kind}:{rid}" for kind,rid in resources if rid})
-    for key in keys:db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),{"key":key})
+    lock_resources(db,lodge_id,*resources)
 
 def _activity_conflicts(db:Session,lodge_id,starts,ends,guide_id=None,vehicle_id=None,exclude_id=None):
     _lock_schedule_resources(db,lodge_id,("staff",guide_id),("vehicle",vehicle_id))

@@ -8,10 +8,19 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from ..models import Stay, Unit, Vehicle, MaintenanceTicket, Activity, Transfer
 from datetime import datetime, timezone
+from uuid import UUID
 
 UNIT_STATES = {"available", "occupied", "cleaning", "awaiting_inspection", "ready", "maintenance", "out_of_service"}
 PROTECTED_UNIT_STATES = {"maintenance", "out_of_service"}
 OCCUPYING_STAY_STATES = {"in_house", "departing"}
+
+
+def lock_resources(db: Session, lodge_id, *resources) -> None:
+    # Equivalent URL UUID spellings must never acquire different locks.
+    lodge = str(UUID(str(lodge_id)))
+    keys = sorted({f"{lodge}:{kind}:{UUID(str(record_id))}" for kind,record_id in resources if record_id})
+    for key in keys:
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"), {"key":key})
 
 
 def lock_asset_state(db: Session, *assets) -> None:
@@ -23,8 +32,7 @@ def lock_asset_state(db: Session, *assets) -> None:
     rows = [asset for asset in assets if asset is not None]
     for asset in sorted(rows, key=lambda a: (a.__tablename__, str(a.id))):
         kind = "unit" if isinstance(asset, Unit) else "vehicle"
-        db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
-                   {"key": f"{asset.lodge_id}:{kind}:{asset.id}"})
+        lock_resources(db, asset.lodge_id, (kind, asset.id))
         db.refresh(asset)
 
 

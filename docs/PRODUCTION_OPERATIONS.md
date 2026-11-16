@@ -84,6 +84,10 @@ Recovery rejects nonempty targets, unsafe archive members, wrong signatures and 
 
 Validate restored counts, selected private-media bytes, logins/MFA, worker readiness and a full role-scoped journey before switching traffic. Record measured backup age (RPO), outage and recovery duration (RTO); local rehearsal results do not establish VPS targets. For an upgrade, rehearse against a recovered copy first, back up production, run migrations/grants for the pinned new release, then verify readiness and acceptance. After a failed schema upgrade, recover into a separate target; rolling back an image alone may not roll back its schema.
 
+## Browser update behaviour
+
+The service worker keeps only the fixed public offline/branding assets. Application bundles use the browser's normal loading/cache path; private pages, APIs, RSC responses and media are never added to the worker cache. Activation removes the previous static worker cache and preserves the separately scoped IndexedDB work queue. An already loaded tab can queue permitted offline work; a new private navigation while offline shows the public reconnect screen. Verify these behaviours and push delivery on the launch devices after an upgrade.
+
 ## Monitoring and incident response
 
 Monitor HTTPS readiness externally, host disk/inodes/memory, PostgreSQL capacity, Redis health, queue age/failures, worker heartbeat, backup success/age and certificate expiry. Logs rotate locally (5 × 10 MB per configured service); configure a protected central log/error destination and avoid guest data/secrets in alerts. Test alerts actually reach an operator. Agree maintenance windows, on-call ownership, recovery targets and retention/deletion rules with the launch lodges.

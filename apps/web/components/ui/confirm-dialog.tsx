@@ -31,6 +31,13 @@ export function ConfirmDialog({
         <Dialog.Overlay className="glassOverlay" />
         <Dialog.Content
           className="glassDialog confirmationDialog"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              onOpenChange(false);
+            }
+          }}
           onCloseAutoFocus={(event) => {
             if (restoreFocus.current?.isConnected) {
               event.preventDefault();

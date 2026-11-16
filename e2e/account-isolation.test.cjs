@@ -762,6 +762,7 @@ test('conversational AI shows pending turns, formats answers safely, preserves d
  const answer='Here is what needs attention.\n\n### Open tasks\n\n1. **Room readiness check** — due today.\n2. **Vehicle inspection** — awaiting assignment.\n\n| Task | Status |\n| --- | --- |\n| Room check | In progress |\n| Vehicle inspection | Assigned |\n\n[External reference](https://chat-external.invalid/leak)\n\n![Remote image](https://chat-external.invalid/pixel.png)\n\n<script>window.chatInjected=true</script>';
  const history=Array.from({length:6},(_,i)=>({id:'old-'+i,title:i===2?'Vehicle notes':'Previous conversation '+i,created_at:'2026-11-08T10:00:00Z'}));
  try{
+  await page.emulateMedia({reducedMotion:'reduce'});
   page.on('request',r=>{if(r.url().includes('chat-external.invalid'))external.push(r.url());});
   await context.grantPermissions(['clipboard-read','clipboard-write']);
   await page.route('**/api/v1/lodges/chat-lodge/ai/**',async r=>{
@@ -990,14 +991,17 @@ test('premium design covers every lodge module and platform screen in both theme
  const platform=['','lodges','groups','users','subscriptions','packages','audit','notifications','settings'].map(p=>'/super-admin'+(p?'/'+p:''));
  const audit=[];
  for(const isPlatform of [false,true]){
-  const {context,page}=await accountPage(premiumTestAccount(isPlatform));const crashes=[];
-  page.on('pageerror',e=>crashes.push(e.message));
+  const {context,page}=await accountPage(premiumTestAccount(isPlatform));const crashes=[],consoleErrors=[];
+  page.on('pageerror',e=>crashes.push(e.stack||e.message));
+  page.on('console',m=>{if(m.type()==='error'){consoleErrors.push(m.text());if(consoleErrors.length>30)consoleErrors.shift()}});
+  context.on('requestfailed',r=>{if(r.url().includes('/_next/')){consoleErrors.push('ASSET FAILED '+r.url()+' '+JSON.stringify(r.failure()));if(consoleErrors.length>30)consoleErrors.shift()}});
+  context.on('response',r=>{if(r.status()>=400&&r.url().includes('/_next/'))consoleErrors.push('ASSET HTTP '+r.status()+' '+r.url())});
   await context.addInitScript(()=>{const theme=new URL(location.href).searchParams.get('visualTheme');if(theme)localStorage.setItem('theme',theme)});
   try{
    await page.emulateMedia({reducedMotion:'reduce'});await premiumFixtures(page);
    for(const route of isPlatform?platform:modules.map(m=>'/'+m))for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
     await page.setViewportSize({width,height:1000});await page.goto(base+route+'?visualTheme='+theme);
-    await page.locator('.content h1').first().waitFor().catch(async e=>{throw new Error(`${route} ${width}/${theme}: ${e.message}; ${await page.locator('body').innerText()}`)});await page.waitForTimeout(120);
+    await page.locator('.content h1').first().waitFor().catch(async e=>{fs.writeFileSync('/tmp/safarios-route-failure.json',JSON.stringify({route,width,theme,crashes,consoleErrors},null,2));throw new Error(`${route} ${width}/${theme}: ${e.message}; browser exceptions: ${JSON.stringify(crashes)}; console: ${JSON.stringify(consoleErrors)}; ${await page.locator('body').innerText()}`)});await page.waitForTimeout(120);
     assert.equal(await page.getByText('Access denied',{exact:true}).count(),0,route+' unexpected access block');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${route} overflow ${width}/${theme}`);
     assert.deepEqual(crashes,[],`${route} crashed ${width}/${theme}`);
@@ -1612,9 +1616,9 @@ test('PWA offline sign-out clears the queue and prevents private restoration on 
 test('PWA manifest is installable and offline navigation serves only a public fallback',async()=>{
  const {context,page}=await accountPage(premiumTestAccount());
  try{
-  await premiumFixtures(page);await page.goto(base+'/rooms');await page.getByRole('heading',{name:'Rooms & Units',exact:true}).waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+  await premiumFixtures(page);await page.goto(base+'/offline.html');await page.evaluate(async()=>{const cache=await caches.open('safarios-static-v1');await cache.put('/_next/static/chunks/old-release.js',new Response('old public bundle'))});await page.goto(base+'/rooms');await page.getByRole('heading',{name:'Rooms & Units',exact:true}).waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await page.waitForFunction(async()=>!(await caches.keys()).includes('safarios-static-v1'));
   const manifest=await page.evaluate(async()=>await(await fetch('/manifest.webmanifest')).json());assert.equal(manifest.display,'standalone');assert.equal(manifest.name,'SafariOS · Lodge operations');assert.deepEqual(manifest.icons.map(i=>i.sizes),['192x192','512x512']);
-  const urls=await page.evaluate(async()=>{const urls=[];for(const key of await caches.keys())for(const request of await(await caches.open(key)).keys())urls.push(new URL(request.url).pathname);return urls;});assert.ok(urls.includes('/offline.html'));assert.equal(urls.some(url=>url.startsWith('/api/')||url==='/rooms'||url==='/dashboard'),false);
+  const urls=await page.evaluate(async()=>{const urls=[];for(const key of await caches.keys())for(const request of await(await caches.open(key)).keys())urls.push(new URL(request.url).pathname);return urls;});assert.ok(urls.includes('/offline.html'));assert.equal(urls.some(url=>url.startsWith('/api/')||url==='/rooms'||url==='/dashboard'),false);assert.equal(urls.some(url=>url.startsWith('/_next/static/')),false);
   await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'You’re offline',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Rooms & Units',exact:true}).count(),0);
  }finally{await context.setOffline(false);await context.close()}
 });
@@ -1711,4 +1715,17 @@ test('first-run tour is dismissible, remembers completion and does not trap norm
   assert.equal(await page.getByRole('button',{name:'Skip tour',exact:true}).count(),0);
   await page.getByRole('button',{name:'Add task',exact:true}).waitFor();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.keyboard.press('n');await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');
  }finally{await context.close()}
+});
+
+test('PWA public network responses survive cache failures and application bundles bypass worker caching',async()=>{
+ const vm=require('node:vm');
+ for(const failure of ['read','open','write']){
+  const handlers={},jobs=[];let fetches=0;
+  const cache={put:async()=>{if(failure==='write')throw Error('quota')},keys:async()=>{if(failure==='evict')throw Error('eviction');return []}};
+  const sandbox={URL,Response,Promise,console,caches:{match:async()=>{if(failure==='read')throw Error('cache unavailable');return undefined},open:async()=>{if(failure==='open')throw Error('storage denied');return cache}},fetch:async()=>{fetches++;const response=new Response('public application bundle');Object.defineProperty(response,'type',{value:'basic'});return response},self:{location:{origin:base},addEventListener:(name,fn)=>handlers[name]=fn}};
+  vm.runInNewContext(fs.readFileSync(path.join(web,'public/sw.js'),'utf8'),sandbox);
+  let response;handlers.fetch({request:{url:base+'/branding/safarios-mark.svg',method:'GET',mode:'cors'},respondWith:p=>response=p,waitUntil:p=>jobs.push(p)});
+  assert.equal(await(await response).text(),'public application bundle',failure);await Promise.all(jobs);assert.equal(fetches,1);
+  response=undefined;handlers.fetch({request:{url:base+'/_next/static/chunks/application.js',method:'GET',mode:'cors'},respondWith:p=>response=p,waitUntil:p=>jobs.push(p)});assert.equal(response,undefined,'hashed JavaScript stays on the browser network/cache path');assert.equal(fetches,1);
+ }
 });

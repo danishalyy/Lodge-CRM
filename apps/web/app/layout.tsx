@@ -7,6 +7,7 @@ import "@fontsource/outfit/500.css";
 import "./globals.css";
 import "./design-system.css";
 import "./reference-theme.css";
+import "./guest-portal.css";
 
 export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",

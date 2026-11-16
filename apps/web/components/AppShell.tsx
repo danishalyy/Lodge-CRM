@@ -156,6 +156,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     authApi
       .me()
       .then(async (v) => {
+        if(v.is_guest){router.replace("/guest");return}
         setMe(v);
         if (!v.is_super_admin && !getActiveLodgeId() && v.memberships?.[0])
           setActiveLodgeId(v.memberships[0].lodge_id);
@@ -207,7 +208,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <span>Loading secure workspace…</span>
       </div>
     );
-  if (!me) return null;
+  if (!me || me.is_guest) return null;
   if (checkingAccess)
     return (
       <main className="content">

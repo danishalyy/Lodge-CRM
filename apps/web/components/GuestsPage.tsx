@@ -10,6 +10,8 @@ import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { FormEvent, useEffect, useMemo, useState, useRef } from "react";
 import GuestCommunications from "./GuestCommunications";
+import {GuestAccessManager,GuestPortalEditor} from "./GuestPortalAdmin";
+import {portalCopy} from "@/lib/strings/guest-portal";
 import { guestCopy as copy } from "@/lib/strings/guests";
 import Drawer from "./Drawer";
 import StatusPill from "./StatusPill";
@@ -44,6 +46,8 @@ type Guest = {
 export default function GuestsPage() {
   const access = useWorkspaceAccess();
   const canManage = access.permission("guests.manage");
+  const canPortal=access.permission("guest_portal.manage")&&access.feature("guest_mobile")&&["lodge_admin","group_admin","front_office"].includes(access.roleKey||"");
+  const [portalEditor,setPortalEditor]=useState(false);
   const [rows, setRows] = useState<Guest[]>([]),
     [q, setQ] = useState(""),
     [selected, setSelected] = useState<Guest | null>(null),
@@ -208,11 +212,12 @@ export default function GuestsPage() {
           <h1>Guests</h1>
           <p>Guest details, preferences, dietary needs and past stays.</p>
         </div>
+        <div className="guestAccessActions">{canPortal&&<button className="button secondary" onClick={()=>setPortalEditor(true)}>{portalCopy.content}</button>}
         {canManage && (
           <button className="button primary" onClick={() => setOpen(true)}>
             Add guest
           </button>
-        )}
+        )}</div>
       </div>
       {error && (
         <div className="panel dangerText" role="alert">
@@ -469,6 +474,7 @@ export default function GuestsPage() {
               </div>
             )}
           </Form>
+          {canPortal&&<GuestAccessManager key={"portal:"+selected.id} guestId={selected.id} canInvite={!selected.anonymized_at}/>}
           <GuestCommunications
             key={selected.id}
             guestId={selected.id}
@@ -476,6 +482,7 @@ export default function GuestsPage() {
           />
         </Drawer>
       )}
+      {portalEditor&&canPortal&&<GuestPortalEditor onClose={()=>setPortalEditor(false)}/>}
       {open && (
         <Drawer onClose={() => setOpen(false)}>
           <div className="drawerHead">

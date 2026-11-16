@@ -3,6 +3,7 @@
 PERMISSION_FEATURES = {
     "dashboard": ("dashboard",),
     "guests": ("guests",),
+    "guest_portal": ("guest_mobile",),
     "stays": ("stays",),
     "units": ("units",),
     "staff": ("staff",),

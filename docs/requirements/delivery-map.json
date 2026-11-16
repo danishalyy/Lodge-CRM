@@ -1,5 +1,5 @@
 {
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "sources": [
     {
       "file": "Lodge_CRM_Packages_and_Features.docx",
@@ -138,8 +138,8 @@
       "title": "Guest mobile experience",
       "package_reference": "§3.14",
       "workflow_reference": "§20.2",
-      "status": "missing",
-      "acceptance_gap": "Deliver the restricted guest web/QR equivalent now; native applications remain deferred by the owner."
+      "status": "partial",
+      "acceptance_gap": "Restricted invited guest web/QR, own stay/itinerary, published lodge information, requests and private updates implemented and security-tested. Guest safari/wildlife capture where enabled and live device/delivery acceptance remain; native apps are deferred."
     },
     {
       "id": "B15",
@@ -328,7 +328,7 @@
       "package_reference": "§4.17",
       "workflow_reference": "§23",
       "status": "partial",
-      "acceptance_gap": "Management chat/tools exist; complete default staff access, guest access and the documented operational question set."
+      "acceptance_gap": "Separate management and guest chat scopes exist. Complete default staff access, the documented operational question set and real-model acceptance."
     },
     {
       "id": "S18",
@@ -354,8 +354,8 @@
       "title": "AI for guest questions",
       "package_reference": "§4.20",
       "workflow_reference": "§20.2, §23",
-      "status": "missing",
-      "acceptance_gap": "Add a separate guest principal and explicitly guest-approved knowledge; internal lodge SOP access is not guest access."
+      "status": "implemented_core",
+      "acceptance_gap": "Separate guest identity, guest-approved published knowledge and own-itinerary assistant implemented with private RLS history, source/authority revalidation and erasure fencing. Accept real model grounding/refusal, delivery and launch-lodge operations before commercial use."
     },
     {
       "id": "S21",

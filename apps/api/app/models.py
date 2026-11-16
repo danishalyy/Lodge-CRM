@@ -12,6 +12,7 @@ def utcnow():
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (CheckConstraint("NOT (is_guest AND is_super_admin)",name="ck_user_guest_platform"),)
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(512))
@@ -20,6 +21,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(180))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_super_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_guest: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -203,7 +205,7 @@ class Guest(Base):
 
 class Stay(Base):
     __tablename__ = "stays"
-    __table_args__ = (Index("ix_stays_lodge_dates", "lodge_id", "arrival_date", "departure_date"), CheckConstraint("departure_date >= arrival_date", name="ck_stay_dates"), CheckConstraint("party_size >= 1", name="ck_stay_party_size"))
+    __table_args__ = (Index("ix_stays_lodge_dates", "lodge_id", "arrival_date", "departure_date"), CheckConstraint("departure_date >= arrival_date", name="ck_stay_dates"), CheckConstraint("party_size >= 1", name="ck_stay_party_size"), UniqueConstraint("id","guest_id","lodge_id",name="uq_stay_guest_lodge"))
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
     guest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("guests.id", ondelete="RESTRICT"), index=True)
@@ -252,9 +254,12 @@ class Task(Base):
 
 class GuestRequest(Base):
     __tablename__ = "guest_requests"
-    __table_args__ = (Index("ix_requests_lodge_status", "lodge_id", "status"),)
+    __table_args__ = (Index("ix_requests_lodge_status", "lodge_id", "status"), UniqueConstraint("guest_access_id","client_reference",name="uq_guest_request_command"),)
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), index=True)
+    guest_access_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("guest_access.id",ondelete="SET NULL"), nullable=True)
+    client_reference: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    guest_description: Mapped[str | None] = mapped_column(Text,nullable=True)
     guest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("guests.id", ondelete="RESTRICT"), index=True)
     stay_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("stays.id", ondelete="SET NULL"), nullable=True)
     department_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
@@ -1097,3 +1102,64 @@ class PushDelivery(Base):
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error_code: Mapped[str] = mapped_column(String(40), default='')
+
+
+class GuestAccess(Base):
+    __tablename__ = "guest_access"
+    __table_args__ = (
+        ForeignKeyConstraint(["stay_id","guest_id","lodge_id"],["stays.id","stays.guest_id","stays.lodge_id"],ondelete="CASCADE"),
+        UniqueConstraint("stay_id","user_id",name="uq_guest_access_stay_user"),
+        UniqueConstraint("id","lodge_id","user_id",name="uq_guest_access_owner"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("lodges.id",ondelete="CASCADE"),index=True)
+    guest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("guests.id",ondelete="CASCADE"))
+    stay_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("stays.id",ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="RESTRICT"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow)
+
+
+class GuestPortalContent(Base):
+    __tablename__ = "guest_portal_content"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("lodges.id",ondelete="CASCADE"),index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(160))
+    body: Mapped[str] = mapped_column(Text)
+    published: Mapped[bool] = mapped_column(Boolean,default=False)
+    position: Mapped[int] = mapped_column(Integer,default=0)
+    version: Mapped[int] = mapped_column(Integer,default=1)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="RESTRICT"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow,onupdate=utcnow)
+
+
+class GuestNotice(Base):
+    __tablename__ = "guest_notices"
+    __table_args__ = (ForeignKeyConstraint(["access_id","lodge_id","user_id"],["guest_access.id","guest_access.lodge_id","guest_access.user_id"],ondelete="CASCADE"),UniqueConstraint("access_id","dedupe_key",name="uq_guest_notice_dedupe"))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    access_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("lodges.id",ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(160))
+    body: Mapped[str] = mapped_column(String(1000))
+    dedupe_key: Mapped[str] = mapped_column(String(160))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow)
+
+
+class GuestAIMessage(Base):
+    __tablename__ = "guest_ai_messages"
+    __table_args__ = (ForeignKeyConstraint(["access_id","lodge_id","user_id"],["guest_access.id","guest_access.lodge_id","guest_access.user_id"],ondelete="CASCADE"),UniqueConstraint("access_id","client_reference",name="uq_guest_ai_command"))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    access_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),index=True)
+    lodge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("lodges.id",ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"))
+    client_reference: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    question: Mapped[str] = mapped_column(String(2000))
+    answer: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list] = mapped_column(JSONB,default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow)

@@ -16,6 +16,7 @@ def get_db():
         db.close()
 
 def set_rls_context(db: Session, lodge_id: str | None, is_super_admin: bool = False, user_id: str | None = None):
+    db.execute(text("select set_config('app.guest_mode','false',true), set_config('app.guest_access_id','',true), set_config('app.guest_lodge_id','',true), set_config('app.guest_profile_id','',true), set_config('app.guest_stay_id','',true)"))
     db.execute(text("select set_config('app.current_lodge_id', :lodge_id, true)"), {"lodge_id": lodge_id or ""})
     db.execute(text("select set_config('app.is_super_admin', :flag, true)"), {"flag": "true" if is_super_admin else "false"})
     if user_id is not None:

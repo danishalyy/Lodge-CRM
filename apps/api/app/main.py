@@ -65,7 +65,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id", "X-Lodge-Context", "Last-Event-ID"],
 )
 
@@ -315,10 +315,12 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
                 user.locked_until=now+timedelta(minutes=15);user.failed_login_count=0
             db.commit()
         raise HTTPException(401, "Invalid email or password")
+    if bool(user.is_guest) != (request.url.path == "/api/v1/guest/auth/login"):
+        raise HTTPException(401, "Invalid email or password")
     if not user.is_active:
         raise HTTPException(403, "Account is not activated")
     # A non-platform account must still have active lodge access and active employment.
-    if not user.is_super_admin:
+    if not user.is_super_admin and not user.is_guest:
         set_rls_context(db,None,False,str(user.id))
         memberships=db.scalars(select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True))).all()
         groups=db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()
@@ -370,7 +372,10 @@ def activate(body: ActivateIn, response: Response, db: Session = Depends(get_db)
         raise HTTPException(400, "Invitation user no longer exists")
     if user.is_active:
         raise HTTPException(400, "Account is already activated; sign in or use password recovery")
-    if invitation.lodge_id:
+    if user.is_guest:
+        from .services.guest_portal import invitation_valid
+        if not invitation_valid(db,user,invitation.lodge_id):raise HTTPException(400,"This guest invitation is no longer available")
+    elif invitation.lodge_id:
         member=db.scalar(select(Membership).where(Membership.user_id==user.id,Membership.lodge_id==invitation.lodge_id,Membership.is_active.is_(True)))
         staff=db.scalar(select(StaffProfile).where(StaffProfile.user_id==user.id,StaffProfile.lodge_id==invitation.lodge_id))
         if not member or (staff and staff.employment_status!="active"):raise HTTPException(400,"This invitation is no longer available. Contact your administrator.")
@@ -425,7 +430,7 @@ def confirm_password_reset(body: PasswordResetConfirmIn, response: Response, db:
     # Require the normal sign-in flow (including MFA) after changing a password.
     response.delete_cookie("lodge_session", path="/")
     response.delete_cookie("lodge_csrf", path="/")
-    return {"ok":True}
+    return {"ok":True,"sign_in_path":"/guest" if user.is_guest else "/login"}
 
 
 @app.post("/api/v1/auth/mfa/setup",dependencies=[Depends(require_csrf)])
@@ -518,6 +523,8 @@ def logout(response: Response, request: Request, user: User = Depends(current_us
 
 @app.get("/api/v1/auth/me")
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if user.is_guest:
+        return {"id":str(user.id),"email":user.email,"full_name":user.full_name,"is_guest":True,"is_super_admin":False,"email_verified":bool(user.email_verified_at),"mfa_enabled":bool(user.mfa_enabled_at),"groups":[],"memberships":[]}
     memberships = []
     member_rows = [] if user.is_super_admin else db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
     for m in member_rows:
@@ -964,6 +971,7 @@ def invite_staff_user(lodge_id:str,record_id:str,body:StaffInvite,request:Reques
     role_features=ROLE_FEATURES
     if body.role_key in role_features:ensure_feature(db,lodge_id,role_features[body.role_key])
     account=db.scalar(select(User).where(func.lower(User.email)==staff.email.lower()).with_for_update())
+    if account and account.is_guest:raise HTTPException(409,"Guest accounts cannot be linked to staff profiles; use a separate staff email")
     if account and db.scalar(select(LodgeGroup.id).where(LodgeGroup.admin_user_id==account.id)):raise HTTPException(409,"Group administrator accounts cannot be linked to staff profiles")
     new_account=account is None
     if not account:
@@ -1288,6 +1296,8 @@ def _update_task_record(lodge_id, record_id, body, request, user, db):
                 linked_request=db.scalar(select(GuestRequest).where(GuestRequest.task_id==t.id))
                 if linked_request and linked_request.status not in {"resolved","cancelled"}:
                     linked_request.status="resolved";linked_request.resolution=linked_request.resolution or "Resolved by linked task completion";linked_request.resolved_at=now
+                    from .services.guest_portal import request_notice
+                    request_notice(db,linked_request)
                 if t.recurrence_interval_days and t.due_at and entitlement_enabled(db,str(lodge_id),"advanced_tasks"):
                     next_due=t.due_at+timedelta(days=t.recurrence_interval_days)
                     if not t.recurrence_end_date or next_due.date()<=t.recurrence_end_date:
@@ -1372,6 +1382,8 @@ def update_request(lodge_id:str,record_id:str,body:GuestRequestUpdate,request:Re
     if body.description is not None:r.description=body.description.strip()
     if body.priority is not None:r.priority=body.priority
     if body.resolution is not None:r.resolution=body.resolution
+    from .services.guest_portal import request_notice
+    request_notice(db,r)
     audit(db,request,r.lodge_id,user.id,"guest_request.updated","guest_request",str(r.id));db.commit();return {"id":str(r.id),"status":r.status}
 
 @app.post("/api/v1/lodges/{lodge_id}/requests/{record_id}/create-task",dependencies=[Depends(require_csrf)])
@@ -1975,13 +1987,14 @@ def platform_audit(limit:int=Query(200,ge=1,le=500),user:User=Depends(require_su
     for row in rows:
         lodge=db.get(Lodge,row.lodge_id) if row.lodge_id else None
         actor=db.get(User,row.actor_user_id) if row.actor_user_id else None
+        if actor and actor.is_guest:actor=None  # Platform security metadata must not disclose guest identity.
         out.append({"id":str(row.id),"lodge_id":str(row.lodge_id) if row.lodge_id else None,"lodge_name":lodge.name if lodge else None,"actor_user_id":str(row.actor_user_id) if row.actor_user_id else None,"actor_name":actor.full_name if actor else None,"actor_email":actor.email if actor else None,"action":row.action,"resource_type":row.resource_type,"resource_id":row.resource_id,"detail":row.detail,"request_id":row.request_id,"ip_address":row.ip_address,"created_at":row.created_at.isoformat()})
     return out
 
 
 @app.get("/api/v1/platform/users")
 def platform_users(user:User=Depends(require_super_admin),db:Session=Depends(get_db)):
-    set_rls_context(db,None,True,str(user.id));rows=db.scalars(select(User).order_by(User.full_name,User.email)).all();out=[]
+    set_rls_context(db,None,True,str(user.id));rows=db.scalars(select(User).where(User.is_guest.is_(False)).order_by(User.full_name,User.email)).all();out=[]
     for row in rows:
         memberships=db.execute(select(Membership,Lodge,Role).join(Lodge,Lodge.id==Membership.lodge_id).join(Role,Role.id==Membership.role_id).where(Membership.user_id==row.id,Membership.is_active.is_(True))).all()
         out.append({"id":str(row.id),"email":row.email,"full_name":row.full_name,"is_active":row.is_active,"is_super_admin":row.is_super_admin,"mfa_enabled":bool(row.mfa_enabled_at),"created_at":row.created_at.isoformat(),**account_email_status(db,row),"memberships":[{"lodge_id":str(m.lodge_id),"lodge_name":l.name,"role":r.name,"role_key":r.key} for m,l,r in memberships]})
@@ -2486,3 +2499,6 @@ app.include_router(offline_router)
 
 from .push_routes import router as push_router
 app.include_router(push_router)
+
+from .guest_portal_routes import router as guest_portal_router
+app.include_router(guest_portal_router)

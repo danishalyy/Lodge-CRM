@@ -26,7 +26,10 @@ def preview_invitation(body: InvitationPreviewIn, db=Depends(get_db)):
     if not user or user.is_active:
         raise HTTPException(400, 'This invitation is invalid, expired, or already used. Ask your administrator to resend it.')
     lodge = db.get(Lodge, inv.lodge_id) if inv.lodge_id else None
-    if inv.lodge_id and not db.scalar(select(Membership).where(Membership.lodge_id == inv.lodge_id, Membership.user_id == user.id, Membership.is_active.is_(True))):
+    if user.is_guest:
+        from .services.guest_portal import invitation_valid
+        if not invitation_valid(db,user,inv.lodge_id):raise HTTPException(400,'This guest invitation is no longer available.')
+    if inv.lodge_id and not user.is_guest and not db.scalar(select(Membership).where(Membership.lodge_id == inv.lodge_id, Membership.user_id == user.id, Membership.is_active.is_(True))):
         raise HTTPException(400, 'This invitation is no longer available.')
     if inv.lodge_id:
         staff=db.scalar(select(StaffProfile).where(StaffProfile.lodge_id==inv.lodge_id,StaffProfile.user_id==user.id))
@@ -100,7 +103,7 @@ def _mail_status(row):
 @router.get('/api/v1/platform/email')
 def platform_email(actor: User = Depends(require_super_admin), db=Depends(get_db)):
     set_rls_context(db, None, True, str(actor.id))
-    rows = db.scalars(select(AccountEmail).order_by(AccountEmail.created_at.desc()).limit(100)).all()
+    rows = db.scalars(select(AccountEmail).join(User,User.id==AccountEmail.user_id).where(User.is_guest.is_(False)).order_by(AccountEmail.created_at.desc()).limit(100)).all()
     return {'configured': email_configured(), 'provider': 'Gmail / Google Workspace' if settings.smtp_host.lower() == 'smtp.gmail.com' else 'SMTP',
             'sender': settings.smtp_from_email or None, 'encrypted_transport': settings.smtp_use_tls or settings.smtp_use_ssl,
             'outbox_encryption_configured': bool(settings.email_encryption_key or settings.mfa_encryption_key),
@@ -229,7 +232,7 @@ def save_personal_notification_preferences(body: NotificationPreferenceUpdate, u
 def retry_account_email(record_id: uuid.UUID, request: Request, actor: User = Depends(require_super_admin), db=Depends(get_db)):
     set_rls_context(db, None, True, str(actor.id))
     row = db.scalar(select(AccountEmail).where(AccountEmail.id == record_id).with_for_update())
-    if not row:
+    if not row or (db.get(User, row.user_id) and db.get(User, row.user_id).is_guest):
         raise HTTPException(404, 'Email delivery not found')
     if row.status not in {'failed', 'dead'} or not row.encrypted_payload:
         raise HTTPException(409, 'Only failed email deliveries can be retried.')

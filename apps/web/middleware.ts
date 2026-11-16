@@ -5,7 +5,7 @@ const PUBLIC_PATHS = new Set(['/', '/login', '/activate', '/forgot-password', '/
 
 export function middleware(request: NextRequest) {
   const {pathname} = request.nextUrl;
-  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith('/_next') || pathname.startsWith('/icons/') || pathname.startsWith('/branding/') || pathname === '/favicon.ico') {
+  if (PUBLIC_PATHS.has(pathname) || pathname === '/guest' || pathname.startsWith('/guest/') || pathname.startsWith('/_next') || pathname.startsWith('/icons/') || pathname.startsWith('/branding/') || pathname === '/favicon.ico') {
     return NextResponse.next();
   }
   if (!request.cookies.get(SESSION_COOKIE_NAME)?.value) {

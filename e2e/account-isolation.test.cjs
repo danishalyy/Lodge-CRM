@@ -1729,3 +1729,97 @@ test('PWA public network responses survive cache failures and application bundle
   response=undefined;handlers.fetch({request:{url:base+'/_next/static/chunks/application.js',method:'GET',mode:'cors'},respondWith:p=>response=p,waitUntil:p=>jobs.push(p)});assert.equal(response,undefined,'hashed JavaScript stays on the browser network/cache path');assert.equal(fetches,1);
  }
 });
+
+// Browser mocks verify interaction; integration/test_guest_portal.py uses real RLS.
+async function guestPortalPage({features={},loggedIn=true,delay}={}){
+ const user={id:'invited-guest',is_guest:true,is_super_admin:false,full_name:'Maya Visitor',mfa_enabled:false,memberships:[]};
+ const fixture=await accountPage(user),{page}=fixture;let authenticated=loggedIn,rows=[],turns=[],signIns=0;const calls=[];
+ await page.route('**/api/v1/auth/me',r=>r.fulfill({status:authenticated?200:401,json:authenticated?user:{detail:'Authentication required'}}));
+ await page.route('**/api/v1/guest/**',async r=>{
+  const path=new URL(r.request().url()).pathname,method=r.request().method();calls.push(path);
+  if(path.endsWith('/auth/login')){signIns++;if(!r.request().postDataJSON().recovery_code)return r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}});authenticated=true;return r.fulfill({json:{ok:true}})}
+  if(!authenticated)return r.fulfill({status:401,json:{detail:'Authentication required'}});
+  if(path.endsWith('/accesses'))return r.fulfill({json:{stays:[{id:'stay-grant',lodge_name:'Acacia Lodge',arrival_date:'2026-11-16',departure_date:'2026-11-20'}]}});
+  const suffix=path.split('/access/stay-grant')[1];
+  if(suffix==='')return r.fulfill({json:{access_id:'stay-grant',user_id:user.id,guest_name:'Maya',lodge:{name:'Acacia Lodge',timezone:'Africa/Johannesburg',date_format:'dd/MM/yyyy',has_logo:false},stay:{arrival_date:'2026-11-16',departure_date:'2026-11-20',party_size:2,room:'Acacia suite'},content:[{id:'contact',kind:'contact',title:'Reception',body:'Call extension 100.'}],features:{requests:true,notifications:true,activities:true,transfers:false,ai:true,...features},read_only:false,ai_configured:true}});
+  if(suffix==='/itinerary')return r.fulfill({json:[]});
+  if(suffix==='/notifications')return r.fulfill({json:[]});
+  if(suffix==='/requests'){if(method==='POST'){const body=r.request().postDataJSON();rows=[{...body,id:body.client_reference,status:'open',created_at:'2026-11-17T08:00:00Z'}];return r.fulfill({json:rows[0]})}return r.fulfill({json:rows})}
+  if(suffix==='/ai/messages'){if(method==='POST'){if(delay)await delay();const body=r.request().postDataJSON();const row={id:body.client_reference,question:body.content,answer:'Reception is on **extension 100**. ![tracking](https://example.invalid/tracking) [Link](https://example.invalid/link)',sources:[{id:'contact',kind:'guest_information',label:'Reception'}]};turns.push(row);return r.fulfill({json:row})}if(method==='DELETE')turns=[];return r.fulfill({json:turns})}
+  return r.fulfill({status:404,json:{detail:'Stay unavailable'}});
+ });
+ return {...fixture,calls,getSignIns:()=>signIns};
+}
+async function askGuest(page){await page.getByRole('button',{name:'Guest assistant',exact:true}).click();await page.getByLabel('Your question',{exact:true}).fill('Where is reception?');await page.getByRole('button',{name:'Send question',exact:true}).click()}
+
+test('guest conversation and requests provide feedback without staff APIs or unsafe model links',async()=>{
+ const {context,page,calls,requests}=await guestPortalPage();
+ try{
+  await page.goto(base+'/guest?access=stay-grant');await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();
+  await page.getByRole('button',{name:'Requests',exact:true}).click();await page.getByLabel('What do you need?',{exact:true}).fill('Please bring fresh towels');await page.getByRole('button',{name:'Send request',exact:true}).click();await page.getByText('Request sent to the lodge',{exact:true}).waitFor();await page.getByText('Please bring fresh towels',{exact:true}).waitFor();
+  await askGuest(page);await page.getByText('extension 100',{exact:true}).last().waitFor();assert.equal(await page.locator('.guestChat img,.guestChat a').count(),0);
+  await page.getByText('Information used',{exact:true}).click();await page.locator('.guestChat details').getByText('Reception',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Clear conversation',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Clear conversation',exact:true}).click();await page.getByRole('heading',{name:'Ask about your stay'}).waitFor();assert.deepEqual(requests,[]);assert.ok(calls.every(url=>url.startsWith('/api/v1/guest/')));
+ }finally{await context.close()}
+});
+
+test('guest QR requires sign-in and guest MFA remains in the guest realm',async()=>{
+ const {context,page,getSignIns}=await guestPortalPage({loggedIn:false});
+ try{await page.goto(base+'/guest?access=stay-grant');await page.getByRole('heading',{name:'Your lodge, at your fingertips'}).waitFor();await page.getByLabel('Email',{exact:true}).fill('guest@example.com');await page.getByLabel('Password',{exact:true}).fill('Guest private passphrase 123!');await page.getByRole('button',{name:'Sign in to my stay',exact:true}).click();await page.getByRole('button',{name:'Use a recovery code',exact:true}).click();assert.equal(new URL(page.url()).pathname,'/guest');await page.getByLabel('Recovery code',{exact:true}).fill('one-time-recovery');await page.getByRole('button',{name:'Sign in to my stay',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(getSignIns(),2)}finally{await context.close()}
+});
+
+test('guest disabled features make no API calls and another guest QR never opens a stay',async()=>{
+ const {context,page,calls}=await guestPortalPage({features:{requests:false,notifications:false,activities:false,transfers:false,ai:false}});
+ try{await page.goto(base+'/guest?access=other-guest');await page.getByRole('alert').filter({hasText:'That stay is not available to your account.'}).waitFor();assert.ok(!calls.some(url=>url.includes('/access/')));await page.getByRole('button',{name:'Open my stay · Acacia Lodge',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(await page.getByRole('button',{name:'Requests',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Guest assistant',exact:true}).count(),0);assert.ok(!calls.some(url=>/\/(requests|notifications|itinerary|ai\/messages)$/.test(url)))}finally{await context.close()}
+});
+
+test('guest identities cannot render staff children and platform identities cannot open guest stays',async()=>{
+ const guest=await guestPortalPage();try{await guest.page.goto(base+'/tasks');await guest.page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(new URL(guest.page.url()).pathname,'/guest');assert.deepEqual(guest.requests,[])}finally{await guest.context.close()}
+ const staff=await accountPage({id:'platform',is_super_admin:true,mfa_enabled:true,memberships:[]});try{await staff.page.goto(base+'/guest');await staff.page.getByText('This area is for invited guest accounts. Sign out of your staff account to use a separate guest account.',{exact:true}).waitFor();assert.deepEqual(staff.requests,[])}finally{await staff.context.close()}
+});
+
+test('late guest answer cannot repopulate the screen after an account change',async()=>{
+ let release,entered;const pending=new Promise(r=>release=r),ready=new Promise(r=>entered=r);const {context,page}=await guestPortalPage({delay:async()=>{entered();await pending}});
+ try{await page.goto(base+'/guest');await askGuest(page);await ready;await page.evaluate(()=>{localStorage.setItem('active_user_id','other-user');window.dispatchEvent(new StorageEvent('storage',{key:'active_user_id',newValue:'other-user'}))});release();await page.getByRole('heading',{name:'Your lodge, at your fingertips'}).waitFor();assert.equal(await page.locator('.guestChat').count(),0);assert.equal(await page.getByText('Welcome, Maya').count(),0)}finally{release();await context.close()}
+});
+
+test('guest stay and chat fit all four widths in dark and light themes',async()=>{
+ const {context,page}=await guestPortalPage();
+ try{for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){await page.setViewportSize({width,height:1000});await page.addInitScript(theme=>localStorage.setItem('theme',theme),theme);await page.goto(base+'/guest');await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`stay overflow ${width}/${theme}`);await askGuest(page);await page.getByText('extension 100',{exact:true}).last().waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`chat overflow ${width}/${theme}`);if(width===375||width===1440){const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`guest accessibility ${width}/${theme}`)}await page.screenshot({path:path.join(process.env.GUEST_SCREENSHOT_DIR||require('node:os').tmpdir(),`safarios-guest-chat-${width}-${theme}.png`),fullPage:true})}}finally{await context.close()}
+});
+
+test('guest portal management publishes approved content, invites, displays safe QR and confirms revocation',async()=>{
+ const lodge='portal-lodge',guest={id:'portal-profile',first_name:'Maya',last_name:'Visitor',name:'Maya Visitor',email:'maya@example.com',phone:'',nationality:'',vip:false,dietary_requirements:'',allergies:'',preferences:'',notes:'',completed_stays:0};
+ const {context,page}=await accountPage({id:'portal-manager',full_name:'Lodge Owner',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:lodge,role_key:'lodge_admin',permissions:['guests.view','guests.manage','guest_portal.manage'],entitlements:['guests','stays','guest_mobile']}]});
+ let contents=[],grants=[],invited=0,revoked=0;
+ await page.route('**/api/v1/lodges/portal-lodge/guests**',r=>r.fulfill({json:r.request().url().includes('/communications')?{items:[],has_more:false}:[guest]}));
+ await page.route('**/api/v1/lodges/portal-lodge/guest-portal/**',async r=>{
+  const p=new URL(r.request().url()).pathname,m=r.request().method();
+  if(p.endsWith('/content')){if(m==='POST'){contents.push({...r.request().postDataJSON(),id:'content'});return r.fulfill({json:contents[0]})}return r.fulfill({json:contents})}
+  if(p.endsWith('/invite')){invited++;grants=[{id:'grant',stay_id:'stay',account_active:false,revoked:false,portal_url:base+'/guest?access=grant'}];return r.fulfill({json:{id:'grant',delivery_status:'pending'}})}
+  if(p.endsWith('/revoke')){revoked++;grants[0].revoked=true;return r.fulfill({json:{ok:true}})}
+  return r.fulfill({json:{stays:[{id:'stay',arrival_date:'2027-01-15',departure_date:'2027-01-19',status:'upcoming'}],accesses:grants}});
+ });
+ try{
+  await page.goto(base+'/guests');await page.getByRole('button',{name:'Guest information',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Reception');await page.getByLabel('Guest information',{exact:true}).fill('Call extension 100');await page.getByLabel('Published to guests',{exact:true}).check();await page.getByRole('button',{name:'Save guest information',exact:true}).click();await page.getByText('Guest information saved',{exact:true}).waitFor();assert.equal(contents[0].published,true);await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Maya Visitor',exact:true}).click();await page.getByRole('button',{name:'Invite guest',exact:true}).click();await page.getByText('The guest’s setup email has been queued.',{exact:true}).waitFor();assert.equal(invited,1);
+  await page.getByRole('button',{name:'Show sign-in QR',exact:true}).click();await page.getByRole('img',{name:'Guest portal sign-in QR code',exact:true}).waitFor();assert.equal(await page.locator('.guestSafeLink').getAttribute('href'),base+'/guest?access=grant');assert.equal(await page.getByRole('button',{name:'Copy private setup link',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Revoke access',exact:true}).click();assert.equal(revoked,0);await page.locator('.confirmationDialog').getByRole('button',{name:'Revoke access',exact:true}).click();await page.getByText('Guest access revoked',{exact:true}).waitFor();assert.equal(revoked,1);assert.equal(await page.getByRole('img',{name:'Guest portal sign-in QR code',exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('guest account security makes no staff lookups and guest recovery returns to guest sign-in',async()=>{
+ const {context,page,requests}=await guestPortalPage();
+ try{
+  await page.goto(base+'/guest');await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.match(await page.locator('.guestStayFacts').innerText(),/16\/11\/2026/);
+  await page.getByRole('link',{name:'Account security',exact:true}).click();await page.getByRole('button',{name:'Set up authenticator',exact:true}).waitFor();assert.deepEqual(requests,[]);
+  await page.route('**/api/v1/auth/password-reset/confirm',r=>r.fulfill({json:{ok:true,sign_in_path:'/guest'}}));
+  await page.goto(base+'/reset-password#token=guest-private-reset-fixture');await page.getByLabel('New password',{exact:true}).fill('New guest passphrase 456!');await page.getByLabel('Confirm password',{exact:true}).fill('New guest passphrase 456!');await page.getByRole('button',{name:'Update password',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(new URL(page.url()).pathname,'/guest');
+ }finally{await context.close()}
+ const login=await guestPortalPage({loggedIn:false});try{await login.page.goto(base+'/guest');await login.page.getByRole('link',{name:'Forgot your password?',exact:true}).click();await login.page.getByRole('link',{name:'Back to sign in',exact:true}).waitFor();assert.equal(await login.page.getByRole('link',{name:'Back to sign in',exact:true}).getAttribute('href'),'/guest')}finally{await login.context.close()}
+});
+
+test('guest conversation preserves a new draft typed while an answer is pending',async()=>{
+ let release,entered;const pending=new Promise(r=>release=r),ready=new Promise(r=>entered=r);const {context,page}=await guestPortalPage({delay:async()=>{entered();await pending}});
+ try{await page.goto(base+'/guest');await askGuest(page);await ready;await page.getByLabel('Your question',{exact:true}).fill('A follow-up question');release();await page.getByText('extension 100',{exact:true}).last().waitFor();assert.equal(await page.getByLabel('Your question',{exact:true}).inputValue(),'A follow-up question');assert.equal(await page.getByRole('region',{name:'Conversation',exact:true}).getAttribute('tabindex'),'0')}finally{release();await context.close()}
+});

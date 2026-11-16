@@ -49,6 +49,7 @@ function bindAccount(user: any) {
   const signature = JSON.stringify([
     user.id,
     user.is_super_admin,
+    user.is_guest,
     user.memberships,
     user.groups,
   ]);
@@ -61,7 +62,7 @@ function bindAccount(user: any) {
     previousLodge = getActiveLodgeId();
   if (getActiveUserId() !== user.id) clearAccountContext();
   localStorage.setItem("active_user_id", user.id);
-  if (user.is_super_admin) {
+  if (user.is_super_admin || user.is_guest) {
     localStorage.removeItem("active_lodge_id");
     localStorage.removeItem("active_lodge_name");
   }
@@ -262,7 +263,8 @@ async function networkRequest<T>(path: string, init: RequestOptions = {}) {
     res.status === 401 &&
     typeof window !== "undefined" &&
     !location.pathname.startsWith("/login") &&
-    !location.pathname.startsWith("/activate")
+    !location.pathname.startsWith("/activate") &&
+    !location.pathname.startsWith("/guest")
   )
     location.href = "/login";
   if (!res.ok) {
@@ -999,4 +1001,99 @@ export const browserPushApi = {
       silent: true,
       body: JSON.stringify({ id, lodge_id }),
     }),
+};
+
+// Guest scope is explicit and is never inferred from the staff lodge selector.
+export type GuestScope = { userId: string; accessId: string };
+const guestPath = (scope: GuestScope, suffix = "") =>
+  `/api/v1/guest/access/${scope.accessId}${suffix}`;
+const guestOptions = (scope: GuestScope) => ({
+  silent: true,
+  headers: { "X-Expected-User-Id": scope.userId },
+});
+export const guestApi = {
+  login: async (
+    email: string,
+    password: string,
+    otp?: string,
+    recovery_code?: string,
+  ) => {
+    await finishPendingSignout();
+    return request<any>("/api/v1/guest/auth/login", {
+      method: "POST",
+      silent: true,
+      body: JSON.stringify({
+        email,
+        password,
+        otp: otp || undefined,
+        recovery_code: recovery_code || undefined,
+      }),
+    });
+  },
+  accesses: () => request<any>("/api/v1/guest/accesses", { silent: true }),
+  snapshot: (scope: GuestScope) =>
+    request<any>(guestPath(scope), guestOptions(scope)),
+  itinerary: (scope: GuestScope) =>
+    request<any[]>(guestPath(scope, "/itinerary"), guestOptions(scope)),
+  requests: (scope: GuestScope) =>
+    request<any[]>(guestPath(scope, "/requests"), guestOptions(scope)),
+  submit: (scope: GuestScope, body: any) =>
+    request<any>(guestPath(scope, "/requests"), {
+      ...guestOptions(scope),
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  notices: (scope: GuestScope) =>
+    request<any[]>(guestPath(scope, "/notifications"), guestOptions(scope)),
+  readNotice: (scope: GuestScope, id: string) =>
+    request(guestPath(scope, `/notifications/${id}/read`), {
+      ...guestOptions(scope),
+      method: "POST",
+    }),
+  messages: (scope: GuestScope) =>
+    request<any[]>(guestPath(scope, "/ai/messages"), guestOptions(scope)),
+  ask: (scope: GuestScope, body: any) =>
+    request<any>(guestPath(scope, "/ai/messages"), {
+      ...guestOptions(scope),
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  clearChat: (scope: GuestScope) =>
+    request(guestPath(scope, "/ai/messages"), {
+      ...guestOptions(scope),
+      method: "DELETE",
+    }),
+};
+export const guestPortalAdminApi = {
+  access: (guestId: string, scope: AccountScope) =>
+    request<any>(scopedPath(`guest-portal/guests/${guestId}`, scope), {
+      headers: scopedHeaders(scope),
+    }),
+  invite: (guestId: string, stayId: string, scope: AccountScope) =>
+    request<any>(scopedPath(`guest-portal/guests/${guestId}/invite`, scope), {
+      method: "POST",
+      headers: scopedHeaders(scope),
+      body: JSON.stringify({ stay_id: stayId }),
+      silent: true,
+    }),
+  revoke: (id: string, scope: AccountScope) =>
+    request(scopedPath(`guest-portal/access/${id}/revoke`, scope), {
+      method: "POST",
+      headers: scopedHeaders(scope),
+      silent: true,
+    }),
+  content: (scope: AccountScope) =>
+    request<any[]>(scopedPath("guest-portal/content", scope), {
+      headers: scopedHeaders(scope),
+    }),
+  save: (body: any, id: string | null, scope: AccountScope) =>
+    request<any>(
+      scopedPath("guest-portal/content" + (id ? `/${id}` : ""), scope),
+      {
+        method: id ? "PUT" : "POST",
+        headers: scopedHeaders(scope),
+        body: JSON.stringify(body),
+        silent: true,
+      },
+    ),
 };

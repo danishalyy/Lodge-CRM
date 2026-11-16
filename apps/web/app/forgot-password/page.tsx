@@ -2,9 +2,13 @@
 import { Field } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { authApi } from "@/lib/api";
 export default function ForgotPassword() {
+  const [guest, setGuest] = useState(false);
+  useEffect(() => {
+    setGuest(new URLSearchParams(location.search).get("guest") === "1");
+  }, []);
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -56,7 +60,7 @@ export default function ForgotPassword() {
           {busy ? "Sending…" : "Send reset link"}
         </button>
         <p>
-          <Link href="/login">Back to sign in</Link>
+          <Link href={guest ? "/guest" : "/login"}>Back to sign in</Link>
         </p>
       </Form>
     </main>

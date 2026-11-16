@@ -7,7 +7,7 @@ web=root/'apps/web'
 issues=[]
 # Route-level guard audit
 routes=[]
-for source in [main,(root/'apps/api/app/account_routes.py').read_text(), (root/'apps/api/app/group_routes.py').read_text(), (root/'apps/api/app/ai/routes.py').read_text(), (root/'apps/api/app/ai/knowledge_routes.py').read_text(),(root/'apps/api/app/live_events.py').read_text(),(root/'apps/api/app/offline_routes.py').read_text(),(root/'apps/api/app/push_routes.py').read_text()]:
+for source in [main,(root/'apps/api/app/account_routes.py').read_text(), (root/'apps/api/app/group_routes.py').read_text(), (root/'apps/api/app/ai/routes.py').read_text(), (root/'apps/api/app/ai/knowledge_routes.py').read_text(),(root/'apps/api/app/live_events.py').read_text(),(root/'apps/api/app/offline_routes.py').read_text(),(root/'apps/api/app/push_routes.py').read_text(),(root/'apps/api/app/guest_portal_routes.py').read_text()]:
     for n in ast.parse(source).body:
         if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
             src=ast.get_source_segment(source,n) or ''
@@ -18,8 +18,9 @@ for method,path,name,dec,src in routes:
     if path.startswith('/api/v1/lodges/{lodge_id}'):
         if 'Depends(require_permission' not in src and 'Depends(require_lodge_access' not in src:issues.append(f'{method} {path}: missing lodge authorization')
         if method in {'POST','PATCH','PUT','DELETE'} and 'write=True' not in src and 'ensure_subscription_write_allowed' not in src:issues.append(f'{method} {path}: missing subscription write guard')
+    if path.startswith('/api/v1/guest/') and path!='/api/v1/guest/auth/login' and not any(guard in re.sub(r'\s+','',src) for guard in ['Depends(identity)','Depends(context)']):issues.append(f'{method} {path}: missing guest ownership guard')
     if path.startswith('/api/v1/platform/') and 'Depends(require_super_admin)' not in src:issues.append(f'{method} {path}: missing super-admin guard')
-    if method in {'POST','PATCH','PUT','DELETE'} and path not in {'/api/v1/auth/invitations/preview','/api/v1/auth/login','/api/v1/auth/activate','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/confirm'} and 'require_csrf' not in dec:issues.append(f'{method} {path}: missing CSRF')
+    if method in {'POST','PATCH','PUT','DELETE'} and path not in {'/api/v1/auth/invitations/preview','/api/v1/auth/login','/api/v1/guest/auth/login','/api/v1/auth/activate','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/confirm'} and 'require_csrf' not in dec:issues.append(f'{method} {path}: missing CSRF')
 print(f'API routes audited: {len(routes)}')
 print(f'Guard issues: {len(issues)}')
 for i in issues: print(' -',i)

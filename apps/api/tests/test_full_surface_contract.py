@@ -15,7 +15,7 @@ WEB=ROOT.parent/'web'
 
 def routes():
     out=[]
-    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text(), (ROOT/'app'/'group_routes.py').read_text(), (ROOT/'app'/'ai'/'routes.py').read_text(), (ROOT/'app'/'ai'/'knowledge_routes.py').read_text(), (ROOT/'app'/'live_events.py').read_text(),(ROOT/'app'/'offline_routes.py').read_text(),(ROOT/'app'/'push_routes.py').read_text()]:
+    for source in [MAIN, (ROOT/'app'/'account_routes.py').read_text(), (ROOT/'app'/'group_routes.py').read_text(), (ROOT/'app'/'ai'/'routes.py').read_text(), (ROOT/'app'/'ai'/'knowledge_routes.py').read_text(), (ROOT/'app'/'live_events.py').read_text(),(ROOT/'app'/'offline_routes.py').read_text(),(ROOT/'app'/'push_routes.py').read_text(),(ROOT/'app'/'guest_portal_routes.py').read_text()]:
         for n in ast.parse(source).body:
             if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):
                 for d in n.decorator_list:
@@ -31,7 +31,7 @@ def test_api_surface_is_large_and_unique():
     keys=[(m,p) for m,p,*_ in ROUTES]
     assert len(keys)==len(set(keys))
 
-@pytest.mark.parametrize('method,path,name,deco,body',[r for r in ROUTES if r[0] in {'POST','PATCH','PUT','DELETE'} and r[1] not in {'/api/v1/auth/invitations/preview','/api/v1/auth/login','/api/v1/auth/activate','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/confirm'}])
+@pytest.mark.parametrize('method,path,name,deco,body',[r for r in ROUTES if r[0] in {'POST','PATCH','PUT','DELETE'} and r[1] not in {'/api/v1/auth/invitations/preview','/api/v1/auth/login','/api/v1/guest/auth/login','/api/v1/auth/activate','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/confirm'}])
 def test_every_authenticated_mutation_has_csrf(method,path,name,deco,body):
     assert 'require_csrf' in deco, f'{method} {path} lacks CSRF guard'
 
@@ -46,6 +46,13 @@ def test_every_lodge_mutation_has_subscription_write_gate(method,path,name,deco,
 @pytest.mark.parametrize('method,path,name,deco,body',[r for r in ROUTES if r[1].startswith('/api/v1/platform/')])
 def test_every_platform_route_requires_super_admin(method,path,name,deco,body):
     assert 'Depends(require_super_admin)' in body, f'{method} {path} is not Super Admin guarded'
+
+
+
+@pytest.mark.parametrize('method,path,name,deco,body',[r for r in ROUTES if r[1].startswith('/api/v1/guest/') and r[1]!='/api/v1/guest/auth/login'])
+def test_every_guest_route_has_an_explicit_guest_identity_or_stay_guard(method,path,name,deco,body):
+    compact=re.sub(r'\s+','',body)
+    assert 'Depends(identity)' in compact or 'Depends(context)' in compact, f'{method} {path} lacks guest ownership guard'
 
 
 def test_auth_security_contract():

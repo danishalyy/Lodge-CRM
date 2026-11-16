@@ -68,6 +68,8 @@ def create_session(db: Session, user: User, response: Response):
 
 def current_user(request: Request, lodge_session: str | None = Cookie(None), db: Session = Depends(get_db), x_expected_user_id: str | None = Header(None), x_lodge_context: str | None = Header(None)) -> User:
     user = _current_user(lodge_session,db,x_expected_user_id,x_lodge_context,persist_activity=True)
+    if user.is_guest and not request.url.path.startswith("/api/v1/auth/"):
+        raise HTTPException(403, "Guest accounts cannot access staff or platform operations")
     if user.is_super_admin and request.url.path.startswith(("/api/v1/lodges/", "/api/v1/groups/")):
         raise HTTPException(403, "Platform accounts cannot access lodge operations. Sign in with a separate lodge account.")
     return user
@@ -95,6 +97,10 @@ def _current_user(lodge_session,db,x_expected_user_id=None,x_lodge_context=None,
     else:
         db.flush()  # AI callers own their transaction and any record locks.
     set_rls_context(db, None, False, str(user.id))
+    if user.is_guest:
+        from .services.guest_portal import base_context
+        base_context(db,user.id)
+        return user
     if not user.is_super_admin:
         memberships = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
         groups=db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()

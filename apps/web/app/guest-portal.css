@@ -1,0 +1,328 @@
+/* Guest views inherit the approved SafariOS tokens, including both themes. */
+.guestPortal {
+  max-width: 1168px;
+  margin: 0 auto;
+  padding: 24px 32px 64px;
+  min-height: 100dvh;
+}
+.guestHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 24px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+}
+.guestHeader > a {
+  max-width: 200px;
+  min-width: 120px;
+}
+.guestHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.guestPortal .panel {
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.guestPortal h1 {
+  font-size: 34px;
+  margin: 8px 0 16px;
+  line-height: 1.2;
+}
+.guestPortal h2 {
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+.guestPortal p {
+  overflow-wrap: anywhere;
+}
+.guestPortal .statePanel {
+  padding: 48px 24px;
+  text-align: center;
+}
+.guestPortal .statePanel > .button {
+  margin: 12px;
+}
+.guestLogin {
+  max-width: 480px;
+  margin: 64px auto;
+}
+.guestLogin > p,
+.guestChat header p {
+  color: var(--text-2);
+}
+.guestLogin form,
+.guestGrid form,
+.guestPortalAdmin form {
+  display: grid;
+  gap: 20px;
+}
+.guestLoginLinks {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+}
+.guestWelcome {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 16px 0 28px;
+}
+.guestLodgeLogo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+.guestTabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 24px;
+  padding: 4px 0 12px;
+}
+.guestTabs button {
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.guestTabs button[aria-current] {
+  background: var(--gold-wash);
+  color: var(--gold-text);
+  border-color: var(--gold-text);
+}
+.guestGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 24px;
+  align-items: start;
+}
+.guestStayFacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.guestStayFacts dt {
+  color: var(--text-2);
+}
+.guestStayFacts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.guestItinerary {
+  padding: 0;
+  list-style: none;
+}
+.guestItinerary li {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.guestItinerary p {
+  margin: 8px 0 0;
+  color: var(--text-2);
+}
+.guestInformation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.guestPublished {
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+.guestPublished p {
+  white-space: pre-wrap;
+}
+.guestPublished small {
+  display: block;
+  color: var(--text-2);
+  margin: 12px 0;
+}
+.guestChat {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.guestChat > header {
+  display: flex;
+  gap: 24px;
+  align-items: start;
+  justify-content: space-between;
+}
+.guestChatTurns > article {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.guestQuestion {
+  display: grid;
+  gap: 8px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  margin-left: 32px;
+  white-space: pre-wrap;
+}
+.guestChat .aiMarkdown {
+  padding: 12px 0;
+  line-height: 1.7;
+}
+.guestChat details {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.guestChat summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.guestComposer {
+  display: grid;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.guestComposer .button {
+  justify-self: end;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.guestComposer textarea {
+  min-height: 96px;
+}
+.guestPortalAdmin {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.guestPortalAdmin h2 {
+  font-size: 20px;
+}
+.guestPortalAdmin .guestAccessEntry {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.guestPortalAdmin .guestAccessActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.guestQr {
+  width: 200px;
+  height: 200px;
+  max-width: 100%;
+  border-radius: 12px;
+  margin: 20px auto;
+  display: block;
+}
+.guestSafeLink {
+  overflow-wrap: anywhere;
+  display: block;
+  margin: 16px 0;
+}
+.guestContentList {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+.guestContentList button {
+  text-align: left;
+  justify-content: space-between;
+  display: flex;
+  gap: 12px;
+}
+@media (max-width: 767px) {
+  .guestPortal {
+    padding: 16px 16px 40px;
+  }
+  .guestHeader {
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .guestHeaderActions {
+    gap: 8px;
+  }
+  .guestHeaderActions .button {
+    font-size: 12px;
+    padding: 8px;
+  }
+  .guestHeader > a {
+    max-width: 140px;
+  }
+  .guestPortal h1 {
+    font-size: 28px;
+  }
+  .guestPortal .panel {
+    padding: 24px 20px;
+  }
+  .guestGrid,
+  .guestInformation {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .guestLogin {
+    margin: 32px auto;
+  }
+  .guestChat > header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .guestQuestion {
+    margin-left: 16px;
+  }
+  .guestTabs span {
+    font-size: 12px;
+  }
+  .guestWelcome {
+    gap: 16px;
+  }
+  .guestWelcome h1 {
+    font-size: 28px;
+  }
+  .guestLodgeLogo {
+    width: 56px;
+    height: 56px;
+  }
+  .guestComposer .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .guestStayFacts {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+}
+
+.guestHeader > a {
+  text-decoration: none;
+}
+.guestChat > header > .button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.guestChatTurns {
+  max-height: min(50dvh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+}
+.guestAccessActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}

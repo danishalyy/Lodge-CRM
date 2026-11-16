@@ -10,6 +10,8 @@ BUILT={
  'document_knowledge':('Document knowledge','Use approved documents in lodge intelligence.','Reports and AI'),
  'ai':('Lodge AI','Ask operational questions using permitted live data through a configured private vLLM service. Live and historical tools; private documents, Group Owner comparisons and explicitly confirmed actions require their own capabilities.','Reports and AI'),
 
+ 'guest_mobile':('Guest web portal','Invited guests access their own stay, published lodge information and requests.','Guests and stays'),
+ 'guest_ai':('Guest AI','Guest-approved lodge information in a separate guest-only assistant.','Reports and AI'),
  'dashboard':('Lodge overview','Today’s guests, work and operational priorities.','Guests and stays'),
  'guests':('Guest profiles','Guest contact details, preferences and stay history.','Guests and stays'),
  'stays':('Stays','Arrivals, departures and room assignments.','Guests and stays'),
@@ -45,7 +47,6 @@ BUILT={
  'branding.basic':('Lodge branding','Lodge name and logo alongside SafariOS.','Branding'),
 }
 FUTURE={
- 'guest_mobile':('Guest mobile app','A dedicated guest application.','Integrations'),
  'staff_mobile':('Staff mobile app','A dedicated staff application.','Integrations'),
  'advanced_reports':('Advanced analytics','Additional configurable analysis and reports.','Reports and AI'),
  'advanced_wildlife_analytics':('Wildlife analytics','Additional wildlife trend analysis.','Reports and AI'),

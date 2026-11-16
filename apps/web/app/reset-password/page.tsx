@@ -31,8 +31,8 @@ function ResetPasswordForm() {
     }
     setBusy(true);
     try {
-      await authApi.confirmPasswordReset(token, pw);
-      router.replace("/login");
+      const result = await authApi.confirmPasswordReset(token, pw);
+      router.replace(result?.sign_in_path === "/guest" ? "/guest" : "/login");
     } catch (e: any) {
       setErr(e.message);
     } finally {

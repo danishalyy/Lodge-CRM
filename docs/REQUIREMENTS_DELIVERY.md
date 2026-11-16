@@ -1,6 +1,6 @@
 # Document-led delivery and acceptance map
 
-Reviewed 16 November 2026 against the three original attachments and the current source, including verified scheduled-report implementation. This replaces stale completion assumptions in earlier milestone inventories. `requirements/delivery-map.json` contains all 63 named package items, their document references and outstanding acceptance; this file summarises the same register. No feature is considered commercially accepted merely because a model, endpoint, screen or feature flag exists.
+Reviewed 17 November 2026 against the three original attachments and the current source, including verified scheduled-report implementation. This replaces stale completion assumptions in earlier milestone inventories. `requirements/delivery-map.json` contains all 63 named package items, their document references and outstanding acceptance; this file summarises the same register. No feature is considered commercially accepted merely because a model, endpoint, screen or feature flag exists.
 
 ## Source precedence and confirmed owner decisions
 
@@ -42,7 +42,7 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | B11 / §3.11 | Activities and safari schedule | implemented core | Accept guide/guest/vehicle scheduling, checklist, departure, return and issue reporting together. |
 | B12 / §3.12 | Basic fleet records | implemented core | Accept availability, linked activity/transfer and maintenance state consistently. |
 | B13 / §3.13 | Basic notifications | implemented core | Verify live delivery/retry and every specified recipient, priority and status path. |
-| B14 / §3.14 | Guest mobile experience | missing | Deliver the restricted guest web/QR equivalent now; native applications remain deferred by the owner. |
+| B14 / §3.14 | Guest mobile experience | partial | Invited web/QR, own stay/itinerary, published information, requests and private updates implemented. Guest wildlife capture and live acceptance remain; native apps stay deferred. |
 | B15 / §3.15 | Staff mobile companion | partial | Responsive staff screens exist; complete the focused companion and documented offline subset. |
 | B16 / §3.16 | Basic reports | partial | Expand the dedicated report/export journeys beyond the existing summary surface. |
 | B17 / §3.17 | Audit logs | implemented core | Retain append-only administrative audit and verify support/export paths; audit is distinct from operational memory. |
@@ -68,10 +68,10 @@ The original-file SHA-256 identifiers are recorded in the JSON register. Attache
 | S14 / §4.14 | Offline photo/GPS capture | partial | Wildlife queue exists; verify real-device persistence, photos, reconnect, duplicate replay and account isolation. |
 | S15 / §4.15 | Offline mobile mode | partial | Assigned task/checklist, housekeeping, transfer and wildlife queues exist with account-scoped replay. Complete the documented essential/emergency information, notes and inspection subset, and real-device reconnect/storage acceptance. |
 | S16 / §4.16 | Push notifications | partial | Browser push subscriptions, private preferences, encrypted durable delivery/retries and generic notification payloads are implemented for the web release. Accept actual VAPID/HTTPS/provider delivery on supported desktop/mobile devices; native apps remain deferred. |
-| S17 / §4.17 | Lodge AI chatbot | partial | Management chat/tools exist; complete default staff access, guest access and the documented operational question set. |
+| S17 / §4.17 | Lodge AI chatbot | partial | Separate management and guest chat scopes exist; complete default staff access, the documented operational question set and real-model acceptance. |
 | S18 / §4.18 | AI knowledge base | implemented core | Private scoped retrieval exists; real-model grounding and complete live ingestion acceptance remain. |
 | S19 / §4.19 | Document knowledge uploads | implemented core | Extraction/vector/ACL boundaries are tested; verify the full real storage/worker/embedding pipeline. |
-| S20 / §4.20 | AI for guest questions | missing | Add a separate guest principal and explicitly guest-approved knowledge; internal lodge SOP access is not guest access. |
+| S20 / §4.20 | AI for guest questions | implemented core | Separate guest principal and published-only/own-itinerary assistant implemented, with private history and post-inference authority/source checks. Real-model grounding/refusal and operational acceptance remain. |
 | S21 / §4.21 | AI for staff questions | partial | Complete the default staff role grants and contextual questions without broadening assigned/department scopes. |
 | S22 / §4.22 | Advanced operational reports | partial | Dedicated department, housekeeping, maintenance, activities, fleet/fuel, staff and wildlife report/export coverage remains. |
 | S23 / §4.23 | Enhanced branding | partial | Co-branding exists; guest welcome content/selected colours remain. Preserve Super Admin logo control and SafariOS identity. |
@@ -165,3 +165,5 @@ Task responsibility/history checkpoint: [scope, migration and validation](TASK_W
 Platform/lodge isolation checkpoint: [scope and verification](PLATFORM_ISOLATION_DELIVERY.md). This removes the former platform support bypass; it does not declare the wider role/field acceptance matrix or remaining functional requirements complete.
 
 Role-control checkpoint: [scope and verification](ROLE_CONTROLS_DELIVERY.md). Remaining operational action controls now follow permissions, with server-provided assignment capabilities and guarded reference data. The wider connected-role, worker and offline acceptance register remains open.
+
+Guest web/QR and private assistant checkpoint: [implementation, usage and remaining acceptance](GUEST_PORTAL_DELIVERY.md). This advances B14 and S20 without declaring the wider application commercially accepted.

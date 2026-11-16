@@ -1,5 +1,6 @@
 /** Choose only a workspace the activated/signed-in account can actually access. */
 export function accountHome(user: any): string {
+  if (user.is_guest) return "/guest";
   if (user.is_super_admin)
     return user.mfa_enabled ? "/super-admin" : "/settings";
   if (user.groups?.length) return "/group";

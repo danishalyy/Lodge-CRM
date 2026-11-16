@@ -1823,3 +1823,14 @@ test('guest conversation preserves a new draft typed while an answer is pending'
  let release,entered;const pending=new Promise(r=>release=r),ready=new Promise(r=>entered=r);const {context,page}=await guestPortalPage({delay:async()=>{entered();await pending}});
  try{await page.goto(base+'/guest');await askGuest(page);await ready;await page.getByLabel('Your question',{exact:true}).fill('A follow-up question');release();await page.getByText('extension 100',{exact:true}).last().waitFor();assert.equal(await page.getByLabel('Your question',{exact:true}).inputValue(),'A follow-up question');assert.equal(await page.getByRole('region',{name:'Conversation',exact:true}).getAttribute('tabindex'),'0')}finally{release();await context.close()}
 });
+
+test('a delayed guest history refresh cannot restore a cleared conversation',async()=>{
+ let release,entered;const pending=new Promise(r=>release=r),ready=new Promise(r=>entered=r);const {context,page}=await guestPortalPage();
+ try{
+  await page.clock.install();await page.goto(base+'/guest');await askGuest(page);await page.getByText('extension 100',{exact:true}).last().waitFor();
+  await page.route('**/api/v1/guest/access/stay-grant/ai/messages',async r=>{if(r.request().method()==='GET'){entered();await pending;return r.fulfill({json:[{id:'old',question:'An old question',answer:'PRIVATE_CLEARED_HISTORY',sources:[]}]})}return r.fulfill({json:{ok:true}})});
+  await page.clock.fastForward(15000);await ready;
+  await page.getByRole('button',{name:'Clear conversation',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Clear conversation',exact:true}).click();await page.getByText('Conversation cleared',{exact:true}).waitFor();
+  const response=page.waitForResponse(r=>r.url().endsWith('/ai/messages')&&r.request().method()==='GET');release();await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.getByRole('heading',{name:'Ask about your stay'}).waitFor();assert.equal(await page.getByText('PRIVATE_CLEARED_HISTORY',{exact:true}).count(),0);
+ }finally{release();await context.close()}
+});

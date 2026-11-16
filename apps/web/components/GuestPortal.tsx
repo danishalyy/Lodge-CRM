@@ -143,6 +143,7 @@ export default function GuestPortal({
     [pending, setPending] = useState("");
   const alive = useRef(false),
     generation = useRef(0),
+    refreshEpoch = useRef(0),
     scope = useRef<GuestScope | null>(null),
     locked = useRef(false),
     command = useRef<{ body: string; id: string } | null>(null),
@@ -160,6 +161,7 @@ export default function GuestPortal({
   const resetPrivate = useCallback(() => {
     scope.current = null;
     generation.current++;
+    refreshEpoch.current++;
     locked.current = false;
     setData(null);
     setTrips([]);
@@ -189,9 +191,11 @@ export default function GuestPortal({
     setError(error instanceof Error ? error.message : c.invalidStay);
   }
   async function load(origin: GuestScope) {
+    const epoch = ++refreshEpoch.current;
+    const current = () => active(origin) && refreshEpoch.current === epoch;
     try {
       const snapshot = (await guestApi.snapshot(origin)) as Snapshot;
-      if (!active(origin)) return;
+      if (!current()) return;
       const [schedule, ownRequests, updates, history] = await Promise.all([
         snapshot.features.activities || snapshot.features.transfers
           ? guestApi.itinerary(origin)
@@ -200,7 +204,7 @@ export default function GuestPortal({
         snapshot.features.notifications ? guestApi.notices(origin) : [],
         snapshot.features.ai ? guestApi.messages(origin) : [],
       ]);
-      if (!active(origin)) return;
+      if (!current()) return;
       setData(snapshot);
       setTrips(schedule);
       setRequests(ownRequests);
@@ -215,9 +219,9 @@ export default function GuestPortal({
           : old,
       );
     } catch (e) {
-      actionError(origin, e);
+      if (current()) actionError(origin, e);
     } finally {
-      if (active(origin)) setLoading(false);
+      if (current()) setLoading(false);
     }
   }
   async function openStay(id: string, userId = user?.id) {
@@ -344,6 +348,7 @@ export default function GuestPortal({
         description: description.trim(),
       });
       if (!active(origin)) return;
+      refreshEpoch.current++;
       setDescription((value) =>
         value.trim() === description.trim() ? "" : value,
       );
@@ -377,6 +382,7 @@ export default function GuestPortal({
         content: question.trim(),
       });
       if (!active(origin)) return;
+      refreshEpoch.current++;
       setMessages((old) =>
         old.some((row) => row.id === reply.id) ? old : [...old, reply],
       );
@@ -397,9 +403,11 @@ export default function GuestPortal({
     if (!origin || locked.current) return;
     locked.current = true;
     setBusy(true);
+    refreshEpoch.current++;
     try {
       await guestApi.clearChat(origin);
       if (active(origin)) {
+        refreshEpoch.current++;
         setMessages([]);
         chatCommand.current = null;
         toast.success(c.cleared);
@@ -795,7 +803,10 @@ export default function GuestPortal({
                               if (!origin) return;
                               try {
                                 await guestApi.readNotice(origin, notice.id);
-                                if (active(origin)) await load(origin);
+                                if (active(origin)) {
+                                  refreshEpoch.current++;
+                                  await load(origin);
+                                }
                               } catch (e) {
                                 actionError(origin, e);
                               }

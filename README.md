@@ -1,6 +1,8 @@
 # SafariOS — Lodge operations
 
-A co-branded lodge operations platform with a beige, brown, and orange translucent interface with dark and light themes. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
+A co-branded, multi-tenant lodge operations application with premium charcoal/ivory themes and matte-gold accents. Super Admin configures each lodge’s logo and display name while SafariOS identity remains visible.
+
+**Current release status:** the security and reliability checkpoint is implemented and tested; the full documented product still requires completion and commercial acceptance. See [the hardening checkpoint](docs/RELEASE_HARDENING.md), [production setup and recovery](docs/PRODUCTION_OPERATIONS.md), and [the 63-item requirements register](docs/REQUIREMENTS_DELIVERY.md). Historical milestone notes below are not current readiness certification.
 
 Start with [LOCAL_SETUP.md](LOCAL_SETUP.md). Read the [application requirements review](docs/REQUIREMENTS_REVIEW.md) for the documented product scope and remaining functional gaps. See [the new design and screenshots](docs/UI_UX_DESIGN_SYSTEM.md) and [commercial release scope](docs/COMMERCIAL_RELEASE_PLAN.md).
 

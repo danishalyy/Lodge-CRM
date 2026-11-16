@@ -31,6 +31,13 @@ export default function SuperAdminShell({
   const router = useRouter();
   const [me, setMe] = useState<any>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width:1024px)");
+    const sync = () => setWide(query.matches);
+    sync(); query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
   useEffect(() => {
     setNavOpen(false);
   }, [p]);
@@ -135,7 +142,7 @@ export default function SuperAdminShell({
           ))}
         </nav>
         <div className="sidebarFooter">
-          <UserMenu name={me?.full_name} role="Super Admin" />
+          <div className="sidebarUserRow"><UserMenu name={me?.full_name} role="Super Admin" />{wide && <NotificationBell platform />}</div>
         </div>
       </aside>
       <main className="mainArea">
@@ -160,7 +167,7 @@ export default function SuperAdminShell({
             </strong>
           </div>
           <div className="topActions">
-            <NotificationBell platform />
+            {!wide && <NotificationBell platform />}
             <div className="mobileUserMenu">
               <UserMenu name={me?.full_name} role="Super Admin" />
             </div>

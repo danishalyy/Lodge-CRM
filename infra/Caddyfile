@@ -1,0 +1,18 @@
+{
+    email {$ACME_EMAIL}
+    admin off
+}
+{$APP_DOMAIN} {
+    encode zstd gzip
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    reverse_proxy web:3000 {
+        # Flush SSE immediately; Caddy does not encode text/event-stream.
+        flush_interval -1
+    }
+}
+{$MEDIA_DOMAIN} {
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    # The private S3 API is reachable over TLS. The admin console is NOT proxied.
+    # Object access remains private and requires short-lived signed URLs.
+    reverse_proxy minio:9000
+}

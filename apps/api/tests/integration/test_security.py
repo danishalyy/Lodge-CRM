@@ -38,11 +38,14 @@ def test_csrf_required_for_guest_write(account):
 @pytest.mark.parametrize('state,read_status', [('Expired',200),('Suspended',403),('Pending',403)])
 def test_subscription_access_enforced(account,state,read_status):
     from app.models import Subscription
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    today=datetime.now(ZoneInfo(account['lodge'].timezone)).date()
     with account['owner']() as db:
         sub=db.get(Subscription,account['lodge'].id)
-        if state=='Expired':sub.start_date=date.today()-timedelta(days=10);sub.expiry_date=date.today()-timedelta(days=1)
+        if state=='Expired':sub.start_date=today-timedelta(days=10);sub.expiry_date=today-timedelta(days=1)
         elif state=='Suspended':sub.suspended=True
-        else:sub.start_date=date.today()+timedelta(days=1);sub.expiry_date=date.today()+timedelta(days=10)
+        else:sub.start_date=today+timedelta(days=1);sub.expiry_date=today+timedelta(days=10)
         db.commit()
     path=f"/api/v1/lodges/{account['lodge'].id}/guests"
     assert account['client'].get(path).status_code==read_status

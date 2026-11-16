@@ -6,6 +6,7 @@ celery_app.conf.update(
     task_serializer="json",accept_content=["json"],result_serializer="json",timezone="UTC",enable_utc=True,
     task_acks_late=True,worker_prefetch_multiplier=1,task_reject_on_worker_lost=True,
     beat_schedule={
+        "runtime-heartbeat":{"task":"app.worker.runtime_heartbeat","schedule":30.0},
         "process-browser-push":{"task":"app.worker.process_browser_push","schedule":15.0},
         "dispatch-private-ai-reports":{"task":"app.ai.report_jobs.dispatch_reports","schedule":60.0},
         "process-account-email-outbox":{"task":"app.worker.process_account_email_outbox","schedule":15.0},
@@ -17,3 +18,24 @@ celery_app.conf.update(
     },
 )
 celery_app.autodiscover_tasks(["app"])
+
+
+from celery.signals import worker_init, beat_init
+
+def validate_service_configuration(component):
+    from .services.deployment import validate_runtime
+    from .db import engine
+    try:
+        validate_runtime(settings, engine, component=component)
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from None
+
+
+@worker_init.connect
+def validate_worker_configuration(**kwargs):
+    validate_service_configuration('worker')
+
+
+@beat_init.connect
+def validate_scheduler_configuration(**kwargs):
+    validate_service_configuration('beat')

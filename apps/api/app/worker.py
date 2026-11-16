@@ -1,3 +1,4 @@
+from .services.clock import lodge_day
 from datetime import date, datetime, timedelta, timezone
 import redis
 from sqlalchemy import select
@@ -11,7 +12,7 @@ from .models import (
 )
 from .notification_service import create_notification, staff_user_id, user_ids_with_permission, management_recipient_ids
 
-redis_client=redis.Redis.from_url(settings.redis_url,decode_responses=True)
+redis_client=redis.Redis.from_url(settings.redis_url,decode_responses=True,socket_connect_timeout=2,socket_timeout=2)
 
 def _lock(name,ttl):
     return redis_client.set(f"job-lock:{name}",str(datetime.now(timezone.utc).timestamp()),nx=True,ex=ttl)
@@ -35,7 +36,7 @@ def generate_operational_alerts():
         lodges=db.scalars(select(Lodge).where(Lodge.status=="active")).all()
         for lodge in lodges:
             set_rls_context(db,str(lodge.id),True)
-            sub=db.get(Subscription,lodge.id);today=date.today()
+            sub=db.get(Subscription,lodge.id);today=lodge_day(lodge)
             if not sub or sub.suspended or today<sub.start_date or today>sub.expiry_date:continue
             managers=management_recipient_ids(db,lodge.id,"maintenance.view")
             overdue=db.scalars(select(Task).where(Task.lodge_id==lodge.id,Task.status.not_in(["completed","cancelled"]),Task.due_at.is_not(None),Task.due_at<now)).all()
@@ -67,7 +68,7 @@ def generate_operational_alerts():
                 if unit and unit.status not in {"ready","available"}:
                     n=create_notification(db,lodge_id=lodge.id,notification_type="room.arrival_not_ready",severity="high",title=f"Room not ready: {unit.name}",body=f"Today's arrival is assigned to {unit.name}, currently {unit.status.replace('_',' ')}.",resource_type="stay",resource_id=stay.id,dedupe_key=f"arrival-room-not-ready:{stay.id}:{today.isoformat()}",recipient_user_ids=managers)
                     if n:created+=1
-            asset_due=db.scalars(select(MaintenanceAsset).where(MaintenanceAsset.lodge_id==lodge.id,MaintenanceAsset.status=="active",MaintenanceAsset.next_service_date.is_not(None),MaintenanceAsset.next_service_date<=date.today()+timedelta(days=7))).all()
+            asset_due=db.scalars(select(MaintenanceAsset).where(MaintenanceAsset.lodge_id==lodge.id,MaintenanceAsset.status=="active",MaintenanceAsset.next_service_date.is_not(None),MaintenanceAsset.next_service_date<=today+timedelta(days=7))).all()
             for asset in asset_due:
                 n=create_notification(db,lodge_id=lodge.id,notification_type="maintenance.asset_service_due",severity="high",title=f"Asset service due: {asset.name}",body=f"Asset {asset.asset_code} service date: {asset.next_service_date.isoformat()}.",resource_type="maintenance_asset",resource_id=asset.id,dedupe_key=f"asset-service:{asset.id}:{asset.next_service_date.isoformat()}",recipient_user_ids=managers)
                 if n:created+=1
@@ -77,15 +78,16 @@ def generate_operational_alerts():
 @celery_app.task(name="app.worker.generate_subscription_reminders")
 def generate_subscription_reminders():
     if not _lock("subscription-reminders",21000):return {"skipped":"locked"}
-    created=0;today=date.today();thresholds=[30,14,7,3,0]
+    created=0;thresholds=[30,14,7,3,0]
     with SessionLocal() as db:
         set_rls_context(db,None,True)
         superadmins=list(db.scalars(select(User.id).where(User.is_super_admin.is_(True),User.is_active.is_(True))).all())
         for sub in db.scalars(select(Subscription).where(Subscription.suspended.is_(False))).all():
-            days=(sub.expiry_date-today).days
-            if days<0:continue
             lodge=db.get(Lodge,sub.lodge_id)
             if not lodge:continue
+            today=lodge_day(lodge)
+            days=(sub.expiry_date-today).days
+            if days<0:continue
             eligible=[t for t in thresholds if days<=t]
             for threshold in sorted(eligible,reverse=True):
                 key=f"subscription-expiry:{lodge.id}:{sub.expiry_date.isoformat()}:{threshold}"
@@ -102,10 +104,11 @@ def generate_subscription_reminders():
 @celery_app.task(name="app.worker.sync_staff_leave_status")
 def sync_staff_leave_status():
     if not _lock("staff-leave-status",3300):return {"skipped":"locked"}
-    today=date.today();changed=0
+    changed=0
     with SessionLocal() as db:
         set_rls_context(db,None,True)
         for lodge in db.scalars(select(Lodge).where(Lodge.status=="active")).all():
+            today=lodge_day(lodge)
             set_rls_context(db,str(lodge.id),True)
             active_ids=set(db.scalars(select(StaffLeave.staff_id).where(StaffLeave.lodge_id==lodge.id,StaffLeave.status=="approved",StaffLeave.start_date<=today,StaffLeave.end_date>=today)).all())
             for staff in db.scalars(select(StaffProfile).where(StaffProfile.lodge_id==lodge.id,StaffProfile.employment_status=="active")).all():
@@ -117,10 +120,11 @@ def sync_staff_leave_status():
 @celery_app.task(name="app.worker.generate_hr_expiry_alerts")
 def generate_hr_expiry_alerts():
     if not _lock("hr-expiry-alerts",21000):return {"skipped":"locked"}
-    today=date.today();created=0
+    created=0
     with SessionLocal() as db:
         set_rls_context(db,None,True)
         for lodge in db.scalars(select(Lodge).where(Lodge.status=="active")).all():
+            today=lodge_day(lodge)
             set_rls_context(db,str(lodge.id),True);recipients=user_ids_with_permission(db,lodge.id,"staff.hr.manage")
             rows=db.scalars(select(StaffCredential).where(StaffCredential.lodge_id==lodge.id,StaffCredential.expiry_date.is_not(None),StaffCredential.expiry_date>=today,StaffCredential.expiry_date<=today+timedelta(days=30))).all()
             for cred in rows:
@@ -140,3 +144,11 @@ from .ai.report_jobs import dispatch_reports as dispatch_ai_reports, generate_re
 def process_browser_push():
     from .push_service import process_push
     return process_push(SessionLocal)
+
+
+@celery_app.task(name="app.worker.runtime_heartbeat")
+def runtime_heartbeat():
+    # Reaching this task proves that beat, broker and a worker cooperated.
+    from .main import redis_client
+    redis_client.set("safarios:worker-heartbeat", "ready", ex=90)
+    return {"ready": True}

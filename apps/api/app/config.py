@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://lodge:lodge_dev_password@postgres:5432/lodge_crm"
     redis_url: str = "redis://redis:6379/0"
-    app_env: str = "production"
+    app_env: str = Field("production", pattern="^(production|development|test)$")
     frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     cookie_secure: bool = False
     session_ttl_hours: int = 12

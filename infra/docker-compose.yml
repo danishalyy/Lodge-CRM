@@ -1,8 +1,15 @@
+# Internal service requests must stay on the private container network, even
+# when an operator configures an outbound HTTP proxy.
+x-internal-network: &internal-network
+  NO_PROXY: "${NO_PROXY:-${no_proxy:-localhost,127.0.0.1}},api,minio,postgres,redis,host.docker.internal"
+  no_proxy: "${NO_PROXY:-${no_proxy:-localhost,127.0.0.1}},api,minio,postgres,redis,host.docker.internal"
+
 services:
   postgres:
     image: safarios-postgres:16-vector
     build: ./postgres
     environment:
+      <<: *internal-network
       POSTGRES_DB: ${POSTGRES_DB:-lodge_crm}
       POSTGRES_USER: ${POSTGRES_USER:-lodge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lodge_dev_password}
@@ -21,6 +28,7 @@ services:
       context: ./minio
     command: ["server","/data","--console-address",":9001"]
     environment:
+      <<: *internal-network
       MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY:-lodgecrm}
       MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_KEY:-change-this-object-storage-secret}
       # Current MinIO community builds configure API CORS at server level.
@@ -39,6 +47,7 @@ services:
     depends_on:
       minio: {condition: service_healthy}
     environment:
+      <<: *internal-network
       OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
       OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-lodgecrm}
       OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change-this-object-storage-secret}
@@ -50,6 +59,7 @@ services:
   migrate:
     build: ../apps/api
     environment:
+      <<: *internal-network
       DATABASE_URL: ${DATABASE_ADMIN_URL:-postgresql+psycopg://lodge:lodge_dev_password@postgres:5432/lodge_crm}
     command: ["alembic","upgrade","head"]
     depends_on:
@@ -58,6 +68,7 @@ services:
   db-grants:
     build: ../apps/api
     environment:
+      <<: *internal-network
       DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-postgresql+psycopg://lodge:lodge_dev_password@postgres:5432/lodge_crm}
       APP_DATABASE_ROLE: ${APP_DATABASE_ROLE:-lodge_app}
       APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:-lodge_app_dev_password}
@@ -69,6 +80,7 @@ services:
     build: ../apps/api
     ports: ["8000:8000"]
     environment:
+      <<: *internal-network
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_ENV: ${APP_ENV:-production}
@@ -122,9 +134,16 @@ services:
       redis: {condition: service_started}
       minio-init: {condition: service_completed_successfully}
   worker:
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.ops.worker_health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     build: ../apps/api
     command: ["celery","-A","app.celery_app.celery_app","worker","--include=app.worker","--loglevel=INFO","--concurrency=2"]
     environment:
+      <<: *internal-network
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
@@ -152,6 +171,9 @@ services:
       AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-}
       AI_EMBEDDING_VERSION: ${AI_EMBEDDING_VERSION:-}
       APP_ENV: ${APP_ENV:-production}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -173,9 +195,16 @@ services:
       redis: {condition: service_started}
     restart: unless-stopped
   beat:
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.ops.worker_health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     build: ../apps/api
     command: ["celery","-A","app.celery_app.celery_app","beat","--loglevel=INFO"]
     environment:
+      <<: *internal-network
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://lodge_app:lodge_app_dev_password@postgres:5432/lodge_crm}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_ENV: ${APP_ENV:-production}
@@ -201,6 +230,7 @@ services:
     restart: unless-stopped
   web:
     build: ../apps/web
+    environment: *internal-network
     ports: ["3000:3000"]
     depends_on: [api]
 volumes:

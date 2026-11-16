@@ -532,6 +532,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <strong className="mobilePlatformName">SafariOS</strong>
           </div>
           <div className="topActions">
+            {!wide && allowed("notifications") && <NotificationBell />}
+            {!wide && ["Expiring Soon", "Expired"].includes(
+              membership?.subscription_status,
+            ) && <StatusPill value={membership.subscription_status} />}
+            <div className="mobileUserMenu">
+              <UserMenu
+                name={me.full_name}
+                role={membership?.role}
+                tools={!!membership && !me.is_super_admin}
+              />
+            </div>
+          </div>
+        </header>
+        <div className="content">
+          <div className="workspaceLiveStatus">
             {!me.is_super_admin &&
               membership &&
               requestedModule !== "group" &&
@@ -549,20 +564,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   onAccessChange={() => void recheckAccess()}
                 />
               )}
-            {!wide && allowed("notifications") && <NotificationBell />}
-            {!wide && ["Expiring Soon", "Expired"].includes(
-              membership?.subscription_status,
-            ) && <StatusPill value={membership.subscription_status} />}
-            <div className="mobileUserMenu">
-              <UserMenu
-                name={me.full_name}
-                role={membership?.role}
-                tools={!!membership && !me.is_super_admin}
-              />
-            </div>
           </div>
-        </header>
-        <div className="content">
           {!me.mfa_enabled &&
             !me.is_super_admin &&
             membership?.mfa_recommended &&

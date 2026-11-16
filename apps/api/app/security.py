@@ -174,7 +174,8 @@ def subscription_state(db: Session, lodge_id: str) -> tuple[Subscription | None,
     sub = db.get(Subscription, lodge_id)
     if not sub:
         return None, "Unavailable"
-    today = date.today()
+    from .services.clock import lodge_day
+    today = lodge_day(db.get(Lodge,lodge_id))
     if sub.suspended:
         return sub, "Suspended"
     if today < sub.start_date:
@@ -260,6 +261,9 @@ def require_permission(permission_key: str, write: bool = False):
         ensure_subscription_read_allowed(db, lodge_id)
         if not has_permission(db, m, permission_key):
             raise HTTPException(403, "Your role does not permit this action")
+        from .services.feature_policy import features_for_permission
+        for feature in features_for_permission(permission_key):
+            ensure_feature(db, lodge_id, feature)
         if write:
             ensure_subscription_write_allowed(db, lodge_id)
         return user

@@ -1569,3 +1569,7 @@ h2,.cardTitle { font-size:18px; letter-spacing:-.015em; }
 :root[data-sidebar="collapsed"] .sidebar .userMenu { flex:none; }
 :root[data-sidebar="collapsed"] .sidebar .userMenu summary { justify-content:center; padding:0; background:transparent; border:0; }
 :root[data-sidebar="collapsed"] .sidebar .userMenu summary .avatar { margin:0; }
+
+/* Operational notices remain reachable when the desktop header is hidden. */
+.workspaceLiveStatus .liveControls { justify-content:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+.workspaceLiveStatus .liveConnection:not([data-state="live"]) { opacity:1; animation:none; }

@@ -1,0 +1,81 @@
+# Requires Docker Compose v2.24.4+ (port-reset support).
+# Apply AFTER docker-compose.yml with --env-file infra/.env.production.
+x-production-runtime: &runtime
+  APP_ENV: production
+  COOKIE_SECURE: "true"
+  PUBLIC_WEB_URL: https://${APP_DOMAIN:?Set APP_DOMAIN}
+  FRONTEND_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN}
+  OBJECT_STORAGE_PUBLIC_ENDPOINT: https://${MEDIA_DOMAIN:?Set MEDIA_DOMAIN}
+
+services:
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique production database password}
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+  redis:
+    restart: unless-stopped
+    logging: *logging
+  minio:
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: https://${APP_DOMAIN:?Set APP_DOMAIN}
+    logging: *logging
+  minio-init:
+    environment:
+      FRONTEND_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN}
+  api:
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      <<: *runtime
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m,mode=1777"]
+    logging: *logging
+  worker:
+    environment:
+      <<: *runtime
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=512m,mode=1777"]
+    logging: *logging
+  beat:
+    command: ["celery", "-A", "app.celery_app.celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment:
+      <<: *runtime
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m,mode=1777"]
+    logging: *logging
+  web:
+    ports: !reset []
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=128m,mode=1777", "/app/.next/cache:rw,noexec,nosuid,size=128m,uid=10001,gid=10001,mode=0700"]
+    logging: *logging
+  proxy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+      MEDIA_DOMAIN: ${MEDIA_DOMAIN:?Set MEDIA_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set an operator email for certificates}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - tls_data:/data
+      - tls_config:/config
+    depends_on: [web, api, minio]
+    logging: *logging
+volumes:
+  tls_data:
+  tls_config:

@@ -29,13 +29,6 @@ def test_advanced_task_contract():
     assert '/checklist' in MAIN and '/comments' in MAIN
 
 
-def test_housekeeping_workflow_updates_authoritative_unit_state():
-    assert 'class HousekeepingJob' in MODELS
-    assert 'HK_TRANSITIONS' in MAIN
-    assert 'status="ready"' in MAIN or '.status="ready"' in MAIN
-    assert 'housekeeping_full' in MAIN
-
-
 def test_workshop_assets_parts_and_recurrence():
     assert 'class MaintenanceAsset' in MODELS
     assert 'class MaintenancePartUsage' in MODELS

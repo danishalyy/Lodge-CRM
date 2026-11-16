@@ -27,6 +27,13 @@ export default function LiveUpdates({
     [held, setHeld] = useState(false),
     [editing, setEditing] = useState(false);
   const apply = useRef<() => void>(() => {});
+  const [showConnection, setShowConnection] = useState(false);
+  useEffect(() => {
+    setShowConnection(false);
+    if (state === "live") return;
+    const timer = window.setTimeout(() => setShowConnection(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [state]);
   useEffect(() => {
     let disposed = false,
       restricted = false,
@@ -271,6 +278,7 @@ export default function LiveUpdates({
       apply.current = () => {};
     };
   }, [userId, lodgeId, accessVersion]);
+  if (!held && !showConnection) return null;
   return (
     <div className="liveControls">
       <span

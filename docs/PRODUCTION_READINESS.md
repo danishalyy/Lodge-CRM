@@ -1,5 +1,7 @@
 # Production-readiness gates
 
+Current checkpoint: [security and reliability hardening](RELEASE_HARDENING.md). Operator procedures: [production operations](PRODUCTION_OPERATIONS.md). The application is not yet commercially accepted; the requirement register and real deployment gates still apply.
+
 A build may be called production-ready only after all applicable gates pass:
 
 - Fresh install migrations succeed.

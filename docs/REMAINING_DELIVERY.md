@@ -1,5 +1,7 @@
 # Remaining delivery after the conversational workspace
 
+16 November 2026: [release hardening](RELEASE_HARDENING.md) addresses confirmed security/integrity defects and adds deployment/recovery tools. This does not close the unfinished product requirements listed below.
+
 The owner reaffirmed the original documents as the acceptance criteria. [The current 63-item source map](REQUIREMENTS_DELIVERY.md) governs priorities; optional additions do not replace documented workflows.
 
 The owner requested completion of the remaining work on 9 November 2026. Deliver in tested phases, preserving the current stack, permissions, RLS, MFA, subscription gates and charcoal UI. The owner has not selected external booking/accounting/messaging services; these provider-specific connections remain pending that choice. Hosting was previously deferred to a future Hostinger VPS. Do not purchase infrastructure or claim a production deployment.

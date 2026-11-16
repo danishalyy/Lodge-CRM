@@ -50,7 +50,7 @@ from .security import (
     verify_password, access_context, membership_for, has_permission, ensure_feature, entitlement_enabled,
     encrypt_mfa_secret, decrypt_mfa_secret,
 )
-from .services.state import housekeeping_job_created, housekeeping_awaiting_inspection, housekeeping_completed, maintenance_opened, maintenance_released, unit_is_occupied
+from .services.state import housekeeping_job_created, housekeeping_awaiting_inspection, housekeeping_completed, maintenance_opened, maintenance_released, unit_is_occupied, lock_asset_state, OCCUPYING_STAY_STATES, require_room_readiness, room_checked_out, require_asset_release, vehicle_returned, require_asset_fault_clear
 from .notification_service import create_notification, staff_user_id, user_ids_with_permission
 from .email_service import issue_invitation, account_email_status, queue_account_email, validate_email_configuration
 
@@ -69,37 +69,21 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID", "X-Expected-User-Id", "X-Lodge-Context", "Last-Event-ID"],
 )
 
-redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
 
-def _s3(endpoint: str):
-    return boto3.client("s3", endpoint_url=endpoint, aws_access_key_id=settings.object_storage_access_key, aws_secret_access_key=settings.object_storage_secret_key, region_name=settings.object_storage_region, config=BotoConfig(signature_version="s3v4"))
+def _s3(endpoint: str, *, readiness: bool = False):
+    return boto3.client("s3", endpoint_url=endpoint, aws_access_key_id=settings.object_storage_access_key, aws_secret_access_key=settings.object_storage_secret_key, region_name=settings.object_storage_region, config=BotoConfig(signature_version="s3v4", connect_timeout=2 if readiness else 5, read_timeout=2 if readiness else 10, retries={"max_attempts": 0 if readiness else 2}))
 
 s3_internal = _s3(settings.object_storage_endpoint)
 s3_public = _s3(settings.object_storage_public_endpoint)
+s3_readiness = _s3(settings.object_storage_endpoint, readiness=True)
 
 @app.on_event("startup")
 def validate_production_configuration():
-    if settings.app_env != "production":
-        return
-    problems=[]
-    if not settings.cookie_secure: problems.append("COOKIE_SECURE must be true")
-    if not settings.mfa_encryption_key: problems.append("MFA_ENCRYPTION_KEY is required")
-    if not settings.smtp_host or not settings.smtp_from_email: problems.append("SMTP is required for password recovery and invitations")
-    else:
-        try: validate_email_configuration()
-        except HTTPException as exc: problems.append(str(exc.detail))
-    if not (settings.email_encryption_key or settings.mfa_encryption_key): problems.append("EMAIL_ENCRYPTION_KEY or MFA_ENCRYPTION_KEY is required for the account email outbox")
-    if "change-this" in settings.object_storage_secret_key: problems.append("OBJECT_STORAGE_SECRET_KEY must be replaced")
-    if any(o.startswith("http://") for o in settings.origins): problems.append("FRONTEND_ORIGINS must use HTTPS")
-    if settings.public_web_url.startswith("http://"): problems.append("PUBLIC_WEB_URL must use HTTPS")
-    try:
-        with engine.connect() as conn:
-            row=conn.execute(text("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user")).one()
-            if row[0] or row[1]: problems.append("DATABASE_URL must use a non-superuser role without BYPASSRLS")
-    except Exception as exc:
-        problems.append(f"database security-role validation failed: {exc}")
-    if problems:
-        raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))
+    from .services.deployment import validate_runtime
+    validate_runtime(settings, engine)
+    if settings.app_env == "production":
+        validate_email_configuration()
 
 
 @app.on_event("startup")
@@ -150,6 +134,16 @@ def health(db: Session = Depends(get_db)):
     return {"status": "ok" if redis_ok else "degraded", "database": "ok", "redis": "ok" if redis_ok else "unavailable"}
 
 
+@app.get("/api/v1/health/ready")
+def readiness_status(db: Session = Depends(get_db)):
+    from .ops.health import readiness
+    result, status = readiness(db, redis_client, s3_readiness, settings.object_storage_bucket)
+    return JSONResponse(status_code=status, content=result)
+
+
+from .services.login_limits import fallback_login_limits
+
+
 def rate_limit_login(request: Request, email: str):
     ip = request.client.host if request.client else "unknown"
     key = f"login:{ip}:{email.lower()}"
@@ -162,12 +156,13 @@ def rate_limit_login(request: Request, email: str):
     except HTTPException:
         raise
     except redis.RedisError:
-        # Authentication remains available if Redis is temporarily unavailable; /health exposes degradation.
-        pass
+        if not fallback_login_limits.allow(key, settings.login_rate_limit, settings.login_rate_window_seconds):
+            raise HTTPException(429, "Too many login attempts. Please try again later.")
 
 
 def clear_login_limit(request: Request, email: str):
     ip = request.client.host if request.client else "unknown"
+    fallback_login_limits.clear(f"login:{ip}:{email.lower()}")
     try:
         redis_client.delete(f"login:{ip}:{email.lower()}")
     except redis.RedisError:
@@ -595,7 +590,7 @@ def dashboard(lodge_id: str, user: User = Depends(require_permission("dashboard.
         events=[]  # Operational memory is intentionally not exposed lodge-wide to department managers.
         scope={"type":"department","department_id":str(ctx.department_id)}
     else:
-        guests_in_house = db.scalar(select(func.count()).select_from(Stay).where(Stay.lodge_id == lodge.id, Stay.status == "in_house")) or 0
+        guests_in_house = db.scalar(select(func.count()).select_from(Stay).where(Stay.lodge_id == lodge.id, Stay.status.in_(OCCUPYING_STAY_STATES))) or 0
         arrivals = db.scalar(select(func.count()).select_from(Stay).where(Stay.lodge_id == lodge.id, Stay.arrival_date == today, Stay.status != "cancelled")) or 0
         departures = db.scalar(select(func.count()).select_from(Stay).where(Stay.lodge_id == lodge.id, Stay.departure_date == today, Stay.status.not_in(["cancelled", "completed"]))) or 0
         open_tasks = db.scalar(select(func.count()).select_from(Task).where(Task.lodge_id == lodge.id, Task.status.not_in(["completed", "cancelled"]))) or 0
@@ -609,8 +604,31 @@ def dashboard(lodge_id: str, user: User = Depends(require_permission("dashboard.
             attention.append({"id": str(t.id), "type": "task", "title": f"Overdue task: {t.title}", "priority": t.priority})
         for mt in db.scalars(select(MaintenanceTicket).where(MaintenanceTicket.lodge_id == lodge.id, MaintenanceTicket.status.not_in(["completed", "cancelled"]), MaintenanceTicket.priority == "critical").order_by(MaintenanceTicket.created_at.desc()).limit(10)).all():
             attention.append({"id": str(mt.id), "type": "maintenance", "title": f"Critical maintenance: {mt.title}", "priority": mt.priority})
-        events=[{"id":str(e.id),"type":e.event_type,"summary":e.summary,"created_at":e.created_at.isoformat()} for e in db.scalars(select(OperationalEvent).where(OperationalEvent.lodge_id==lodge.id).order_by(OperationalEvent.created_at.desc()).limit(20)).all()]
+        from .services.history import visible_events, project_event
+        events=[]
+        for e in db.scalars(visible_events(db,ctx,lodge.id).order_by(OperationalEvent.created_at.desc()).limit(20)).all():
+            projected=project_event(db,e)
+            events.append({"id":projected["id"],"type":projected["event_type"],"summary":projected["summary"],"created_at":projected["created_at"]})
         scope={"type":"lodge"}
+    # A dashboard grant is not a grant to every underlying operational module.
+    # Assigned-only custom roles do not receive lodge-wide aggregates or titles.
+    from .services.history import can_read, GLOBAL_SCOPES
+    broad_scope=ctx.role_key in GLOBAL_SCOPES or ctx.role_key=="department_manager"
+    if not broad_scope or not can_read(db,ctx,"stays.view"):
+        guests_in_house=arrivals=departures=None
+    if not broad_scope or not can_read(db,ctx,"tasks.view"):
+        open_tasks=overdue=None
+    if not broad_scope or not can_read(db,ctx,"maintenance.view"):
+        maintenance_open=None
+    if not broad_scope or not can_read(db,ctx,"activities.view"):
+        activities_today=None
+    if not broad_scope or not can_read(db,ctx,"transfers.view"):
+        transfers_today=None
+    if not broad_scope or not can_read(db,ctx,"vehicles.view"):
+        vehicles_unavailable=None
+    attention=[item for item in attention if broad_scope and can_read(db,ctx,"tasks.view" if item["type"]=="task" else "maintenance.view")]
+    if not broad_scope:
+        scope={"type":"assigned"}
     return {
         "lodge":{"id":str(lodge.id),"name":lodge.name,"location":lodge.location,"branding":lodge_branding(lodge)},
         "scope":scope,
@@ -1009,7 +1027,7 @@ def reactivate_staff_access(lodge_id:str,record_id:str,request:Request,user:User
 def rooms(lodge_id:str,user:User=Depends(require_permission("units.view")),db:Session=Depends(get_db),limit:int|None=Query(None,ge=1,le=250)):
     out=[]
     for x in db.scalars(select(Unit).where(Unit.lodge_id==lodge_id).order_by(Unit.name).limit(limit)).all():
-        active_stay=db.scalar(select(Stay).where(Stay.unit_id==x.id,Stay.status=="in_house").limit(1))
+        active_stay=db.scalar(select(Stay).where(Stay.unit_id==x.id,Stay.status.in_(OCCUPYING_STAY_STATES)).limit(1))
         guest=db.get(Guest,active_stay.guest_id) if active_stay else None
         out.append({"id":str(x.id),"name":x.name,"unit_type":x.unit_type,"status":x.status,"notes":x.notes,"current_guest":f"{guest.first_name} {guest.last_name}" if guest else None})
     return out
@@ -1024,7 +1042,7 @@ def create_room(lodge_id:str,body:UnitCreate,request:Request,user:User=Depends(r
 
 @app.patch("/api/v1/lodges/{lodge_id}/rooms/{record_id}",dependencies=[Depends(require_csrf)])
 def update_room(lodge_id:str,record_id:str,body:UnitUpdate,request:Request,user:User=Depends(require_permission("units.view",write=True)),db:Session=Depends(get_db)):
-    ctx=_ctx(db,user,lodge_id);row=tenant_get(db,Unit,record_id,lodge_id,"Unit")
+    ctx=_ctx(db,user,lodge_id);row=tenant_get(db,Unit,record_id,lodge_id,"Unit");lock_asset_state(db,row)
     can_config=_may(db,ctx,"units.manage");can_status=can_config or _may(db,ctx,"units.status.manage")
     if body.name is not None or body.unit_type is not None:
         if not can_config:raise HTTPException(403,"Only lodge management can edit room configuration")
@@ -1032,8 +1050,9 @@ def update_room(lodge_id:str,record_id:str,body:UnitUpdate,request:Request,user:
         if body.unit_type is not None:row.unit_type=body.unit_type.strip()
     if body.status is not None:
         if not can_status:raise HTTPException(403,"Your role cannot change room operational status")
-        active=db.scalar(select(Stay).where(Stay.unit_id==row.id,Stay.status=="in_house").limit(1))
+        active=db.scalar(select(Stay).where(Stay.unit_id==row.id,Stay.status.in_(OCCUPYING_STAY_STATES)).limit(1))
         if active and body.status!="occupied":raise HTTPException(409,"This unit has an in-house stay; occupancy is authoritative until checkout")
+        if body.status in {"available","ready"}:require_asset_release(db,row)
         row.status=body.status
     if body.notes is not None:
         if not can_config:raise HTTPException(403,"Only lodge management can edit room configuration notes")
@@ -1059,7 +1078,8 @@ def guests(lodge_id:str,limit:int=Query(50,ge=1,le=250),offset:int=Query(0,ge=0)
 def guest_dietary(lodge_id:str,user:User=Depends(require_permission("guests.dietary.view")),db:Session=Depends(get_db)):
     ensure_feature(db,lodge_id,"guests")
     # Need-to-know: only guests whose stay overlaps the current service window (+/- one day).
-    today=date.today();window_start=today-timedelta(days=1);window_end=today+timedelta(days=1)
+    from .services.clock import lodge_day
+    today=lodge_day(db.get(Lodge,lodge_id));window_start=today-timedelta(days=1);window_end=today+timedelta(days=1)
     rows=db.scalars(select(Guest).join(Stay,Stay.guest_id==Guest.id).where(Guest.lodge_id==lodge_id,Stay.status!="cancelled",Stay.arrival_date<=window_end,Stay.departure_date>=window_start).distinct().order_by(Guest.last_name,Guest.first_name)).all()
     return [{"id":str(g.id),"name":f"{g.first_name} {g.last_name}","dietary_requirements":g.dietary_requirements,"allergies":g.allergies} for g in rows if g.dietary_requirements or g.allergies]
 
@@ -1070,7 +1090,7 @@ def create_guest(lodge_id:str,body:GuestCreate,request:Request,user:User=Depends
         duplicate=db.scalar(select(Guest.id).where(Guest.lodge_id==lodge_id,func.lower(Guest.first_name)==body.first_name.strip().lower(),func.lower(Guest.last_name)==body.last_name.strip().lower(),func.lower(Guest.email)==str(body.email).lower()))
         if duplicate:raise HTTPException(409,"A guest with the same name and email already exists")
     g=Guest(lodge_id=lodge_id,first_name=body.first_name.strip(),last_name=body.last_name.strip(),email=str(body.email).lower() if body.email else None,phone=body.phone.strip(),nationality=body.nationality.strip(),vip=body.vip,dietary_requirements=body.dietary_requirements,allergies=body.allergies,preferences=body.preferences,notes=body.notes,birthday=body.birthday,anniversary=body.anniversary,repeat_guest=body.repeat_guest,safari_preferences=body.safari_preferences)
-    db.add(g);db.flush();audit(db,request,g.lodge_id,user.id,"guest.created","guest",str(g.id));event(db,g.lodge_id,user.id,"guest.created","guest",str(g.id),f"Guest {g.first_name} {g.last_name} added to CRM");db.commit()
+    db.add(g);db.flush();audit(db,request,g.lodge_id,user.id,"guest.created","guest",str(g.id));event(db,g.lodge_id,user.id,"guest.created","guest",str(g.id),"Guest added to CRM");db.commit()
     return {"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,**guest_details(g),"current_unit":None,"stay_status":None,"completed_stays":0}
 
 
@@ -1138,11 +1158,11 @@ STAY_TRANSITIONS={"upcoming":{"arriving","cancelled"},"arriving":{"in_house","ca
 
 @app.patch("/api/v1/lodges/{lodge_id}/stays/{record_id}",dependencies=[Depends(require_csrf)])
 def update_stay(lodge_id:str,record_id:str,body:StayUpdate,request:Request,user:User=Depends(require_permission("stays.manage",write=True)),db:Session=Depends(get_db)):
-    s=tenant_get(db,Stay,record_id,lodge_id,"Stay");data=body.model_dump(exclude_unset=True)
+    s=tenant_get(db,Stay,record_id,lodge_id,"Stay");db.refresh(s,with_for_update=True);data=body.model_dump(exclude_unset=True)
     new_unit_id=data.get("unit_id",s.unit_id);new_arrival=data.get("arrival_date",s.arrival_date);new_departure=data.get("departure_date",s.departure_date)
     if new_departure<new_arrival:raise HTTPException(422,"Departure date must be on or after arrival date")
     if s.status in {"in_house","departing","completed"} and ("unit_id" in data or "arrival_date" in data):raise HTTPException(409,"Unit and arrival date cannot be changed after check-in")
-    unit=ensure_fk(db,Unit,new_unit_id,lodge_id,"Unit")
+    unit=ensure_fk(db,Unit,new_unit_id,lodge_id,"Unit");lock_asset_state(db,unit)
     if unit.status in {"maintenance","out_of_service"} and new_unit_id!=s.unit_id:raise HTTPException(409,"Unit is unavailable")
     if any(k in data for k in ["unit_id","arrival_date","departure_date"]):check_unit_conflict(db,lodge_id,new_unit_id,new_arrival,new_departure,s.id)
     s.unit_id=new_unit_id;s.arrival_date=new_arrival;s.departure_date=new_departure
@@ -1150,9 +1170,11 @@ def update_stay(lodge_id:str,record_id:str,body:StayUpdate,request:Request,user:
     if body.status is not None and body.status!=s.status:
         if body.status not in STAY_TRANSITIONS.get(s.status,set()):raise HTTPException(409,f"Stay cannot transition from {s.status} to {body.status}")
         if body.status=="in_house":
-            if unit.status in {"maintenance","out_of_service"}:raise HTTPException(409,"Unit is unavailable")
+            require_room_readiness(db,unit)
             unit.status="occupied"
-        elif body.status=="completed": unit.status="cleaning"
+        elif body.status=="completed":
+            s.status=body.status
+            room_checked_out(db,unit)
         s.status=body.status;event(db,s.lodge_id,user.id,"stay.status_changed","stay",str(s.id),f"Stay status changed to {s.status}")
     for f in ["expected_arrival_time","expected_departure_time","transfer_notes","special_requirements"]:
         if f in data:setattr(s,f,data[f])
@@ -1401,7 +1423,9 @@ MAINT_TRANSITIONS={"open":{"assigned","in_progress","cancelled"},"assigned":{"in
 
 @app.patch("/api/v1/lodges/{lodge_id}/maintenance/{record_id}",dependencies=[Depends(require_csrf)])
 def update_maintenance(lodge_id:str,record_id:str,body:MaintenanceUpdate,request:Request,user:User=Depends(require_permission("maintenance.view",write=True)),db:Session=Depends(get_db)):
-    ctx=_ctx(db,user,lodge_id);m=tenant_get(db,MaintenanceTicket,record_id,lodge_id,"Maintenance ticket");_ensure_department_scope(ctx,m.department_id,"maintenance ticket")
+    ctx=_ctx(db,user,lodge_id);m=tenant_get(db,MaintenanceTicket,record_id,lodge_id,"Maintenance ticket");db.refresh(m,with_for_update=True);_ensure_department_scope(ctx,m.department_id,"maintenance ticket")
+    original_unit=db.get(Unit,m.unit_id) if m.unit_id else None
+    original_vehicle=db.get(Vehicle,m.vehicle_id) if m.vehicle_id else None
     full=_may(db,ctx,"maintenance.manage");own=ctx.staff and m.assigned_staff_id==ctx.staff.id
     if not full and not own:raise HTTPException(403,"You may only update maintenance assigned to you")
     if not full and any(getattr(body,f) is not None for f in ["assigned_staff_id","title","description","category","department_id","unit_id","asset_id","vehicle_id"]):raise HTTPException(403,"Assigned staff cannot change maintenance ownership or ticket structure")
@@ -1425,7 +1449,6 @@ def update_maintenance(lodge_id:str,record_id:str,body:MaintenanceUpdate,request
         if m.status in {"completed","cancelled"}:
             if m.status=="completed":m.completed_at=now
             m.downtime_ended_at=now if m.downtime_started_at else m.downtime_ended_at
-            maintenance_released(db,db.get(Unit,m.unit_id) if m.unit_id else None,db.get(Vehicle,m.vehicle_id) if m.vehicle_id else None)
         if m.status=="completed":
             if m.recurrence_interval_days:
                 next_when=(m.scheduled_for or now)+timedelta(days=m.recurrence_interval_days)
@@ -1437,6 +1460,15 @@ def update_maintenance(lodge_id:str,record_id:str,body:MaintenanceUpdate,request
         if v is not None:
             if not full and f in {"priority","cost_cents"}:raise HTTPException(403,"Assigned staff cannot change maintenance priority or cost")
             setattr(m,f,v)
+    current_unit=db.get(Unit,m.unit_id) if m.unit_id else None
+    current_vehicle=db.get(Vehicle,m.vehicle_id) if m.vehicle_id else None
+    lock_asset_state(db,original_unit,original_vehicle,current_unit,current_vehicle)
+    if m.unit_id != (original_unit.id if original_unit else None) or m.vehicle_id != (original_vehicle.id if original_vehicle else None):
+        maintenance_released(db,original_unit,original_vehicle)
+    if m.status not in {"completed","cancelled"}:
+        maintenance_opened(db,current_unit,current_vehicle)
+    else:
+        maintenance_released(db,current_unit,current_vehicle)
     audit(db,request,m.lodge_id,user.id,"maintenance.updated","maintenance",str(m.id));db.commit();return {"id":str(m.id),"status":m.status}
 
 # --- Safari operations: production workflows ---
@@ -1501,7 +1533,8 @@ def create_vehicle(lodge_id:str,body:VehicleCreate,request:Request,user:User=Dep
 
 @app.patch("/api/v1/lodges/{lodge_id}/vehicles/{record_id}",dependencies=[Depends(require_csrf)])
 def update_vehicle(lodge_id:str,record_id:str,body:VehicleUpdate,request:Request,user:User=Depends(require_permission("vehicles.manage",write=True)),db:Session=Depends(get_db)):
-    v=tenant_get(db,Vehicle,record_id,lodge_id,"Vehicle")
+    v=tenant_get(db,Vehicle,record_id,lodge_id,"Vehicle");lock_asset_state(db,v)
+    if body.status in {"ready","assigned"}:require_asset_release(db,v)
     data=body.model_dump(exclude_unset=True)
     if "odometer_km" in data and data["odometer_km"] < v.odometer_km and not (data.get("odometer_correction_reason") or "").strip(): raise HTTPException(422,"A correction reason is required when reducing the odometer")
     correction_reason=data.pop("odometer_correction_reason",None)
@@ -1596,6 +1629,9 @@ def create_activity(lodge_id:str,body:ActivityCreate,request:Request,user:User=D
         overlap=db.scalar(select(ActivityGuest.activity_id).join(Activity,Activity.id==ActivityGuest.activity_id).where(ActivityGuest.guest_id==gid,Activity.lodge_id==lodge_id,Activity.status.notin_(["completed","cancelled"]),Activity.starts_at<body.ends_at,Activity.ends_at>body.starts_at).limit(1))
         if overlap:raise HTTPException(409,"A guest is already assigned to an overlapping activity")
     _activity_conflicts(db,lodge_id,body.starts_at,body.ends_at,body.guide_staff_id,body.vehicle_id)
+    if vehicle:
+        lock_asset_state(db,vehicle)
+        require_asset_fault_clear(db,vehicle)
     department_id=_set_department_from_staff_or_context(ctx,guide,body.department_id)
     a=Activity(lodge_id=lodge_id,activity_type=body.activity_type,title=body.title,starts_at=body.starts_at,ends_at=body.ends_at,guide_staff_id=body.guide_staff_id,department_id=department_id,vehicle_id=body.vehicle_id,requires_vehicle=body.requires_vehicle,meeting_point=body.meeting_point,notes=body.notes,created_by_user_id=user.id)
     db.add(a);db.flush()
@@ -1604,10 +1640,12 @@ def create_activity(lodge_id:str,body:ActivityCreate,request:Request,user:User=D
 
 @app.patch("/api/v1/lodges/{lodge_id}/activities/{record_id}",dependencies=[Depends(require_csrf)])
 def update_activity(lodge_id:str,record_id:str,body:ActivityUpdate,request:Request,user:User=Depends(require_permission("activities.view",write=True)),db:Session=Depends(get_db)):
-    ensure_feature(db,lodge_id,"activities");ctx=_ctx(db,user,lodge_id);a=tenant_get(db,Activity,record_id,lodge_id,"Activity");_ensure_department_scope(ctx,a.department_id,"activity")
+    ensure_feature(db,lodge_id,"activities");ctx=_ctx(db,user,lodge_id);a=tenant_get(db,Activity,record_id,lodge_id,"Activity");db.refresh(a,with_for_update=True);_ensure_department_scope(ctx,a.department_id,"activity")
     full=_may(db,ctx,"activities.manage");own=_may(db,ctx,"activities.own.manage") and ctx.staff and a.guide_staff_id==ctx.staff.id
     if not full and not own:raise HTTPException(403,"You may only update activities assigned to you")
     data=body.model_dump(exclude_unset=True)
+    if a.status in {"in_progress","completed","cancelled"} and any(key in data and data[key]!=getattr(a,key) for key in ["guide_staff_id","vehicle_id"]):
+        raise HTTPException(409,"Guide and vehicle cannot be changed after departure. Record a separate activity for a replacement journey.")
     if not full and any(k in data for k in ["activity_type","title","guide_staff_id","vehicle_id","requires_vehicle","starts_at","ends_at","meeting_point"]):raise HTTPException(403,"Assigned guides can only update activity status and notes")
     starts=data.get("starts_at",a.starts_at);ends=data.get("ends_at",a.ends_at);guide_id=data.get("guide_staff_id",a.guide_staff_id);vehicle_id=data.get("vehicle_id",a.vehicle_id)
     if ends<=starts:raise HTTPException(422,"Activity end must be after start")
@@ -1625,6 +1663,9 @@ def update_activity(lodge_id:str,record_id:str,body:ActivityUpdate,request:Reque
         requires_vehicle=data.get("requires_vehicle",a.requires_vehicle)
         if requires_vehicle and not vehicle:raise HTTPException(409,"A vehicle must be assigned before starting this activity")
         _assert_staff_operational(guide,"Guide/ranger")
+        if vehicle:
+            lock_asset_state(db,vehicle)
+            require_asset_release(db,vehicle)
         if vehicle and vehicle.status not in {"ready","assigned"}:raise HTTPException(409,"Vehicle is not ready")
         if vehicle and entitlement_enabled(db,lodge_id,"vehicle_checklists"):
             cutoff=datetime.now(timezone.utc)-timedelta(hours=12)
@@ -1633,7 +1674,8 @@ def update_activity(lodge_id:str,record_id:str,body:ActivityUpdate,request:Reque
         if vehicle:vehicle.status="on_drive"
         guide.operational_status="on_drive"
     if target in {"completed","cancelled"} and a.status=="in_progress":
-        if vehicle and vehicle.status=="on_drive":vehicle.status="ready"
+        a.status=target
+        if vehicle:vehicle_returned(db,vehicle)
         if guide and guide.operational_status=="on_drive":guide.operational_status="available"
     for k,val in data.items():setattr(a,k,val)
     audit(db,request,lodge_id,user.id,"activity.updated","activity",str(a.id),f"Status: {a.status}");event(db,lodge_id,user.id,"activity.updated","activity",str(a.id),f"Activity {a.title} is {a.status.replace('_',' ')}");db.commit();return {"id":str(a.id),"status":a.status}
@@ -1664,6 +1706,9 @@ def create_transfer(lodge_id:str,body:TransferCreate,request:Request,user:User=D
     if driver:_assert_staff_operational(driver,"Driver")
     if vehicle and vehicle.status in {"maintenance","out_of_service"}:raise HTTPException(409,"Vehicle is not available")
     _transfer_conflicts(db,lodge_id,body.scheduled_at,body.expected_end_at,body.driver_staff_id,body.vehicle_id)
+    if vehicle:
+        lock_asset_state(db,vehicle)
+        require_asset_fault_clear(db,vehicle)
     department_id=_set_department_from_staff_or_context(ctx,driver,body.department_id)
     t=Transfer(lodge_id=lodge_id,transfer_type=body.transfer_type,guest_id=body.guest_id,stay_id=body.stay_id,driver_staff_id=body.driver_staff_id,department_id=department_id,vehicle_id=body.vehicle_id,scheduled_at=body.scheduled_at,expected_end_at=body.expected_end_at,pickup_location=body.pickup_location,dropoff_location=body.dropoff_location,flight_number=body.flight_number,flight_time=body.flight_time,passenger_count=body.passenger_count,notes=body.notes,created_by_user_id=user.id)
     db.add(t);db.flush()
@@ -1674,10 +1719,12 @@ def create_transfer(lodge_id:str,body:TransferCreate,request:Request,user:User=D
 
 @app.patch("/api/v1/lodges/{lodge_id}/transfers/{record_id}",dependencies=[Depends(require_csrf)])
 def update_transfer(lodge_id:str,record_id:str,body:TransferUpdate,request:Request,user:User=Depends(require_permission("transfers.view",write=True)),db:Session=Depends(get_db)):
-    ensure_feature(db,lodge_id,"transfers");ctx=_ctx(db,user,lodge_id);t=tenant_get(db,Transfer,record_id,lodge_id,"Transfer");_ensure_department_scope(ctx,t.department_id,"transfer")
+    ensure_feature(db,lodge_id,"transfers");ctx=_ctx(db,user,lodge_id);t=tenant_get(db,Transfer,record_id,lodge_id,"Transfer");db.refresh(t,with_for_update=True);_ensure_department_scope(ctx,t.department_id,"transfer")
     full=_may(db,ctx,"transfers.manage");own=_may(db,ctx,"transfers.own.manage") and ctx.staff and t.driver_staff_id==ctx.staff.id
     if not full and not own:raise HTTPException(403,"You may only update transfers assigned to you")
     data=body.model_dump(exclude_unset=True)
+    if t.status in {"en_route","arrived","completed","cancelled"} and any(key in data and data[key]!=getattr(t,key) for key in ["driver_staff_id","vehicle_id"]):
+        raise HTTPException(409,"Driver and vehicle cannot be changed after departure. Record a separate transfer for a replacement journey.")
     if not full and any(k in data for k in ["driver_staff_id","vehicle_id","scheduled_at","expected_end_at","pickup_location","dropoff_location","flight_number","flight_time","passenger_count"]):raise HTTPException(403,"Assigned drivers can only update transfer status and notes")
     starts=data.get("scheduled_at",t.scheduled_at);ends=data.get("expected_end_at",t.expected_end_at);driver_id=data.get("driver_staff_id",t.driver_staff_id);vehicle_id=data.get("vehicle_id",t.vehicle_id)
     if ends<=starts:raise HTTPException(422,"Transfer end must be after start")
@@ -1688,6 +1735,8 @@ def update_transfer(lodge_id:str,record_id:str,body:TransferUpdate,request:Reque
     if target=="en_route" and t.status!="en_route":
         if not driver or not vehicle:raise HTTPException(409,"Driver and vehicle are required before departure")
         _assert_staff_operational(driver,"Driver")
+        lock_asset_state(db,vehicle)
+        require_asset_release(db,vehicle)
         if vehicle.status not in {"ready","assigned"}:raise HTTPException(409,"Vehicle is not ready")
         if entitlement_enabled(db,lodge_id,"vehicle_checklists"):
             cutoff=datetime.now(timezone.utc)-timedelta(hours=12)
@@ -1695,7 +1744,8 @@ def update_transfer(lodge_id:str,record_id:str,body:TransferUpdate,request:Reque
             if not passed:raise HTTPException(409,"A passed pre-drive checklist from the last 12 hours is required")
         vehicle.status="on_drive";driver.operational_status="on_drive"
     if target in {"completed","cancelled"} and t.status in {"en_route","arrived"}:
-        if vehicle and vehicle.status=="on_drive":vehicle.status="ready"
+        t.status=target
+        if vehicle:vehicle_returned(db,vehicle)
         if driver and driver.operational_status=="on_drive":driver.operational_status="available"
     for k,val in data.items():setattr(t,k,val)
     if t.driver_staff_id and data:
@@ -1837,15 +1887,14 @@ def notification_deliveries(lodge_id:str,limit:int=Query(100,ge=1,le=250),user:U
 
 @app.get("/api/v1/lodges/{lodge_id}/operational-memory")
 def operational_memory(lodge_id:str,event_type:str|None=None,resource_type:str|None=None,start:date|None=None,end:date|None=None,limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),user:User=Depends(require_permission("memory.view")),db:Session=Depends(get_db)):
-    ctx=_ctx(db,user,lodge_id);q=select(OperationalEvent).where(OperationalEvent.lodge_id==lodge_id)
-    if not _may(db,ctx,"staff.hr.view"):
-        q=q.where(~OperationalEvent.event_type.like("staff.%"),OperationalEvent.resource_type.notin_(["staff","staff_leave","staff_credential","staff_training","staff_incident","staff_performance"]))
+    from .services.history import visible_events, project_event
+    ctx=_ctx(db,user,lodge_id);q=visible_events(db,ctx,lodge_id)
     if event_type:q=q.where(OperationalEvent.event_type==event_type)
     if resource_type:q=q.where(OperationalEvent.resource_type==resource_type)
     if start:q=q.where(OperationalEvent.created_at>=datetime.combine(start,datetime.min.time(),tzinfo=timezone.utc))
     if end:q=q.where(OperationalEvent.created_at<datetime.combine(end+timedelta(days=1),datetime.min.time(),tzinfo=timezone.utc))
     rows=db.scalars(q.order_by(OperationalEvent.created_at.desc()).offset(offset).limit(limit)).all()
-    return [{"id":str(e.id),"event_type":e.event_type,"resource_type":e.resource_type,"resource_id":e.resource_id,"summary":e.summary,"detail":e.detail,"actor_user_id":str(e.actor_user_id) if e.actor_user_id else None,"created_at":e.created_at.isoformat()} for e in rows]
+    return [project_event(db,e) for e in rows]
 
 def _filter_report_features(db,lodge_id,report):
     for section,feature in {'tasks':'tasks','maintenance':'maintenance','guest_requests':'guest_requests','fleet':'fuel','stays':'stays','rooms':'units'}.items():
@@ -1860,7 +1909,8 @@ def _filter_report_features(db,lodge_id,report):
 @app.get("/api/v1/lodges/{lodge_id}/reports/summary")
 def reports_summary(lodge_id:str,start:date|None=None,end:date|None=None,user:User=Depends(require_permission("reports.view")),db:Session=Depends(get_db)):
     ensure_feature(db,lodge_id,"reports")
-    end=end or date.today();start=start or (end-timedelta(days=29))
+    from .services.clock import lodge_day
+    end=end or lodge_day(db.get(Lodge,lodge_id));start=start or (end-timedelta(days=29))
     if end<start:raise HTTPException(422,"End date must be on or after start date")
     start_dt=datetime.combine(start,datetime.min.time(),tzinfo=timezone.utc);end_dt=datetime.combine(end+timedelta(days=1),datetime.min.time(),tzinfo=timezone.utc)
     ctx=_ctx(db,user,lodge_id)
@@ -1975,7 +2025,8 @@ def update_staff_leave(lodge_id:str,record_id:str,body:StaffLeaveUpdate,request:
     if row.status not in {"pending","approved"}:raise HTTPException(409,"This leave record can no longer be changed")
     if body.status in {"approved","rejected"} and staff.user_id==user.id:raise HTTPException(403,"You cannot approve or reject your own leave")
     row.status=body.status;row.approved_by_user_id=user.id if body.status in {"approved","rejected"} else row.approved_by_user_id
-    if body.status=="approved" and row.start_date<=date.today()<=row.end_date:staff.operational_status="leave"
+    from .services.clock import lodge_day
+    if body.status=="approved" and row.start_date<=lodge_day(db.get(Lodge,lodge_id))<=row.end_date:staff.operational_status="leave"
     audit(db,request,lodge_id,user.id,"staff_leave.updated","staff_leave",str(row.id),body.status);event(db,lodge_id,user.id,"staff.leave_status","staff",str(staff.id),f"Leave {body.status} for {staff.full_name}");db.commit();return {"id":str(row.id),"status":row.status}
 
 @app.get("/api/v1/lodges/{lodge_id}/hr/credentials")
@@ -2184,7 +2235,7 @@ HK_TRANSITIONS={"assigned":{"accepted","in_progress","cancelled"},"accepted":{"i
 @app.patch("/api/v1/lodges/{lodge_id}/housekeeping-jobs/{record_id}",dependencies=[Depends(require_csrf)])
 def update_housekeeping_job(lodge_id:str,record_id:str,body:HousekeepingUpdate,request:Request,user:User=Depends(require_permission("housekeeping.view",write=True)),db:Session=Depends(get_db)):
     ensure_feature(db,lodge_id,"housekeeping")
-    ctx=_ctx(db,user,lodge_id);row=tenant_get(db,HousekeepingJob,record_id,lodge_id,"Housekeeping job");full=_may(db,ctx,"housekeeping.manage");own=_may(db,ctx,"housekeeping.own.manage") and ctx.staff and row.assigned_staff_id==ctx.staff.id;inspector=bool(ctx.staff and row.inspector_staff_id==ctx.staff.id)
+    ctx=_ctx(db,user,lodge_id);row=tenant_get(db,HousekeepingJob,record_id,lodge_id,"Housekeeping job");db.refresh(row,with_for_update=True);full=_may(db,ctx,"housekeeping.manage");own=_may(db,ctx,"housekeeping.own.manage") and ctx.staff and row.assigned_staff_id==ctx.staff.id;inspector=bool(ctx.staff and row.inspector_staff_id==ctx.staff.id)
     inspector_completion=inspector and row.status=="awaiting_inspection" and body.status=="completed"
     if not full and not own and not inspector_completion:raise HTTPException(403,"You may only update housekeeping assigned to you or inspections assigned to you")
     if not full and (body.assigned_staff_id is not None or body.inspector_staff_id is not None):raise HTTPException(403,"Assigned housekeeping staff cannot reassign jobs")

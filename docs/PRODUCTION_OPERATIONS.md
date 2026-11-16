@@ -38,6 +38,14 @@ The runtime refuses unsafe production configuration, including a superuser/BYPAS
 
 Check `https://app.example.com/api/v1/health/ready` through the same-origin web proxy: it must return 200 and all checks `ok`. The scheduler heartbeat may take up to 30 seconds after startup. This endpoint tests DB, broker, worker/scheduler and storage; it does not certify email delivery or model quality. `/health` is a basic liveness check, not release acceptance.
 
+Create the first Super Admin from the private operator terminal (interactive prompts accept the owner's email and full name; no password goes into a command):
+
+```sh
+docker compose --env-file infra/.env.production -f infra/docker-compose.yml -f infra/compose.production.yml exec api python -m app.bootstrap_superadmin
+```
+
+The running worker sends the owner's activation email. The owner chooses a password and enrols MFA before using platform administration. There is no default production login or development activation link in production. Register each lodge with a separate Lodge Admin email and let that owner activate their own account. Super Admin cannot enter a lodge workspace; use explicitly assigned lodge/Group Admin identities. Never temporarily disable MFA or role checks to bootstrap access.
+
 Then verify HTTPS, cookies, invite/activation, MFA enrolment/recovery, separate platform and lodge accounts, a guest/stay/task journey, private media, notifications and actual email. Super Admin remains platform-only. Configure optional AI/push only with intended credentials and run their provider-specific acceptance; enabled flags alone are insufficient. Record the release SHA and acceptance results.
 
 ## Encrypted, authenticated backup
@@ -56,7 +64,7 @@ Store a protected off-server copy of the signing key separately from archives. P
 python3 scripts/recovery.py backup --env-file infra/.env.production --file infra/docker-compose.yml --file infra/compose.production.yml --project infra --archive /secure/backups/release.age --recipient age1YOUR_PUBLIC_RECIPIENT --signing-key-file /secure/safarios-backup-signing.key
 ```
 
-Replace the example project with the **actual existing Compose project name**, as shown by `docker compose ... config`. The script stops currently running web/API/worker/beat writers, captures PostgreSQL, all private bucket objects and configuration, then restarts those writers even after a capture failure. This is a maintenance-window backup; pause external writes and confirm jobs are drained. Files are privately staged on the operator's temp filesystem before encryption, so use an encrypted host/temp filesystem, adequate free space and restricted operator access. Copy completed archives off the VPS, restrict retention and perform regular drills. The script never overwrites an archive.
+Replace the example project with the **actual existing Compose project name**, as shown by `docker compose ... config`. The script stops currently running web/API/worker/beat writers, captures PostgreSQL, all private bucket objects and configuration, then restarts those writers even after a capture failure. This is a maintenance-window backup; pause external writes and confirm jobs are drained. Files are privately staged on the operator's temp filesystem before encryption, so use an encrypted host/temp filesystem, adequate free space and restricted operator access. Allow at least three times the database-dump plus object-archive size during backup staging/encryption, in addition to normal application headroom; preferably use a separate encrypted backup filesystem. Copy completed archives off the VPS, restrict retention and perform regular drills. The script never overwrites an archive.
 
 ## Recovery and upgrades
 

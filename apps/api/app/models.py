@@ -822,6 +822,7 @@ class TaskAttachment(Base):
 
 class AccountEmail(Base):
     __tablename__ = "account_emails"
+    login_challenge_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True),ForeignKey('email_login_challenges.id',ondelete='SET NULL'),nullable=True)
     __table_args__ = (Index("ix_account_emails_due", "status", "next_attempt_at"),)
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lodge_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("lodges.id", ondelete="CASCADE"), nullable=True, index=True)
@@ -1163,3 +1164,23 @@ class GuestAIMessage(Base):
     answer: Mapped[str] = mapped_column(Text)
     sources: Mapped[list] = mapped_column(JSONB,default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow)
+
+
+class EmailLoginChallenge(Base):
+    __tablename__ = 'email_login_challenges'
+    __table_args__ = (
+        Index('ix_email_login_user_created','user_id','created_at'),
+        CheckConstraint("realm IN ('staff','guest')",name='ck_email_login_realm'),
+        CheckConstraint('attempts >= 0 AND attempts <= 5',name='ck_email_login_attempts'),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey('users.id',ondelete='CASCADE'))
+    token_hash: Mapped[str] = mapped_column(String(64),unique=True)
+    browser_hash: Mapped[str] = mapped_column(String(64))
+    code_hash: Mapped[str | None] = mapped_column(String(64),nullable=True)
+    credential_digest: Mapped[str] = mapped_column(String(64))
+    realm: Mapped[str] = mapped_column(String(12))
+    attempts: Mapped[int] = mapped_column(Integer,default=0,server_default='0')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)

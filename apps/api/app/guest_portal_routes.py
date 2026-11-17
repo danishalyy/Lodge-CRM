@@ -112,7 +112,8 @@ def stays_for_guest(
         "user": {
             "id": str(user.id),
             "first_name": user.full_name.split(" ")[0],
-            "mfa_enabled": bool(user.mfa_enabled_at),
+            "mfa_enabled": True,
+            "authentication_method":"email_otp",
         },
         "stays": active_accesses(db, user, request.cookies.get("lodge_session", "")),
     }

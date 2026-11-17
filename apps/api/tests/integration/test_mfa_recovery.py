@@ -1,8 +1,15 @@
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
+import pytest
 import pyotp
 from sqlalchemy import select
+
+
+@pytest.fixture(autouse=True)
+def platform_factor_policy(account):
+    from app.models import User
+    with account['owner']() as db:db.get(User,account['user'].id).is_super_admin=True;db.commit()
 
 
 def enroll(account):
@@ -79,11 +86,11 @@ def test_recovery_code_does_not_enable_cross_account_login(account):
     assert response.status_code==401
 
 
-def test_disabling_mfa_clears_recovery_codes(account):
+def test_super_admin_cannot_disable_mfa_or_erase_recovery_codes(account):
     from app.models import User
     setup,_=enroll(account)
     with account['owner']() as db:
         user=db.get(User,account['user'].id);user.mfa_last_timestep-=2;db.commit()
     response=account['client'].post('/api/v1/auth/mfa/disable',json={'code':pyotp.TOTP(setup['secret']).now(),'current_password':account['password']},headers=account['csrf'])
-    assert response.status_code==200,response.text
-    with account['owner']() as db:assert db.get(User,account['user'].id).mfa_recovery_hashes==[]
+    assert response.status_code==409,response.text
+    with account['owner']() as db:assert len(db.get(User,account['user'].id).mfa_recovery_hashes)==10

@@ -20,6 +20,8 @@ def _lock(name,ttl):
 @celery_app.task(name="app.worker.process_account_email_outbox")
 def process_account_email_outbox():
     from .email_jobs import process_account_emails
+    from .services.email_sign_in import purge_challenges
+    purge_challenges(SessionLocal)
     return process_account_emails(SessionLocal)
 
 @celery_app.task(name="app.worker.process_notification_outbox")

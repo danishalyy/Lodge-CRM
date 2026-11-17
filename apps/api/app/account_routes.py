@@ -234,6 +234,7 @@ def retry_account_email(record_id: uuid.UUID, request: Request, actor: User = De
     row = db.scalar(select(AccountEmail).where(AccountEmail.id == record_id).with_for_update())
     if not row or (db.get(User, row.user_id) and db.get(User, row.user_id).is_guest):
         raise HTTPException(404, 'Email delivery not found')
+    if row.kind=='login_otp':raise HTTPException(409,'Request a new sign-in code from the sign-in screen')
     if row.status not in {'failed', 'dead'} or not row.encrypted_payload:
         raise HTTPException(409, 'Only failed email deliveries can be retried.')
     if row.invitation_id:

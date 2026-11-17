@@ -7,7 +7,6 @@ import { SyncChip } from "./ui/sync-chip";
 import LiveUpdates from "./LiveUpdates";
 import { liveCopy } from "@/lib/strings/live";
 import StatusPill from "./StatusPill";
-import MfaPrompt from "./MfaPrompt";
 import { navigationCopy } from "@/lib/strings/navigation";
 import LockedFeature from "./LockedFeature";
 import { LockKeyhole } from "lucide-react";
@@ -566,10 +565,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 />
               )}
           </div>
-          {!me.mfa_enabled &&
-            !me.is_super_admin &&
-            membership?.mfa_recommended &&
-            path !== "/settings" && <MfaPrompt key={me.id} userId={me.id} />}
           {membership?.subscription_status === "Expired" && (
             <section className="expiryBanner">
               <strong>Subscription expired</strong>

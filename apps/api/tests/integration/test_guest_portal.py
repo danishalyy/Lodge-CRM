@@ -492,29 +492,15 @@ def test_guest_cannot_be_invited_into_staff_membership(portal):
             db.commit()
 
 
-def test_guest_mfa_enrolment_and_recovery_login_keep_guest_identity(portal):
-    import pyotp
-
+def test_guest_uses_email_verification_and_cannot_enrol_authenticator(portal):
     a = portal
     c = guest_client(a)
-    r = c.post("/api/v1/auth/mfa/setup", headers=a["guest_csrf"])
-    assert r.status_code == 200, r.text
-    code = pyotp.TOTP(r.json()["secret"]).now()
-    r = c.post("/api/v1/auth/mfa/confirm", headers=a["guest_csrf"], json={"code": code})
-    assert r.status_code == 200, r.text
-    recovery = r.json()["recovery_codes"][0]
-    c.cookies.clear()
-    body = {"email": a["guest"]["email"], "password": a["guest_password"]}
-    assert c.post("/api/v1/guest/auth/login", json=body).status_code == 401
-    r = c.post("/api/v1/guest/auth/login", json={**body, "recovery_code": recovery})
-    assert r.status_code == 200, r.text
-    assert c.get("/api/v1/auth/me").json()["is_guest"]
-    c.cookies.clear()
+    assert c.post("/api/v1/auth/mfa/setup", headers=a["guest_csrf"]).status_code == 403
+    me = c.get("/api/v1/auth/me").json()
     assert (
-        c.post(
-            "/api/v1/guest/auth/login", json={**body, "recovery_code": recovery}
-        ).status_code
-        == 401
+        me["authentication_method"] == "email_otp"
+        and me["mfa_enabled"]
+        and me["is_guest"]
     )
 
 

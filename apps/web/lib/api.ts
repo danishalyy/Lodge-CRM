@@ -1,3 +1,4 @@
+import type { EmailProof } from "@/components/EmailOtpFields";
 import { clearOfflineUser } from "./offlineWildlife";
 import { clearPushDevice } from "./device-state";
 import { storeFormatting } from "./formatting";
@@ -350,15 +351,17 @@ export const authApi = {
     password: string,
     otp?: string,
     recovery_code?: string,
+    emailProof: EmailProof = {},
   ) => {
     await finishPendingSignout();
-    return request("/api/v1/auth/login", {
+    return request<any>("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({
         email,
         password,
         otp: otp || undefined,
         recovery_code: recovery_code || undefined,
+        ...emailProof,
       }),
     });
   },
@@ -1017,6 +1020,7 @@ export const guestApi = {
     password: string,
     otp?: string,
     recovery_code?: string,
+    emailProof: EmailProof = {},
   ) => {
     await finishPendingSignout();
     return request<any>("/api/v1/guest/auth/login", {
@@ -1027,6 +1031,7 @@ export const guestApi = {
         password,
         otp: otp || undefined,
         recovery_code: recovery_code || undefined,
+        ...emailProof,
       }),
     });
   },

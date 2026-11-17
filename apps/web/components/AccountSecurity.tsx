@@ -1,4 +1,5 @@
 "use client";
+import { emailSignInCopy as emailCopy } from "@/lib/strings/email-sign-in";
 import { CodeInput } from "@/components/ui/code-input";
 import LodgePreferences from "@/components/LodgePreferences";
 import Link from "next/link";
@@ -10,7 +11,11 @@ import AuthenticatorQR from "@/components/AuthenticatorQR";
 import { authApi } from "@/lib/api";
 import { onboardingCopy } from "@/lib/strings/onboarding";
 import { securityCopy as copy } from "@/lib/strings/security";
-type Account = { mfa_enabled: boolean; is_super_admin: boolean };
+type Account = {
+  mfa_enabled: boolean;
+  is_super_admin: boolean;
+  email?: string;
+};
 type Enrollment = { secret: string; otpauth_uri: string };
 export default function AccountSecurity({
   showLodgePreferences = true,
@@ -89,7 +94,9 @@ export default function AccountSecurity({
         <div>
           <span className="eyebrow">ACCOUNT SECURITY</span>
           <h1>{copy.title}</h1>
-          <p>{copy.subtitle}</p>
+          <p>
+            {me && !me.is_super_admin ? emailCopy.securityBody : copy.subtitle}
+          </p>
         </div>
       </div>
       {me?.is_super_admin && (
@@ -104,124 +111,135 @@ export default function AccountSecurity({
         </section>
       )}
       {showLodgePreferences && <LodgePreferences />}
-      <section className="panel" aria-busy={busy}>
-        <h2>{copy.mfa}</h2>
-        <p>
-          <strong>
-            {me
-              ? me.mfa_enabled
-                ? copy.enabled
-                : copy.disabled
-              : copy.loading}
-          </strong>
-        </p>
-        {me && !me.mfa_enabled && !setup && (
-          <button
-            className="button primary"
-            disabled={busy}
-            onClick={() => update("setup")}
-          >
-            {copy.setup}
-          </button>
-        )}
-        {setup && (
-          <>
-            <p>{copy.scan}</p>
-            <AuthenticatorQR uri={setup.otpauth_uri} />
-            <div className="checkRow">
-              <span>{copy.secret}</span>
-              <code className="manualSecret">{setup.secret}</code>
-            </div>
-          </>
-        )}
-        {codes.length > 0 && (
-          <section className="recoveryCodes">
-            <h2>{copy.recoveryTitle}</h2>
-            <p>{copy.recoveryBody}</p>
-            <ul>
-              {codes.map((value) => (
-                <li key={value}>
-                  <code>{value}</code>
-                </li>
-              ))}
-            </ul>
-            <div className="drawerActions">
-              <button className="button primary" onClick={download}>
-                {copy.download}
-              </button>
-              <button className="button" onClick={() => setCodes([])}>
-                {copy.saved}
-              </button>
-            </div>
-          </section>
-        )}
-        {me?.mfa_enabled && !setup && !codes.length && !regenerating && (
-          <button
-            className="button"
-            onClick={() => {
-              setRegenerating(true);
-              setCode("");
-              setPassword("");
-            }}
-          >
-            {copy.regenerate}
-          </button>
-        )}
-        {regenerating && <p>{copy.regenerateBody}</p>}
-        {me?.is_super_admin && me.mfa_enabled && <p>{copy.mandatory}</p>}
-        {(setup ||
-          regenerating ||
-          (me?.mfa_enabled && !me.is_super_admin && !codes.length)) && (
-          <Form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void update(
-                setup ? "confirm" : regenerating ? "regenerate" : "disable",
-              );
-            }}
-          >
-            <Field label={copy.code}>
-              <CodeInput
-                className="field"
-                name="code"
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                minLength={6}
-                maxLength={6}
-                required
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              />
-            </Field>
-            {!setup && (
-              <PasswordField
-                label={copy.password}
-                name="current_password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            )}
-            <button className="button primary" disabled={busy}>
-              {busy
-                ? copy.updating
-                : setup
-                  ? copy.confirm
-                  : regenerating
-                    ? copy.regenerate
-                    : copy.disable}
-            </button>
-          </Form>
-        )}
-        {message && <p role="status">{message}</p>}
-        {error && (
-          <p role="alert" className="dangerText">
-            {error}
+      {me && !me.is_super_admin ? (
+        <section className="panel">
+          <h2>{emailCopy.required}</h2>
+          <p>{emailCopy.securityHint}</p>
+          <dl>
+            <dt>{emailCopy.email}</dt>
+            <dd>{me.email}</dd>
+          </dl>
+        </section>
+      ) : (
+        <section className="panel" aria-busy={busy}>
+          <h2>{copy.mfa}</h2>
+          <p>
+            <strong>
+              {me
+                ? me.mfa_enabled
+                  ? copy.enabled
+                  : copy.disabled
+                : copy.loading}
+            </strong>
           </p>
-        )}
-      </section>
+          {me && !me.mfa_enabled && !setup && (
+            <button
+              className="button primary"
+              disabled={busy}
+              onClick={() => update("setup")}
+            >
+              {copy.setup}
+            </button>
+          )}
+          {setup && (
+            <>
+              <p>{copy.scan}</p>
+              <AuthenticatorQR uri={setup.otpauth_uri} />
+              <div className="checkRow">
+                <span>{copy.secret}</span>
+                <code className="manualSecret">{setup.secret}</code>
+              </div>
+            </>
+          )}
+          {codes.length > 0 && (
+            <section className="recoveryCodes">
+              <h2>{copy.recoveryTitle}</h2>
+              <p>{copy.recoveryBody}</p>
+              <ul>
+                {codes.map((value) => (
+                  <li key={value}>
+                    <code>{value}</code>
+                  </li>
+                ))}
+              </ul>
+              <div className="drawerActions">
+                <button className="button primary" onClick={download}>
+                  {copy.download}
+                </button>
+                <button className="button" onClick={() => setCodes([])}>
+                  {copy.saved}
+                </button>
+              </div>
+            </section>
+          )}
+          {me?.mfa_enabled && !setup && !codes.length && !regenerating && (
+            <button
+              className="button"
+              onClick={() => {
+                setRegenerating(true);
+                setCode("");
+                setPassword("");
+              }}
+            >
+              {copy.regenerate}
+            </button>
+          )}
+          {regenerating && <p>{copy.regenerateBody}</p>}
+          {me?.is_super_admin && me.mfa_enabled && <p>{copy.mandatory}</p>}
+          {(setup ||
+            regenerating ||
+            (me?.mfa_enabled && !me.is_super_admin && !codes.length)) && (
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void update(
+                  setup ? "confirm" : regenerating ? "regenerate" : "disable",
+                );
+              }}
+            >
+              <Field label={copy.code}>
+                <CodeInput
+                  className="field"
+                  name="code"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  minLength={6}
+                  maxLength={6}
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                />
+              </Field>
+              {!setup && (
+                <PasswordField
+                  label={copy.password}
+                  name="current_password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              )}
+              <button className="button primary" disabled={busy}>
+                {busy
+                  ? copy.updating
+                  : setup
+                    ? copy.confirm
+                    : regenerating
+                      ? copy.regenerate
+                      : copy.disable}
+              </button>
+            </Form>
+          )}
+          {message && <p role="status">{message}</p>}
+          {error && (
+            <p role="alert" className="dangerText">
+              {error}
+            </p>
+          )}
+        </section>
+      )}
     </>
   );
 }

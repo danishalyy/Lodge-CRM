@@ -1,4 +1,6 @@
 "use client";
+import { EmailOtpFields, useEmailSignIn } from "@/components/EmailOtpFields";
+import { emailSignInCopy as emailCopy } from "@/lib/strings/email-sign-in";
 import { offlineCopy } from "@/lib/strings/offline";
 import { uiCopy as c } from "@/lib/strings/redesign";
 import { CodeInput } from "@/components/ui/code-input";
@@ -15,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { authApi, setActiveLodgeId } from "@/lib/api";
 export default function Login() {
   const router = useRouter();
+  const emailFlow = useEmailSignIn();
   const [pendingSignout, setPendingSignout] = useState(false);
   useEffect(() => {
     setPendingSignout(!!localStorage.getItem("safarios_local_signout"));
@@ -32,12 +35,20 @@ export default function Login() {
     setBusy(true);
     setError("");
     try {
-      await authApi.login(
+      const result = await authApi.login(
         email,
         password,
         needsOtp && !recovery ? otp : undefined,
         needsOtp && recovery ? recoveryCode : undefined,
+        emailFlow.proof(),
       );
+      if (emailFlow.accept(result)) {
+        setNeedsOtp(false);
+        setOtp("");
+        setRecovery(false);
+        setRecoveryCode("");
+        return;
+      }
       const me = await authApi.me();
       if (me.memberships?.[0]) setActiveLodgeId(me.memberships[0].lodge_id);
       router.replace(accountHome(me));
@@ -49,6 +60,28 @@ export default function Login() {
     } finally {
       setPendingSignout(!!localStorage.getItem("safarios_local_signout"));
       setBusy(false);
+    }
+  }
+  async function resend() {
+    if (busy) return;
+    setBusy(true);
+    emailFlow.setResending(true);
+    setError("");
+    try {
+      emailFlow.accept(
+        await authApi.login(
+          email,
+          password,
+          undefined,
+          undefined,
+          emailFlow.proof(true),
+        ),
+      );
+    } catch (error) {
+      setError(error instanceof Error ? error.message : emailCopy.error);
+    } finally {
+      setBusy(false);
+      emailFlow.setResending(false);
     }
   }
   return (
@@ -88,6 +121,7 @@ export default function Login() {
           <p>{c.loginIntro}</p>
           <Field label="Email">
             <input
+              readOnly={!!emailFlow.challenge}
               id="login-email"
               className="field"
               type="email"
@@ -101,12 +135,28 @@ export default function Login() {
           <PasswordField
             label="Password"
             rules
+            readOnly={!!emailFlow.challenge}
             id="login-password"
             required
             minLength={12}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
+          />
+          <EmailOtpFields
+            flow={emailFlow}
+            busy={busy}
+            onResend={() => void resend()}
+            onReset={() => {
+              emailFlow.reset();
+              setEmail("");
+              setPassword("");
+              setNeedsOtp(false);
+              setOtp("");
+              setRecovery(false);
+              setRecoveryCode("");
+              setError("");
+            }}
           />
           {needsOtp && (
             <>
@@ -155,8 +205,23 @@ export default function Login() {
               {error}
             </div>
           )}
-          <button className="button primary full authSubmit" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
+          <button
+            className="button primary full authSubmit"
+            disabled={
+              busy ||
+              (!!emailFlow.challenge &&
+                (!emailFlow.expires || emailFlow.code.length !== 6))
+            }
+          >
+            {emailFlow.challenge
+              ? busy
+                ? emailFlow.resending
+                  ? emailCopy.resending
+                  : emailCopy.verifying
+                : emailCopy.verify
+              : busy
+                ? "Signing in…"
+                : "Sign in"}
           </button>
           <div className="authLinks">
             <Link href="/forgot-password">Forgot password?</Link>

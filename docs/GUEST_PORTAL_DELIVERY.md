@@ -16,7 +16,7 @@ In development without SMTP, the existing account workflow can return a private 
 
 ## Confidentiality and encapsulation
 
-- Guest accounts use the shared secure identity/session, invitation, reset and optional MFA/recovery mechanisms, plus a distinct guest login endpoint. They receive no staff, group or platform membership. A database trigger rejects internal assignments for guest identities.
+- Guest accounts use the shared secure identity/session, invitation and reset mechanisms, with mandatory password plus email verification, plus a distinct guest login endpoint. They receive no staff, group or platform membership. A database trigger rejects internal assignments for guest identities.
 - Staff/platform APIs reject guest identities. Guest APIs reject staff/platform identities. Super Admin remains platform-only; no impersonation or Open lodge path is introduced.
 - Guest RLS leaves the staff tenant setting empty. Separate guest settings and explicit own-record policies constrain the authorised stay/profile, own activity/transfer links, published content, requests, notices and chat. Other operational tables remain denied. Existing tenant policies are retained.
 - Guest DTOs whitelist their fields. Internal guest/stay/activity notes, staff assignments, request resolution notes, other guests and management history are excluded. The original guest-authored request description is stored separately from staff edits.
@@ -30,7 +30,7 @@ In development without SMTP, the existing account workflow can return a private 
 - Audit, operational events and staff notifications remain transactional. Existing deferred invalidation triggers execute within the bounded internal writer context before guest scope is restored. Immutable audit/history protections remain intact.
 - AI shares the existing bounded Redis admission, provider deadlines and context/output limits. It has no operational actions. Cookie/session, account, grant, stay, entitlement and source versions are rechecked after inference. Withdrawn or changed sources invalidate older answers.
 - Clearing chat erases the content and leaves a private, empty version marker. Short transaction locks fence final answer persistence against erasure; an answer already in flight cannot recreate erased history. No database row/transaction lock is held across the model call.
-- Guest password recovery revokes old sessions and returns to guest sign-in, retaining enrolled MFA. Existing staff recovery still returns to staff sign-in. Active-account invitation emails have a resend cooldown.
+- Guest password recovery revokes old sessions and returns to guest sign-in, requiring email verification on the next sign-in. Existing staff recovery still returns to staff sign-in. Active-account invitation emails have a resend cooldown.
 - Guest screens reuse SafariOS tokens, local fonts, labels/forms, password/OTP controls, notifications, confirmations, theme toggle and shared account security. Drawers retain focus management. Conversational views use bounded scroll, safe Markdown and no model-authored tracking images or active links.
 
 ## Verification
@@ -45,3 +45,5 @@ Layouts are checked at 375, 768, 1366 and 1440 px in both themes, with screensho
 - Real invitation/reset email delivery and live guest-model grounding, refusal, latency and concurrency acceptance for the launch lodge.
 - Product/legal decisions for private chat retention and global guest identity erasure across independently administered lodges; profile anonymisation immediately denies that lodge's access, while identity/private-history retention remains a separate controlled lifecycle. Clearing an active stay's chat is already supported.
 - The wider reporting, connected workflow, premium analytics/API, selected integrations and production acceptance items tracked in the original delivery register. No provider was selected, no customer service was purchased and no production deployment occurred in this phase.
+
+Authentication policy update (18 November 2026): guest accounts now use mandatory password + email OTP; authenticator enrolment and recovery codes remain Super Admin-only. See [EMAIL_SIGN_IN.md](EMAIL_SIGN_IN.md).

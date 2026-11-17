@@ -2,7 +2,7 @@
 from datetime import date,datetime,timedelta,timezone
 from uuid import uuid4
 import pytest
-from fastapi.testclient import TestClient
+from conftest import SignInClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models import User,Lodge,Subscription,Membership,Role,Guest,LodgeGroup,LodgeEntitlementOverride
@@ -20,7 +20,7 @@ def group(account):
     email=f'{uuid4().hex}@example.com'
     result=account['client'].post('/api/v1/platform/groups',json={'name':'Owner group '+uuid4().hex,'admin_name':'Multi Lodge Owner','admin_email':email,'lodge_ids':[str(account['lodge'].id),str(second.id)]},headers=account['csrf'])
     assert result.status_code==200,result.text
-    client=TestClient(app)
+    client=SignInClient(app,owner=account["owner"])
     token=result.json()['activation_token']
     response=client.post('/api/v1/auth/activate',json={'token':token,'password':'Private group owner passphrase 42!'})
     assert response.status_code==200,response.text
@@ -79,7 +79,7 @@ def test_group_admin_invites_separate_lodge_admin_without_platform_privileges(gr
     response=client.post(f'/api/v1/lodges/{lid}/administrators/invite',json={'full_name':'Local Lodge Owner','email':f'{uuid4().hex}@gmail.com'},headers=group['group_csrf'])
     assert response.status_code==200,response.text
     from app.main import app
-    local=TestClient(app)
+    local=SignInClient(app,owner=group["owner"])
     try:
         assert local.post('/api/v1/auth/activate',json={'token':response.json()['activation_token'],'password':'Private local owner passphrase 42!'}).status_code==200
         me=local.get('/api/v1/auth/me').json()
@@ -129,7 +129,7 @@ def test_pending_group_owner_can_receive_more_groups_without_replacing_setup_lin
     second=account['client'].post('/api/v1/platform/groups',json=body,headers=account['csrf']);assert second.status_code==200,second.text
     assert second.json()['administrator']['id']==first.json()['administrator']['id'] and second.json()['activation_token'] is None
     from app.main import app
-    client=TestClient(app)
+    client=SignInClient(app,owner=account["owner"])
     try:
         assert client.post('/api/v1/auth/activate',json={'token':first.json()['activation_token'],'password':'Pending owner private passphrase 42!'}).status_code==200
         me=client.get('/api/v1/auth/me').json();assert len(me['groups'])==2 and not me['memberships']
@@ -149,7 +149,7 @@ def test_group_admin_resends_revokes_and_restores_local_admin_access(group):
         db.get(Invitation,response.json()['invitation_id']).created_at-=timedelta(minutes=2);db.commit()
     resend=client.post(path+'/invitation/resend',headers=group['group_csrf']);assert resend.status_code==200,resend.text
     assert client.post('/api/v1/auth/invitations/preview',json={'token':old_token}).status_code==400
-    local=TestClient(app)
+    local=SignInClient(app,owner=group["owner"])
     try:
         assert local.post('/api/v1/auth/activate',json={'token':resend.json()['activation_token'],'password':'Local admin private passphrase 42!'}).status_code==200
         assert client.post(path+'/revoke-access',headers=group['group_csrf']).status_code==200

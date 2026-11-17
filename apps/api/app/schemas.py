@@ -9,6 +9,9 @@ class StrictModel(BaseModel):
 
 
 class LoginIn(StrictModel):
+    email_challenge: str | None = Field(default=None,min_length=20,max_length=300)
+    email_code: str | None = Field(default=None,pattern="^[0-9]{6}$")
+    resend: bool = False
     email: EmailStr
     password: str = Field(min_length=10, max_length=200)
     otp: str | None = Field(default=None, pattern="^[0-9]{6}$")

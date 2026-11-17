@@ -68,6 +68,7 @@ def enable_mfa(account):
     secret=pyotp.random_base32()
     with account['owner']() as db:
         user=db.get(User,account['user'].id)
+        user.is_super_admin=True
         user.mfa_secret_encrypted=encrypt_mfa_secret(secret)
         user.mfa_enabled_at=datetime.now(timezone.utc);db.commit()
     return secret
@@ -89,10 +90,10 @@ def test_mfa_disable_requires_password_and_code(account):
     path='/api/v1/auth/mfa/disable'
     code=pyotp.TOTP(secret).now()
     assert account['client'].post(path,json={'code':code},headers=account['csrf']).status_code==422
-    assert account['client'].post(path,json={'code':code,'current_password':'incorrect'},headers=account['csrf']).status_code==403
+    assert account['client'].post(path,json={'code':code,'current_password':'incorrect'},headers=account['csrf']).status_code==409
     result=account['client'].post(path,json={'code':code,'current_password':account['password']},headers=account['csrf'])
-    assert result.status_code==200,result.text
-    assert result.json()=={'enabled':False}
+    assert result.status_code==409,result.text
+    assert result.json()['detail']=='Super Admin MFA cannot be disabled'
 
 
 def test_password_reset_revokes_sessions_without_bypassing_mfa(account):

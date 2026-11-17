@@ -1,5 +1,7 @@
 export const contentCopy = {
   statuses: {
+    login_otp:"Sign-in code",
+    "auth.email_otp.verified":"Sign-in verified by email",
     development_link: "Invitation link ready",
     pending_activation: "Awaiting account activation",
     already_active: "Account already active",
@@ -88,6 +90,7 @@ export const contentCopy = {
     group_admin: "Group administrator",
   } as Record<string, string>,
   resources: {
+    auth:"Account",
     lodge: "Lodge",
     guest: "Guest",
     guest_request: "Guest request",
@@ -114,6 +117,7 @@ export const contentCopy = {
     plan: "Package",
   } as Record<string, string>,
   actions: {
+    email_otp_verified:"sign-in verified by email",
     created: "created",
     updated: "updated",
     removed: "removed",

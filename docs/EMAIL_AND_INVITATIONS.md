@@ -58,3 +58,7 @@ Defaults: `INVITATION_TTL_HOURS=72`, `INVITATION_RESEND_COOLDOWN_SECONDS=60`, `N
 The change was checked with a real PostgreSQL migration/RLS suite, mocked SMTP transport and retry tests, a production frontend build, and Chromium account/invitation/notification interactions. SMTP tests do not send real mail. Real Gmail acceptance still needs the configured sender test described above.
 
 [Password setup preview](screenshots/safarios-invitation-light.png) · [Notification inbox preview](screenshots/safarios-notifications-light.png) · [Mobile dark preview](screenshots/safarios-notifications-mobile-dark.png)
+
+## Sign-in verification policy
+
+Password plus an emailed code is mandatory for all non-Super-Admin accounts, including guests. Super Admin retains authenticator MFA/recovery codes. Codes use the encrypted outbox independently of notification preferences. Worker and beat must run; see [rollout, limits and Gmail sign-in setup](EMAIL_SIGN_IN.md). Development activation links are for initial setup only and do not bypass later email-code sign-in.

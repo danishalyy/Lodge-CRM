@@ -149,3 +149,7 @@ After updating the source and rebuilding with your existing `infra/.env`, sign i
 Use a static PNG, JPEG or WebP file under 256 KB. SafariOS validates and normalizes it before saving. Each lodge sees its own identity in its authenticated workspace, alongside the SafariOS wordmark and “Powered by SafariOS.” Lodge administrators cannot edit these settings.
 
 Migration `0009_lodge_branding` runs automatically during the Compose upgrade. Existing lodge records remain intact. Keep your existing database volumes and MFA encryption key; no reset is required.
+
+### Password + email verification
+
+Non-Super-Admin accounts (including Lodge/Group Admin, staff and guests) now need a one-time email code after their password. Configure SMTP and keep worker/beat running before testing a fresh sign-in. Super Admin still uses authenticator MFA. The upgrade signs out existing non-Super-Admin sessions. Existing invitation links still prove email ownership for initial activation. See [email sign-in and Gmail setup](docs/EMAIL_SIGN_IN.md); preserve the encryption keys in your existing `infra/.env`.

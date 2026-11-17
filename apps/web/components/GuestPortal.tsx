@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, FormEvent } from "react";
 import Link from "next/link";
+import { EmailOtpFields, useEmailSignIn } from "./EmailOtpFields";
+import { emailSignInCopy as emailCopy } from "@/lib/strings/email-sign-in";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -19,7 +21,6 @@ import AccountSecurity from "./AccountSecurity";
 import { Field } from "./ui/field";
 import { Form } from "./ui/form";
 import { PasswordField } from "./ui/password-field";
-import { CodeInput } from "./ui/code-input";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import StatusPill from "./StatusPill";
 import {
@@ -116,6 +117,7 @@ export default function GuestPortal({
 }: {
   security?: boolean;
 }) {
+  const emailFlow = useEmailSignIn();
   const [mode, setMode] = useState<"checking" | "login" | "wrong" | "guest">(
     "checking",
   );
@@ -132,11 +134,7 @@ export default function GuestPortal({
     [loading, setLoading] = useState(false),
     [clear, setClear] = useState(false);
   const [email, setEmail] = useState(""),
-    [password, setPassword] = useState(""),
-    [otp, setOtp] = useState(""),
-    [mfa, setMfa] = useState(false),
-    [useRecovery, setUseRecovery] = useState(false),
-    [recovery, setRecovery] = useState("");
+    [password, setPassword] = useState("");
   const [description, setDescription] = useState(""),
     [kind, setKind] = useState("general"),
     [question, setQuestion] = useState(""),
@@ -275,6 +273,9 @@ export default function GuestPortal({
       )
         return;
       resetPrivate();
+      emailFlow.reset();
+      setPassword("");
+      setEmail("");
       setStays([]);
       setUser(null);
       setMode("login");
@@ -300,24 +301,46 @@ export default function GuestPortal({
     setBusy(true);
     setError("");
     try {
-      await guestApi.login(
+      const result = await guestApi.login(
         email,
         password,
-        useRecovery ? undefined : otp,
-        useRecovery ? recovery : undefined,
+        undefined,
+        undefined,
+        emailFlow.proof(),
       );
+      if (emailFlow.accept(result)) return;
       setPassword("");
-      setOtp("");
-      setRecovery("");
+      emailFlow.reset();
       await initialize();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "MFA_REQUIRED") {
-        setMfa(true);
-        setError("");
-      } else setError(e instanceof Error ? e.message : c.invalidStay);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : emailCopy.error);
     } finally {
       locked.current = false;
       setBusy(false);
+    }
+  }
+  async function resend() {
+    if (locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    emailFlow.setResending(true);
+    setError("");
+    try {
+      emailFlow.accept(
+        await guestApi.login(
+          email,
+          password,
+          undefined,
+          undefined,
+          emailFlow.proof(true),
+        ),
+      );
+    } catch (error) {
+      setError(error instanceof Error ? error.message : emailCopy.error);
+    } finally {
+      locked.current = false;
+      setBusy(false);
+      emailFlow.setResending(false);
     }
   }
   async function signOut() {
@@ -487,6 +510,7 @@ export default function GuestPortal({
             <Field label={c.email}>
               <input
                 className="field"
+                readOnly={!!emailFlow.challenge}
                 name="email"
                 type="email"
                 value={email}
@@ -496,47 +520,41 @@ export default function GuestPortal({
             </Field>
             <PasswordField
               label={c.password}
+              readOnly={!!emailFlow.challenge}
               name="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            {mfa && (
-              <>
-                <p>{c.mfaHint}</p>
-                {useRecovery ? (
-                  <Field label={c.recoveryLabel}>
-                    <input
-                      className="field"
-                      name="recovery_code"
-                      value={recovery}
-                      onChange={(e) => setRecovery(e.target.value)}
-                      required
-                      autoComplete="off"
-                    />
-                  </Field>
-                ) : (
-                  <Field label={c.otp}>
-                    <CodeInput
-                      id="guest-otp"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      required
-                    />
-                  </Field>
-                )}
-                <button
-                  className="linkButton"
-                  type="button"
-                  onClick={() => setUseRecovery(!useRecovery)}
-                >
-                  {useRecovery ? c.authenticator : c.recovery}
-                </button>
-              </>
-            )}
-            <button className="button primary" disabled={busy}>
-              {busy ? c.signingIn : c.signIn}
+            <EmailOtpFields
+              flow={emailFlow}
+              busy={busy}
+              onResend={() => void resend()}
+              onReset={() => {
+                emailFlow.reset();
+                setPassword("");
+                setEmail("");
+                setError("");
+              }}
+            />
+            <button
+              className="button primary"
+              disabled={
+                busy ||
+                (!!emailFlow.challenge &&
+                  (!emailFlow.expires || emailFlow.code.length !== 6))
+              }
+            >
+              {emailFlow.challenge
+                ? busy
+                  ? emailFlow.resending
+                    ? emailCopy.resending
+                    : emailCopy.verifying
+                  : emailCopy.verify
+                : busy
+                  ? c.signingIn
+                  : c.signIn}
             </button>
           </Form>
           <div className="guestLoginLinks">

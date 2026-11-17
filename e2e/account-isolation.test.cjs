@@ -530,11 +530,11 @@ test('MFA enrolment renders a local QR, shows codes once, downloads and regenera
 });
 
 test('login offers a recovery code after the password challenge',async()=>{
- const {context,page}=await accountPage({id:'mfa-user',full_name:'User',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'mfa-lodge',permissions:['tasks.view'],entitlements:['tasks']}]});let body;
+ const {context,page}=await accountPage({id:'mfa-user',full_name:'Platform Owner',is_super_admin:true,mfa_enabled:true,memberships:[]});let body;
  try{
   await page.route('**/api/v1/auth/login',async r=>{body=r.request().postDataJSON();return body.recovery_code?r.fulfill({json:{ok:true}}):r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}})});
   await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('owner@example.com');await page.getByLabel('Password',{exact:true}).fill('Secure-test-passphrase');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('button',{name:'Use a recovery code',exact:true}).click();
-  await page.getByLabel('Recovery code',{exact:true}).fill('ABCDE-ABCDE-ABCDE-ABCDE');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL('**/tasks');assert.equal(body.recovery_code,'ABCDE-ABCDE-ABCDE-ABCDE');assert.equal(body.otp,undefined);
+  await page.getByLabel('Recovery code',{exact:true}).fill('ABCDE-ABCDE-ABCDE-ABCDE');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL('**/super-admin');assert.equal(body.recovery_code,'ABCDE-ABCDE-ABCDE-ABCDE');assert.equal(body.otp,undefined);
  }finally{await context.close()}
 });
 
@@ -1144,12 +1144,12 @@ test('canvas navigation persists collapsed groups and keeps the active group ope
 });
 
 test('canvas MFA visual digit cells preserve the existing OTP submission contract',async()=>{
- const {context,page}=await accountPage({id:'otp-canvas',full_name:'User',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'otp-lodge',permissions:['tasks.view'],entitlements:['tasks']}]});let sent;
+ const {context,page}=await accountPage({id:'otp-canvas',full_name:'Platform Owner',is_super_admin:true,mfa_enabled:true,memberships:[]});let sent;
  try{
   await page.route('**/api/v1/auth/login',r=>{sent=r.request().postDataJSON();return sent.otp?r.fulfill({json:{ok:true}}):r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}})});
   await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('owner@example.com');await page.getByLabel('Password',{exact:true}).fill('Secure-test-passphrase');await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await page.getByLabel('Authenticator code',{exact:true}).fill('123456');assert.equal(await page.locator('.codeInputBoxes span').count(),6);assert.deepEqual(await page.locator('.codeInputBoxes span').allTextContents(),['1','2','3','4','5','6']);
-  await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL('**/tasks');assert.equal(sent.otp,'123456');assert.equal(sent.recovery_code,undefined);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL('**/super-admin');assert.equal(sent.otp,'123456');assert.equal(sent.recovery_code,undefined);
  }finally{await context.close()}
 });
 
@@ -1732,12 +1732,12 @@ test('PWA public network responses survive cache failures and application bundle
 
 // Browser mocks verify interaction; integration/test_guest_portal.py uses real RLS.
 async function guestPortalPage({features={},loggedIn=true,delay}={}){
- const user={id:'invited-guest',is_guest:true,is_super_admin:false,full_name:'Maya Visitor',mfa_enabled:false,memberships:[]};
+ const user={id:'invited-guest',email:'guest@example.com',is_guest:true,is_super_admin:false,full_name:'Maya Visitor',mfa_enabled:true,authentication_method:'email_otp',memberships:[]};
  const fixture=await accountPage(user),{page}=fixture;let authenticated=loggedIn,rows=[],turns=[],signIns=0;const calls=[];
  await page.route('**/api/v1/auth/me',r=>r.fulfill({status:authenticated?200:401,json:authenticated?user:{detail:'Authentication required'}}));
  await page.route('**/api/v1/guest/**',async r=>{
   const path=new URL(r.request().url()).pathname,method=r.request().method();calls.push(path);
-  if(path.endsWith('/auth/login')){signIns++;if(!r.request().postDataJSON().recovery_code)return r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}});authenticated=true;return r.fulfill({json:{ok:true}})}
+  if(path.endsWith('/auth/login')){signIns++;if(!r.request().postDataJSON().email_code)return r.fulfill({status:202,json:{status:'email_otp_required',challenge_token:'guest-fixture-email-challenge-token',masked_email:'g•••@example.com',expires_in:300,resend_after:60}});assert.equal(r.request().postDataJSON().email_challenge,'guest-fixture-email-challenge-token');authenticated=true;return r.fulfill({json:{ok:true}})}
   if(!authenticated)return r.fulfill({status:401,json:{detail:'Authentication required'}});
   if(path.endsWith('/accesses'))return r.fulfill({json:{stays:[{id:'stay-grant',lodge_name:'Acacia Lodge',arrival_date:'2026-11-16',departure_date:'2026-11-20'}]}});
   const suffix=path.split('/access/stay-grant')[1];
@@ -1763,9 +1763,9 @@ test('guest conversation and requests provide feedback without staff APIs or uns
  }finally{await context.close()}
 });
 
-test('guest QR requires sign-in and guest MFA remains in the guest realm',async()=>{
+test('guest QR requires password and email code in the guest realm',async()=>{
  const {context,page,getSignIns}=await guestPortalPage({loggedIn:false});
- try{await page.goto(base+'/guest?access=stay-grant');await page.getByRole('heading',{name:'Your lodge, at your fingertips'}).waitFor();await page.getByLabel('Email',{exact:true}).fill('guest@example.com');await page.getByLabel('Password',{exact:true}).fill('Guest private passphrase 123!');await page.getByRole('button',{name:'Sign in to my stay',exact:true}).click();await page.getByRole('button',{name:'Use a recovery code',exact:true}).click();assert.equal(new URL(page.url()).pathname,'/guest');await page.getByLabel('Recovery code',{exact:true}).fill('one-time-recovery');await page.getByRole('button',{name:'Sign in to my stay',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(getSignIns(),2)}finally{await context.close()}
+ try{await page.goto(base+'/guest?access=stay-grant');await page.getByRole('heading',{name:'Your lodge, at your fingertips'}).waitFor();await page.getByLabel('Email',{exact:true}).fill('guest@example.com');await page.getByLabel('Password',{exact:true}).fill('Guest private passphrase 123!');await page.getByRole('button',{name:'Sign in to my stay',exact:true}).click();await page.getByLabel('Email sign-in code',{exact:true}).waitFor();assert.equal(new URL(page.url()).pathname,'/guest');assert.equal(await page.getByRole('button',{name:'Use a recovery code',exact:true}).count(),0);await page.getByLabel('Email sign-in code',{exact:true}).fill('123456');await page.getByRole('button',{name:'Verify and sign in',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(getSignIns(),2)}finally{await context.close()}
 });
 
 test('guest disabled features make no API calls and another guest QR never opens a stay',async()=>{
@@ -1812,7 +1812,7 @@ test('guest account security makes no staff lookups and guest recovery returns t
  const {context,page,requests}=await guestPortalPage();
  try{
   await page.goto(base+'/guest');await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.match(await page.locator('.guestStayFacts').innerText(),/16\/11\/2026/);
-  await page.getByRole('link',{name:'Account security',exact:true}).click();await page.getByRole('button',{name:'Set up authenticator',exact:true}).waitFor();assert.deepEqual(requests,[]);
+  await page.getByRole('link',{name:'Account security',exact:true}).click();await page.getByRole('heading',{name:'Password and email verification',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Set up authenticator',exact:true}).count(),0);assert.deepEqual(requests,[]);
   await page.route('**/api/v1/auth/password-reset/confirm',r=>r.fulfill({json:{ok:true,sign_in_path:'/guest'}}));
   await page.goto(base+'/reset-password#token=guest-private-reset-fixture');await page.getByLabel('New password',{exact:true}).fill('New guest passphrase 456!');await page.getByLabel('Confirm password',{exact:true}).fill('New guest passphrase 456!');await page.getByRole('button',{name:'Update password',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Maya'}).waitFor();assert.equal(new URL(page.url()).pathname,'/guest');
  }finally{await context.close()}
@@ -1833,4 +1833,41 @@ test('a delayed guest history refresh cannot restore a cleared conversation',asy
   await page.getByRole('button',{name:'Clear conversation',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Clear conversation',exact:true}).click();await page.getByText('Conversation cleared',{exact:true}).waitFor();
   const response=page.waitForResponse(r=>r.url().endsWith('/ai/messages')&&r.request().method()==='GET');release();await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.getByRole('heading',{name:'Ask about your stay'}).waitFor();assert.equal(await page.getByText('PRIVATE_CLEARED_HISTORY',{exact:true}).count(),0);
  }finally{release();await context.close()}
+});
+
+test('staff password requires an email code before auth lookup, supports resend and keeps challenge private',async()=>{
+ const {context,page}=await accountPage({id:'email-user',email:'manager@example.com',full_name:'Manager',is_super_admin:false,mfa_enabled:true,authentication_method:'email_otp',memberships:[{lodge_id:'email-lodge',permissions:['tasks.view'],entitlements:['tasks']}]});let me=0,sent=[],version=1;
+ await page.route('**/api/v1/auth/me',r=>{me++;return r.fulfill({json:{id:'email-user',email:'manager@example.com',is_super_admin:false,mfa_enabled:true,authentication_method:'email_otp',memberships:[{lodge_id:'email-lodge',permissions:['tasks.view'],entitlements:['tasks']}]}})});
+ await page.route('**/api/v1/auth/login',r=>{const body=r.request().postDataJSON();sent.push(body);if(body.resend)version++;if(!body.email_code||body.resend)return r.fulfill({status:202,json:{status:'email_otp_required',challenge_token:'private-email-challenge-'+version,masked_email:'m•••@example.com',expires_in:300,resend_after:60}});if(body.email_code!=='123456')return r.fulfill({status:401,json:{detail:'The email code is invalid or expired. Request a new code.'}});assert.equal(body.email_challenge,'private-email-challenge-'+version);return r.fulfill({json:{ok:true}})});
+ try{
+  await page.clock.install();await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('manager@example.com');await page.getByLabel('Password',{exact:true}).fill('Private email account password 123!');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByLabel('Email sign-in code',{exact:true}).waitFor();assert.equal(me,0);assert.equal(new URL(page.url()).pathname,'/login');assert.equal(await page.getByLabel('Email',{exact:true}).getAttribute('readonly'),'');assert.equal(await page.getByLabel('Email sign-in code',{exact:true}).getAttribute('autocomplete'),'one-time-code');
+  assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('private-email-challenge')),false);
+  await page.getByLabel('Email sign-in code',{exact:true}).fill('000000');await page.getByRole('button',{name:'Verify and sign in',exact:true}).click();await page.getByRole('alert').filter({hasText:'The email code is invalid or expired.'}).waitFor();assert.equal(me,0);
+  await page.clock.fastForward(61000);await page.getByRole('button',{name:'Send a new code',exact:true}).click();await page.getByRole('button',{name:/Send a new code in/}).waitFor();assert.equal(await page.getByLabel('Email sign-in code',{exact:true}).inputValue(),'');
+  await page.getByLabel('Email sign-in code',{exact:true}).fill('123456');await page.getByRole('button',{name:'Verify and sign in',exact:true}).click();await page.waitForURL('**/tasks');assert.ok(me>=1);assert.ok(sent.some(body=>body.resend===true));
+ }finally{await context.close()}
+});
+
+test('ordinary account security uses mandatory email verification and offers no authenticator opt-out',async()=>{
+ const {context,page,requests}=await accountPage({id:'email-security',email:'manager@example.com',is_super_admin:false,mfa_enabled:true,authentication_method:'email_otp',memberships:[]});
+ try{await page.goto(base+'/settings');await page.getByRole('heading',{name:'Password and email verification',exact:true}).waitFor();await page.getByText('manager@example.com',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Set up authenticator',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Disable MFA',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Generate new recovery codes',exact:true}).count(),0);assert.ok(!requests.some(url=>url.includes('/auth/mfa/')))}finally{await context.close()}
+});
+
+test('email verification expires, resets safely and fits both themes at all four widths',async()=>{
+ const {context,page}=await accountPage({id:'email-layout',is_super_admin:false,mfa_enabled:true,memberships:[]});
+ await page.route('**/api/v1/auth/login',r=>r.fulfill({status:202,json:{status:'email_otp_required',challenge_token:'private-layout-email-challenge',masked_email:'m•••@example.com',expires_in:300,resend_after:60}}));
+ try{await page.emulateMedia({reducedMotion:'reduce'});await page.clock.install();for(const width of [375,768,1366,1440])for(const theme of ['dark','light']){
+  await page.setViewportSize({width,height:1000});await page.addInitScript(theme=>localStorage.setItem('theme',theme),theme);await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('manager@example.com');await page.getByLabel('Password',{exact:true}).fill('Private email account password 123!');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByLabel('Email sign-in code',{exact:true}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`email layout overflow ${width}/${theme}`);
+  if(width===375||width===1440){const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`email verification accessibility ${width}/${theme}`)}
+  await page.clock.runFor(500); // Let entrance animations paint before visual capture.
+  await page.screenshot({path:path.join(process.env.EMAIL_SCREENSHOT_DIR||require("node:os").tmpdir(),`safarios-email-${width}-${theme}.png`),fullPage:true});
+ }
+ await page.clock.fastForward(301000);await page.getByText('This code has expired. Request a new code.',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Verify and sign in',exact:true}).isDisabled(),true);await page.getByRole('button',{name:'Use another account',exact:true}).click();assert.equal(await page.getByLabel('Password',{exact:true}).inputValue(),'');assert.equal(await page.getByLabel('Email',{exact:true}).isEditable(),true);assert.equal(await page.getByLabel('Email sign-in code',{exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('changing from a platform password challenge to an ordinary account clears authenticator fields',async()=>{
+ const {context,page}=await accountPage({id:'switched-email-user',is_super_admin:false,mfa_enabled:true,authentication_method:'email_otp',memberships:[{lodge_id:'switched-email-lodge',permissions:['tasks.view'],entitlements:['tasks']}]});
+ await page.route('**/api/v1/auth/login',r=>{const body=r.request().postDataJSON();if(body.email==='platform@example.com')return r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}});if(!body.email_code)return r.fulfill({status:202,json:{status:'email_otp_required',challenge_token:'switched-account-email-challenge',masked_email:'m•••@example.com',expires_in:300,resend_after:60}});assert.equal(body.otp,undefined);assert.equal(body.recovery_code,undefined);return r.fulfill({json:{ok:true}})});
+ try{await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('platform@example.com');await page.getByLabel('Password',{exact:true}).fill('A private account password 123!');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByLabel('Authenticator code',{exact:true}).fill('111111');await page.getByLabel('Email',{exact:true}).fill('manager@example.com');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByLabel('Email sign-in code',{exact:true}).waitFor();assert.equal(await page.getByLabel('Authenticator code',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Use a recovery code',exact:true}).count(),0);await page.getByLabel('Email sign-in code',{exact:true}).fill('123456');await page.getByRole('button',{name:'Verify and sign in',exact:true}).click();await page.waitForURL('**/tasks')}finally{await context.close()}
 });

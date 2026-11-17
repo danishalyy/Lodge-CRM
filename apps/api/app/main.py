@@ -319,22 +319,17 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
         raise HTTPException(401, "Invalid email or password")
     if not user.is_active:
         raise HTTPException(403, "Account is not activated")
-    # A non-platform account must still have active lodge access and active employment.
-    if not user.is_super_admin and not user.is_guest:
-        set_rls_context(db,None,False,str(user.id))
-        memberships=db.scalars(select(Membership).where(Membership.user_id==user.id,Membership.is_active.is_(True))).all()
-        groups=db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()
-        if groups:
-            if any(db.get(Role,m.role_id).key!='group_admin' for m in memberships):raise HTTPException(403,'Account assignment requires administrator review')
-        else:
-            if not memberships: raise HTTPException(403,"Account access is unavailable")
-            if len(memberships)!=1: raise HTTPException(403,"Account lodge assignment requires administrator review")
-            membership=memberships[0]
-            set_rls_context(db,str(membership.lodge_id),False,str(user.id))
-            staff=db.scalar(select(StaffProfile).where(StaffProfile.lodge_id==membership.lodge_id,StaffProfile.user_id==user.id))
-            if staff and staff.employment_status!="active": raise HTTPException(403,"Account access is unavailable")
-            if not membership_for(db,user,str(membership.lodge_id)):raise HTTPException(403,'Account access is unavailable')
-    if user.mfa_enabled_at:
+    from .services.email_sign_in import assert_account_access,issue,consume,COOKIE
+    assert_account_access(db,user)
+    realm="guest" if user.is_guest else "staff"
+    if not user.is_super_admin:
+        if body.resend or not body.email_challenge:
+            return issue(db,user,body,request,response,realm)
+        consume(db,user,body,request,realm)
+        audit(db,request,None,user.id,"auth.email_otp.verified","account",str(user.id))
+    elif body.email_challenge or body.email_code or body.resend:
+        raise HTTPException(422,"Super Admin sign-in requires an authenticator or recovery code")
+    if user.is_super_admin and user.mfa_enabled_at:
         if body.otp and body.recovery_code: raise HTTPException(422,"Use either an authenticator code or a recovery code")
         if not body.otp and not body.recovery_code: raise HTTPException(401, "MFA_REQUIRED")
         valid=_consume_recovery_code(user,body.recovery_code) if body.recovery_code else _verify_totp_once(user,body.otp)
@@ -350,9 +345,10 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     if previous_cookie:
         previous_session=db.scalar(select(AuthSession).where(AuthSession.token_hash==token_hash(previous_cookie),AuthSession.revoked_at.is_(None)))
         if previous_session:previous_session.revoked_at=now
-    user.failed_login_count=0;user.locked_until=None;db.commit()
+    user.failed_login_count=0;user.locked_until=None
     clear_login_limit(request, body.email)
     create_session(db, user, response)
+    response.delete_cookie(COOKIE,path="/")
     return {"ok": True,"mfa_setup_required":bool(user.is_super_admin and not user.mfa_enabled_at)}
 
 
@@ -435,6 +431,7 @@ def confirm_password_reset(body: PasswordResetConfirmIn, response: Response, db:
 
 @app.post("/api/v1/auth/mfa/setup",dependencies=[Depends(require_csrf)])
 def mfa_setup(user:User=Depends(current_user),db:Session=Depends(get_db)):
+    if not user.is_super_admin:raise HTTPException(403,"This account uses password and email verification. Authenticator MFA is reserved for Super Admin.")
     db.refresh(user, with_for_update=True)
     if user.mfa_enabled_at:
         raise HTTPException(409,"MFA is already enabled; disable it with your password and authenticator before enrolling again")
@@ -446,6 +443,7 @@ def mfa_setup(user:User=Depends(current_user),db:Session=Depends(get_db)):
 
 @app.post("/api/v1/auth/mfa/confirm",dependencies=[Depends(require_csrf)])
 def mfa_confirm(body:MfaCodeIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
+    if not user.is_super_admin:raise HTTPException(403,"This account uses password and email verification. Authenticator MFA is reserved for Super Admin.")
     db.refresh(user, with_for_update=True)
     if user.mfa_enabled_at: raise HTTPException(409,"MFA is already enabled")
     if not user.mfa_secret_encrypted: raise HTTPException(409,"MFA setup has not been started")
@@ -458,17 +456,12 @@ def mfa_confirm(body:MfaCodeIn,request:Request,user:User=Depends(current_user),d
 
 @app.post("/api/v1/auth/mfa/disable",dependencies=[Depends(require_csrf)])
 def mfa_disable(body:MfaDisableIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
-    db.refresh(user, with_for_update=True)
-    if user.is_super_admin: raise HTTPException(409,"Super Admin MFA cannot be disabled")
-    if not user.mfa_enabled_at or not user.mfa_secret_encrypted: return {"enabled":False}
-    if not verify_password(body.current_password,user.password_hash): raise HTTPException(403,"Current password is incorrect")
-    if not _verify_totp_once(user,body.code): raise HTTPException(422,"Invalid or already-used MFA code")
-    user.mfa_enabled_at=None;user.mfa_secret_encrypted=None;user.mfa_last_timestep=None;user.mfa_recovery_hashes=[]
-    audit(db,request,None,user.id,"mfa.disabled","account",str(user.id))
-    db.commit();return {"enabled":False}
+    if not user.is_super_admin:raise HTTPException(403,"This account uses password and email verification. Authenticator MFA is reserved for Super Admin.")
+    raise HTTPException(409,"Super Admin MFA cannot be disabled")
 
 @app.post("/api/v1/auth/mfa/recovery-codes",dependencies=[Depends(require_csrf)])
 def regenerate_mfa_recovery_codes(body:MfaDisableIn,request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
+    if not user.is_super_admin:raise HTTPException(403,"This account uses password and email verification. Authenticator MFA is reserved for Super Admin.")
     db.refresh(user, with_for_update=True)
     if not user.mfa_enabled_at: raise HTTPException(409,"Enable MFA before generating recovery codes")
     if not verify_password(body.current_password,user.password_hash): raise HTTPException(403,"Current password is incorrect")
@@ -524,7 +517,7 @@ def logout(response: Response, request: Request, user: User = Depends(current_us
 @app.get("/api/v1/auth/me")
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.is_guest:
-        return {"id":str(user.id),"email":user.email,"full_name":user.full_name,"is_guest":True,"is_super_admin":False,"email_verified":bool(user.email_verified_at),"mfa_enabled":bool(user.mfa_enabled_at),"groups":[],"memberships":[]}
+        return {"id":str(user.id),"email":user.email,"full_name":user.full_name,"is_guest":True,"is_super_admin":False,"email_verified":bool(user.email_verified_at),"mfa_enabled":True,"authentication_method":"email_otp","groups":[],"memberships":[]}
     memberships = []
     member_rows = [] if user.is_super_admin else db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
     for m in member_rows:
@@ -560,7 +553,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
                 "permissions": list(perm_keys), "subscription_status": subscription_status(sub),
                 "package": sub.package if sub else None, "entitlements":plan_features,
             })
-    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at), "groups": [] if user.is_super_admin else [{"id":str(g.id),"name":g.name} for g in db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()], "memberships": memberships}
+    return {"id": str(user.id), "email": user.email, "email_verified": bool(user.email_verified_at), "full_name": user.full_name, "is_super_admin": user.is_super_admin, "mfa_enabled":bool(user.mfa_enabled_at) if user.is_super_admin else True, "authentication_method":"authenticator" if user.is_super_admin else "email_otp", "groups": [] if user.is_super_admin else [{"id":str(g.id),"name":g.name} for g in db.scalars(select(LodgeGroup).where(LodgeGroup.admin_user_id==user.id,LodgeGroup.is_active.is_(True))).all()], "memberships": memberships}
 
 
 @app.get("/api/v1/lodges/{lodge_id}/dashboard")
@@ -1997,7 +1990,7 @@ def platform_users(user:User=Depends(require_super_admin),db:Session=Depends(get
     set_rls_context(db,None,True,str(user.id));rows=db.scalars(select(User).where(User.is_guest.is_(False)).order_by(User.full_name,User.email)).all();out=[]
     for row in rows:
         memberships=db.execute(select(Membership,Lodge,Role).join(Lodge,Lodge.id==Membership.lodge_id).join(Role,Role.id==Membership.role_id).where(Membership.user_id==row.id,Membership.is_active.is_(True))).all()
-        out.append({"id":str(row.id),"email":row.email,"full_name":row.full_name,"is_active":row.is_active,"is_super_admin":row.is_super_admin,"mfa_enabled":bool(row.mfa_enabled_at),"created_at":row.created_at.isoformat(),**account_email_status(db,row),"memberships":[{"lodge_id":str(m.lodge_id),"lodge_name":l.name,"role":r.name,"role_key":r.key} for m,l,r in memberships]})
+        out.append({"id":str(row.id),"email":row.email,"full_name":row.full_name,"is_active":row.is_active,"is_super_admin":row.is_super_admin,"mfa_enabled":bool(row.mfa_enabled_at) if row.is_super_admin else True,"authentication_method":"authenticator" if row.is_super_admin else "email_otp","created_at":row.created_at.isoformat(),**account_email_status(db,row),"memberships":[{"lodge_id":str(m.lodge_id),"lodge_name":l.name,"role":r.name,"role_key":r.key} for m,l,r in memberships]})
     return out
 
 

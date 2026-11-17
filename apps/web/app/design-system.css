@@ -3174,3 +3174,8 @@ textarea:focus-visible {
 .syncChip { background:var(--surface); }
 :root[data-sidebar="collapsed"] .sidebarFooter>.syncChip { width:44px; padding:10px; justify-content:center; }
 :root[data-sidebar="collapsed"] .sidebarFooter>.syncChip>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+
+/* Shared password + email verification step, using the application tokens. */
+.emailSignInStep{display:grid;gap:16px;padding-top:24px;margin-top:16px;border-top:1px solid var(--line);min-width:0;}
+.emailSignInStep h2,.emailSignInStep p{margin:0;overflow-wrap:anywhere;}
+.emailSignInActions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;}

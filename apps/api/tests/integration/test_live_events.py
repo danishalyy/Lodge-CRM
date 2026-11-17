@@ -62,7 +62,11 @@ def test_resume_tokens_are_bound_and_opaque(account):
     assert live.decode_cursor(cursor,token,a['lodge'].id,a['user'].id,'changed') is None
     for t,l,u in [(token,uuid4(),a['user'].id),(token,a['lodge'].id,uuid4()),('other',a['lodge'].id,a['user'].id)]:
         with pytest.raises(HTTPException):live.decode_cursor(cursor,t,l,u,fp)
-    with pytest.raises(HTTPException):live.decode_cursor(cursor[:20]+'x'+cursor[21:],token,a['lodge'].id,a['user'].id,fp)
+    # Always change the encrypted token: a random ciphertext may already contain x.
+    replacement='y' if cursor[20]=='x' else 'x'
+    tampered=cursor[:20]+replacement+cursor[21:]
+    assert tampered!=cursor
+    with pytest.raises(HTTPException):live.decode_cursor(tampered,token,a['lodge'].id,a['user'].id,fp)
 
 
 def test_feature_override_filters_records(account):

@@ -43,6 +43,27 @@ from .knowledge import verify_sources as verify_document_sources
 def verify_sources(sources, db, ctx, lodge_id, request):
     verify_memory_sources(sources, db, ctx, lodge_id, request)
     verify_document_sources(sources, db, ctx, lodge_id, request)
+    # Guest names must stop replaying when the profile has been anonymised.
+    for source in sources:
+        if source.get("tool") == "get_guest_directory":
+            from ..models import Guest
+            from ..security import ensure_feature
+
+            require_permission("guests.view")(
+                lodge_id=str(lodge_id), request=request, user=ctx.user, db=db
+            )
+            ensure_feature(db, str(lodge_id), "guests")
+            for record_id in source.get("record_ids", []):
+                guest = db.scalar(
+                    select(Guest).where(
+                        Guest.id == record_id, Guest.lodge_id == lodge_id
+                    )
+                )
+                if not guest or guest.anonymized_at:
+                    raise HTTPException(
+                        409,
+                        "Guest source information changed. Start a new conversation.",
+                    )
 
 
 router = APIRouter()
@@ -304,7 +325,11 @@ def send_message(
     conv = conversation(db, lodge_id, user, conversation_id, ctx, request)
     expected = conv.access_fingerprint
     scope_type, group_id = conv.scope_type, conv.group_id
-    content = redact(body.content.strip())
+    can_add_guest = any(
+        t["function"]["name"] == "propose_create_guest"
+        for t in actions.available(db, ctx, lodge_id, scope_type)
+    )
+    content, contact_emails = actions.contact_input(body.content.strip(), can_add_guest)
     if not content:
         raise HTTPException(422, "Enter a question")
     with admission(user.id, lodge_id):
@@ -367,6 +392,7 @@ def send_message(
         output_tokens = 0
         tool_count = 0
         rejected_tool = None
+        selected_action = None
         try:
             for turn in range(settings.ai_max_rounds):
                 ctx = guard(db, user, lodge_id, request, write=True)
@@ -377,9 +403,10 @@ def send_message(
                     raise HTTPException(
                         409, "Your access changed. Start a new conversation"
                     )
+                action_definitions = actions.available(db, ctx, lodge_id, scope_type)
                 approved = tools.available(
                     db, ctx, lodge_id, scope_type
-                ) + actions.available(db, ctx, lodge_id, scope_type)
+                ) + actions.inference_tools(action_definitions, selected_action)
                 # Conservative byte budget, including schemas, reserved output and structured context.
                 if (
                     len(
@@ -402,7 +429,9 @@ def send_message(
                     answer_text = reply.content
                     if not sources:
                         if any(
-                            t["function"]["name"] in actions.KINDS for t in approved
+                            t["function"]["name"] in actions.KINDS
+                            or t["function"]["name"] == actions.SELECTOR
+                            for t in approved
                         ):
                             # Never publish an ungrounded model answer, including a claimed write.
                             # A fixed clarification lets action conversations collect missing details.
@@ -461,6 +490,52 @@ def send_message(
                 rejected_tool = (
                     call.name[:80] if isinstance(call.name, str) else "invalid_tool"
                 )
+                if call.name == actions.SELECTOR:
+                    selected_action = actions.select_action(
+                        call.arguments, action_definitions
+                    )
+                    db.add(
+                        AIToolExecution(
+                            lodge_id=lodge_id,
+                            user_id=user.id,
+                            conversation_id=conversation_id,
+                            request_id=body.request_id,
+                            name=call.name,
+                            status="selected",
+                        )
+                    )
+                    db.commit()
+                    rejected_tool = None
+                    prompt.extend(
+                        [
+                            {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": call.id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": call.name,
+                                            "arguments": json.dumps(call.arguments),
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "role": "tool",
+                                "tool_call_id": call.id,
+                                "content": json.dumps(
+                                    {
+                                        "selected_action": selected_action,
+                                        "status": "schema_available_next_turn",
+                                        "nothing_changed": True,
+                                    }
+                                ),
+                            },
+                        ]
+                    )
+                    continue
                 if call.name in actions.KINDS:
                     # The model creates only a proposal; it never receives a confirmation token.
                     proposal = actions.prepare(
@@ -472,6 +547,7 @@ def send_message(
                         call.name,
                         call.arguments,
                         request,
+                        contacts=contact_emails,
                     )
                     answer = AIMessage(
                         lodge_id=lodge_id,

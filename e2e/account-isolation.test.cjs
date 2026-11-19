@@ -1871,3 +1871,30 @@ test('changing from a platform password challenge to an ordinary account clears 
  await page.route('**/api/v1/auth/login',r=>{const body=r.request().postDataJSON();if(body.email==='platform@example.com')return r.fulfill({status:401,json:{detail:'MFA_REQUIRED'}});if(!body.email_code)return r.fulfill({status:202,json:{status:'email_otp_required',challenge_token:'switched-account-email-challenge',masked_email:'m•••@example.com',expires_in:300,resend_after:60}});assert.equal(body.otp,undefined);assert.equal(body.recovery_code,undefined);return r.fulfill({json:{ok:true}})});
  try{await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill('platform@example.com');await page.getByLabel('Password',{exact:true}).fill('A private account password 123!');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByLabel('Authenticator code',{exact:true}).fill('111111');await page.getByLabel('Email',{exact:true}).fill('manager@example.com');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByLabel('Email sign-in code',{exact:true}).waitFor();assert.equal(await page.getByLabel('Authenticator code',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Use a recovery code',exact:true}).count(),0);await page.getByLabel('Email sign-in code',{exact:true}).fill('123456');await page.getByRole('button',{name:'Verify and sign in',exact:true}).click();await page.waitForURL('**/tasks')}finally{await context.close()}
 });
+
+for(const [kind,label,saved,fields] of [
+ ['guest','Add guest','Guest added',[['first_name','Thandi'],['last_name','Nkosi'],['email','thandi@example.com'],['phone','+27821112222'],['nationality','South Africa'],['vip',true],['preferences','A quiet room, away from the main reception'],['safari_preferences','Morning drives']]],
+ ['stay','Create stay','Stay created',[['guest_id','Thandi Nkosi'],['unit_id','River suite'],['arrival_date','2026-12-10'],['departure_date','2026-12-12'],['party_size',2]]],
+ ['request','Create guest request','Guest request created',[['guest_id','Thandi Nkosi'],['request_type','amenity'],['description','Please provide extra towels'],['priority','normal']]],
+ ['activity','Schedule activity','Activity scheduled',[['title','Morning walk'],['starts_at','2026-12-11T06:00:00+02:00'],['ends_at','2026-12-11T08:00:00+02:00'],['guest_ids','Thandi Nkosi'],['requires_vehicle',false]]],
+ ['transfer','Schedule transfer','Transfer scheduled',[['guest_id','Thandi Nkosi'],['pickup_location','Airport'],['dropoff_location','Lodge'],['scheduled_at','2026-12-10T10:00:00+02:00'],['expected_end_at','2026-12-10T11:00:00+02:00'],['passenger_count',2]]],
+])test(`AI ${kind} automation shows readable details and requires explicit confirmation`,async()=>{
+ const {context,page}=await accountPage({id:'automation-user',is_super_admin:false,mfa_enabled:true,memberships:[{lodge_id:'automation-lodge',permissions:['ai.use','ai.actions'],entitlements:['ai','ai_actions']}]});
+ let confirmed=0;const proposal={id:'new-operation',action:'create_'+kind,status:'pending',expires_at:new Date(Date.now()+600000).toISOString(),preview:{fields:fields.map(([key,value])=>({key,value}))}};
+ try{
+  await page.route('**/api/v1/lodges/automation-lodge/ai/**',async route=>{
+   const pathname=new URL(route.request().url()).pathname;
+   if(pathname.endsWith('/status'))return route.fulfill({json:{state:'ready',tools:[{name:'propose_create_'+kind}]}});
+   if(pathname.endsWith('/conversations'))return route.fulfill({json:route.request().method()==='POST'?{id:'automation-chat'}:[]});
+   if(pathname.endsWith('/messages')){const message={id:'automation-answer',role:'assistant',content:'Review the proposed change. Nothing has been changed yet.',sources:[],actions:[proposal]};return route.fulfill({json:route.request().method()==='POST'?message:[message]})}
+   if(pathname.endsWith('/review'))return route.fulfill({json:{...proposal,token:'private-review-token-automation-only'}});
+   if(pathname.endsWith('/confirm')){confirmed++;assert.deepEqual(route.request().postDataJSON(),{token:'private-review-token-automation-only'});return route.fulfill({json:{...proposal,status:'confirmed',result:{id:'created-record'}}})}
+   throw Error('Unexpected automation URL '+pathname);
+  });
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/lodge-ai');await page.getByText('You can also ask me to prepare an action. Nothing changes until you review and confirm it.',{exact:true}).waitFor();await page.getByLabel('Your question',{exact:true}).fill('Prepare this '+kind+' with the details I provided');await page.getByRole('button',{name:'Ask Lodge AI',exact:true}).click();await page.getByText(label,{exact:true}).waitFor();assert.equal(confirmed,0);
+  await page.getByRole('button',{name:'Review change',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:label,exact:true}).waitFor();
+  for(const width of [375,1440]){await page.setViewportSize({width,height:900});await page.waitForTimeout(450);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const button=dialog.getByRole('button',{name:'Confirm and apply',exact:true});await button.scrollIntoViewIfNeeded();assert.ok(await button.isVisible());}
+  if(kind==='guest'){await dialog.getByText('thandi@example.com',{exact:true}).waitFor();await dialog.getByText('First name',{exact:true}).waitFor();await page.screenshot({path:'/tmp/safarios-ai-add-guest-review.png',fullPage:true})}
+  assert.equal(confirmed,0);await dialog.getByRole('button',{name:'Confirm and apply',exact:true}).click();await page.getByText(saved,{exact:true}).waitFor();assert.equal(confirmed,1);await dialog.waitFor({state:'hidden'});assert.equal(await page.getByRole('button',{name:'Review change',exact:true}).count(),0);
+ }finally{await context.close()}
+});

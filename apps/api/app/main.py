@@ -1087,11 +1087,22 @@ def guest_dietary(lodge_id:str,user:User=Depends(require_permission("guests.diet
 
 @app.post("/api/v1/lodges/{lodge_id}/guests",dependencies=[Depends(require_csrf)])
 def create_guest(lodge_id:str,body:GuestCreate,request:Request,user:User=Depends(require_permission("guests.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_guest_record(lodge_id,body,request,user,db)
+    db.commit();return result
+
+
+def _create_guest_record(lodge_id,body,request,user,db):
+    ensure_feature(db,lodge_id,"guests")
+    if not body.first_name.strip() or not body.last_name.strip():raise HTTPException(422,"Enter the guest first and last name")
+    if body.email:
+        import uuid as guest_identity_uuid
+        identity="|".join((body.first_name.strip().casefold(),body.last_name.strip().casefold(),str(body.email).lower()))
+        lock_resources(db,lodge_id,("guest_identity",guest_identity_uuid.uuid5(guest_identity_uuid.NAMESPACE_URL,identity)))
     if body.email:
         duplicate=db.scalar(select(Guest.id).where(Guest.lodge_id==lodge_id,func.lower(Guest.first_name)==body.first_name.strip().lower(),func.lower(Guest.last_name)==body.last_name.strip().lower(),func.lower(Guest.email)==str(body.email).lower()))
         if duplicate:raise HTTPException(409,"A guest with the same name and email already exists")
     g=Guest(lodge_id=lodge_id,first_name=body.first_name.strip(),last_name=body.last_name.strip(),email=str(body.email).lower() if body.email else None,phone=body.phone.strip(),nationality=body.nationality.strip(),vip=body.vip,dietary_requirements=body.dietary_requirements,allergies=body.allergies,preferences=body.preferences,notes=body.notes,birthday=body.birthday,anniversary=body.anniversary,repeat_guest=body.repeat_guest,safari_preferences=body.safari_preferences)
-    db.add(g);db.flush();audit(db,request,g.lodge_id,user.id,"guest.created","guest",str(g.id));event(db,g.lodge_id,user.id,"guest.created","guest",str(g.id),"Guest added to CRM");db.commit()
+    db.add(g);db.flush();audit(db,request,g.lodge_id,user.id,"guest.created","guest",str(g.id));event(db,g.lodge_id,user.id,"guest.created","guest",str(g.id),"Guest added to CRM")
     return {"id":str(g.id),"first_name":g.first_name,"last_name":g.last_name,"name":f"{g.first_name} {g.last_name}","email":g.email,"phone":g.phone,"nationality":g.nationality,"vip":g.vip,"dietary_requirements":g.dietary_requirements,"allergies":g.allergies,"preferences":g.preferences,"notes":g.notes,**guest_details(g),"current_unit":None,"stay_status":None,"completed_stays":0}
 
 
@@ -1146,11 +1157,16 @@ def check_unit_conflict(db:Session,lodge_id,unit_id,arrival,departure,exclude_id
 
 @app.post("/api/v1/lodges/{lodge_id}/stays",dependencies=[Depends(require_csrf)])
 def create_stay(lodge_id:str,body:StayCreate,request:Request,user:User=Depends(require_permission("stays.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_stay_record(lodge_id,body,request,user,db)
+    db.commit();return result
+
+
+def _create_stay_record(lodge_id,body,request,user,db):
     ensure_fk(db,Guest,body.guest_id,lodge_id,"Guest");unit=ensure_fk(db,Unit,body.unit_id,lodge_id,"Unit")
     if unit.status in {"maintenance","out_of_service"}:raise HTTPException(409,"This unit is not available for a stay")
     check_unit_conflict(db,lodge_id,body.unit_id,body.arrival_date,body.departure_date)
     s=Stay(lodge_id=lodge_id,guest_id=body.guest_id,unit_id=body.unit_id,arrival_date=body.arrival_date,departure_date=body.departure_date,party_size=body.party_size,expected_arrival_time=body.expected_arrival_time,expected_departure_time=body.expected_departure_time,transfer_notes=body.transfer_notes,special_requirements=body.special_requirements,status="upcoming")
-    db.add(s);db.flush();audit(db,request,s.lodge_id,user.id,"stay.created","stay",str(s.id));event(db,s.lodge_id,user.id,"stay.created","stay",str(s.id),f"Stay created for {s.arrival_date.isoformat()} to {s.departure_date.isoformat()}");db.commit()
+    db.add(s);db.flush();audit(db,request,s.lodge_id,user.id,"stay.created","stay",str(s.id));event(db,s.lodge_id,user.id,"stay.created","stay",str(s.id),f"Stay created for {s.arrival_date.isoformat()} to {s.departure_date.isoformat()}")
     return {"id":str(s.id),"status":s.status}
 
 
@@ -1326,7 +1342,15 @@ def requests_list(lodge_id:str,user:User=Depends(require_permission("requests.vi
 
 @app.post("/api/v1/lodges/{lodge_id}/requests",dependencies=[Depends(require_csrf)])
 def create_request(lodge_id:str,body:GuestRequestCreate,request:Request,user:User=Depends(require_permission("requests.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_request_record(lodge_id,body,request,user,db)
+    db.commit();return result
+
+
+def _create_request_record(lodge_id,body,request,user,db):
     ctx=_ctx(db,user,lodge_id);ensure_fk(db,Guest,body.guest_id,lodge_id,"Guest");ensure_fk(db,Stay,body.stay_id,lodge_id,"Stay");ensure_fk(db,Department,body.department_id,lodge_id,"Department");staff=ensure_fk(db,StaffProfile,body.assigned_staff_id,lodge_id,"Staff profile")
+    if body.stay_id:
+        stay=ensure_fk(db,Stay,body.stay_id,lodge_id,"Stay")
+        if stay.guest_id!=body.guest_id:raise HTTPException(409,"Stay does not belong to the selected guest")
     department_id=_set_department_from_staff_or_context(ctx,staff,body.department_id)
     if staff and department_id and staff.department_id and str(staff.department_id)!=str(department_id):raise HTTPException(409,"Assigned staff member is not in the selected department")
     status="assigned" if body.assigned_staff_id else "open"
@@ -1335,7 +1359,7 @@ def create_request(lodge_id:str,body:GuestRequestCreate,request:Request,user:Use
     if r.assigned_staff_id:
         recipient=staff_user_id(db,lodge_id,r.assigned_staff_id)
         create_notification(db,lodge_id=lodge_id,notification_type="guest_request.assigned",severity="high" if r.priority in {"high","critical"} else "normal",title="Guest request assigned",body=r.description[:240],resource_type="guest_request",resource_id=r.id,dedupe_key=f"request-assigned:{r.id}:{r.assigned_staff_id}",recipient_user_ids=[recipient] if recipient else [])
-    audit(db,request,r.lodge_id,user.id,"guest_request.created","guest_request",str(r.id));event(db,r.lodge_id,user.id,"guest_request.created","guest_request",str(r.id),f"Guest request created: {r.request_type}");db.commit();return {"id":str(r.id),"status":r.status}
+    audit(db,request,r.lodge_id,user.id,"guest_request.created","guest_request",str(r.id));event(db,r.lodge_id,user.id,"guest_request.created","guest_request",str(r.id),f"Guest request created: {r.request_type}");return {"id":str(r.id),"status":r.status}
 
 REQUEST_TRANSITIONS={"open":{"assigned","in_progress","cancelled"},"assigned":{"in_progress","waiting","cancelled"},"in_progress":{"waiting","resolved","cancelled"},"waiting":{"in_progress","resolved","cancelled"},"resolved":set(),"cancelled":set()}
 
@@ -1623,6 +1647,11 @@ def list_activities(lodge_id:str,user:User=Depends(require_permission("activitie
 
 @app.post("/api/v1/lodges/{lodge_id}/activities",dependencies=[Depends(require_csrf)])
 def create_activity(lodge_id:str,body:ActivityCreate,request:Request,user:User=Depends(require_permission("activities.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_activity_record(lodge_id,body,request,user,db)
+    db.commit();return result
+
+
+def _create_activity_record(lodge_id,body,request,user,db):
     ensure_feature(db,lodge_id,"activities")
     ctx=_ctx(db,user,lodge_id);guide=ensure_fk(db,StaffProfile,body.guide_staff_id,lodge_id,"Guide/ranger") if body.guide_staff_id else None
     vehicle=ensure_fk(db,Vehicle,body.vehicle_id,lodge_id,"Vehicle") if body.vehicle_id else None
@@ -1640,7 +1669,7 @@ def create_activity(lodge_id:str,body:ActivityCreate,request:Request,user:User=D
     a=Activity(lodge_id=lodge_id,activity_type=body.activity_type,title=body.title,starts_at=body.starts_at,ends_at=body.ends_at,guide_staff_id=body.guide_staff_id,department_id=department_id,vehicle_id=body.vehicle_id,requires_vehicle=body.requires_vehicle,meeting_point=body.meeting_point,notes=body.notes,created_by_user_id=user.id)
     db.add(a);db.flush()
     for gid in dict.fromkeys(body.guest_ids):db.add(ActivityGuest(activity_id=a.id,guest_id=gid,lodge_id=lodge_id))
-    audit(db,request,lodge_id,user.id,"activity.created","activity",str(a.id));event(db,lodge_id,user.id,"activity.created","activity",str(a.id),f"Activity {a.title} scheduled");db.commit();return {"id":str(a.id),"status":a.status}
+    audit(db,request,lodge_id,user.id,"activity.created","activity",str(a.id));event(db,lodge_id,user.id,"activity.created","activity",str(a.id),f"Activity {a.title} scheduled");return {"id":str(a.id),"status":a.status}
 
 @app.patch("/api/v1/lodges/{lodge_id}/activities/{record_id}",dependencies=[Depends(require_csrf)])
 def update_activity(lodge_id:str,record_id:str,body:ActivityUpdate,request:Request,user:User=Depends(require_permission("activities.view",write=True)),db:Session=Depends(get_db)):
@@ -1699,6 +1728,11 @@ def list_transfers(lodge_id:str,user:User=Depends(require_permission("transfers.
 
 @app.post("/api/v1/lodges/{lodge_id}/transfers",dependencies=[Depends(require_csrf)])
 def create_transfer(lodge_id:str,body:TransferCreate,request:Request,user:User=Depends(require_permission("transfers.manage",write=True)),db:Session=Depends(get_db)):
+    result=_create_transfer_record(lodge_id,body,request,user,db)
+    db.commit();return result
+
+
+def _create_transfer_record(lodge_id,body,request,user,db):
     ensure_feature(db,lodge_id,"transfers")
     ctx=_ctx(db,user,lodge_id)
     if body.expected_end_at<=body.scheduled_at:raise HTTPException(422,"Transfer end must be after start")
@@ -1719,7 +1753,7 @@ def create_transfer(lodge_id:str,body:TransferCreate,request:Request,user:User=D
     if t.driver_staff_id:
         recipient=staff_user_id(db,lodge_id,t.driver_staff_id)
         create_notification(db,lodge_id=lodge_id,notification_type="transfer.assigned",severity="normal",title="Transfer assigned",body=f"{t.pickup_location} to {t.dropoff_location}",resource_type="transfer",resource_id=t.id,dedupe_key=f"transfer-assigned:{t.id}:{t.driver_staff_id}",recipient_user_ids=[recipient] if recipient else [])
-    audit(db,request,lodge_id,user.id,"transfer.created","transfer",str(t.id));event(db,lodge_id,user.id,"transfer.created","transfer",str(t.id),f"Transfer scheduled from {t.pickup_location} to {t.dropoff_location}");db.commit();return {"id":str(t.id),"status":t.status}
+    audit(db,request,lodge_id,user.id,"transfer.created","transfer",str(t.id));event(db,lodge_id,user.id,"transfer.created","transfer",str(t.id),f"Transfer scheduled from {t.pickup_location} to {t.dropoff_location}");return {"id":str(t.id),"status":t.status}
 
 @app.patch("/api/v1/lodges/{lodge_id}/transfers/{record_id}",dependencies=[Depends(require_csrf)])
 def update_transfer(lodge_id:str,record_id:str,body:TransferUpdate,request:Request,user:User=Depends(require_permission("transfers.view",write=True)),db:Session=Depends(get_db)):

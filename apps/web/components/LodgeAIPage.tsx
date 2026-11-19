@@ -505,6 +505,10 @@ export default function LodgeAIPage({
                             ? copy.groupIntro
                             : copy.welcomeBody}
                         </p>
+                        {scopeType === "lodge" &&
+                          status.tools.some((t: any) =>
+                            t.name.startsWith("propose_"),
+                          ) && <p>{copy.actionIntro}</p>}
                         <div
                           className="aiSuggestions"
                           aria-label={copy.suggestion}

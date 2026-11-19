@@ -17,7 +17,7 @@ export type Proposal = {
   preview: {
     fields: { key: string; value: unknown; previous?: string | null }[];
   };
-  result?: { id: string; status: string };
+  result?: { id: string; status?: string };
 };
 export default function ActionProposal({
   proposal,
@@ -124,14 +124,36 @@ export default function ActionProposal({
   function value(key: string, raw: unknown): string {
     if (raw === null || raw === undefined) return "—";
     if (typeof raw === "boolean") return raw ? copy.yes : copy.no;
-    if (["due_at", "scheduled_for"].includes(key))
+    if (
+      [
+        "due_at",
+        "scheduled_for",
+        "starts_at",
+        "ends_at",
+        "scheduled_at",
+        "expected_end_at",
+        "flight_time",
+      ].includes(key)
+    )
       return formatDateTime(String(raw));
-    if (key === "recurrence_end_date") return formatDate(String(raw));
+    if (
+      [
+        "recurrence_end_date",
+        "arrival_date",
+        "departure_date",
+        "birthday",
+        "anniversary",
+      ].includes(key)
+    )
+      return formatDate(String(raw));
     if (
       [
         "status",
         "priority",
         "job_type",
+        "request_type",
+        "activity_type",
+        "transfer_type",
         "room_status",
         "vehicle_status",
       ].includes(key)

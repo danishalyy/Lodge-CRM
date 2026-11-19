@@ -4,7 +4,7 @@ BUILT={
  'ai_daily_summary':('AI daily summaries','Automatically summarise the operational day.','Reports and AI'),
  'ai_weekly_report':('AI weekly reports','Automatically summarise weekly activity.','Reports and AI'),
  'ai_insights':('AI insights','Suggested operational follow-up.','Reports and AI'),
- 'ai_actions':('Confirmed AI actions','Review and explicitly confirm permitted task, housekeeping and maintenance proposals.','Reports and AI'),
+ 'ai_actions':('Confirmed AI actions','Review and confirm permitted guest, stay, task, service request, housekeeping, maintenance, activity and transfer proposals.','Reports and AI'),
  'advanced_ai':('Group Owner AI','Read-only comparisons and operational reports for explicitly assigned lodges.','Reports and AI'),
  'ai_knowledge':('AI knowledge','Approved knowledge for lodge questions.','Reports and AI'),
  'document_knowledge':('Document knowledge','Use approved documents in lodge intelligence.','Reports and AI'),

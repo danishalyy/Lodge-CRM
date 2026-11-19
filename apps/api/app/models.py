@@ -948,7 +948,7 @@ class AIAction(AIPrivate, Base):
         ForeignKeyConstraint(["conversation_id", "lodge_id", "user_id"], ["ai_conversations.id", "ai_conversations.lodge_id", "ai_conversations.user_id"], ondelete="CASCADE"),
         UniqueConstraint("conversation_id", "request_id", name="uq_ai_action_request"),
         CheckConstraint("status IN ('pending','confirmed','cancelled')", name="ck_ai_action_status"),
-        CheckConstraint("action IN ('create_task','update_task','create_maintenance','create_housekeeping')", name="ck_ai_action_kind"),
+        CheckConstraint("action IN ('create_task','update_task','create_maintenance','create_housekeeping','create_guest','create_stay','create_request','create_activity','create_transfer')", name="ck_ai_action_kind"),
         Index("ix_ai_action_owner", "lodge_id", "user_id", "created_at"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

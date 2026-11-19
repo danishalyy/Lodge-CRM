@@ -4,6 +4,8 @@ export const aiCopy = {
   welcomeEyebrow: "YOUR LODGE, IN FOCUS",
   welcomeBody:
     "Ask about your day. I’ll check the lodge records you can access and bring the details together.",
+  actionIntro:
+    "You can also ask me to prepare an action. Nothing changes until you review and confirm it.",
   placeholder: "Ask anything about your lodge…",
   chat: "Conversation with Lodge AI",
   privateWorkspace: "Private workspace",

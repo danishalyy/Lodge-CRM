@@ -102,6 +102,7 @@ class Tool:
 
 
 REGISTRY = {
+    "get_guest_directory": Tool("guests.view", "guests", "guests", ("id", "name"), "Guest names for operational actions", "Find a guest by name before preparing a stay or request.", ("limit", "search")),
     "get_assignable_staff": Tool("staff.view", "staff", "staff", ("id", "full_name", "department_id", "operational_status"), "Assignable staff", "Which staff members can I assign work to?", ("limit", "search")),
     "get_group_overview": Tool(
         "ai.group.view",
@@ -425,6 +426,8 @@ def read_rows(tool, args, db, ctx, lodge_id, bound=101):
     kwargs = {"lodge_id": str(lodge_id), "user": ctx.user, "db": db}
     if tool.handler == "tasks":
         kwargs.update(status=args.status, assignee_id=None, limit=bound, offset=0)
+    elif tool.handler == "guests":
+        kwargs.update(limit=bound, offset=0)
     elif tool.handler == "stays":
         kwargs.update(limit=bound, offset=0)
     elif tool.handler in {
@@ -573,6 +576,8 @@ def execute(name, arguments, db, ctx, lodge_id, request, scope_type="lodge"):
         else len(rows) >= 500
     )
     selected = [row for row in rows if row.get("employment_status")=="active"] if name=="get_assignable_staff" else rows
+    if name == "get_guest_directory":
+        selected = [r for r in selected if not r.get("anonymized_at")]
     if args.status:
         selected = [r for r in selected if r.get("status") == args.status]
     if args.search:

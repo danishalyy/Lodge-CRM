@@ -20,8 +20,19 @@ from ..models import (
     MaintenanceAsset,
     MaintenanceTicket,
     GuestRequest,
+    Stay,
 )
-from ..schemas import TaskCreate, TaskUpdate, MaintenanceCreate, HousekeepingCreate
+from ..schemas import (
+    TaskCreate,
+    TaskUpdate,
+    MaintenanceCreate,
+    HousekeepingCreate,
+    GuestCreate,
+    StayCreate,
+    GuestRequestCreate,
+    ActivityCreate,
+    TransferCreate,
+)
 from ..security import (
     require_permission,
     ensure_feature,
@@ -39,9 +50,44 @@ class UpdateTask(BaseModel):
 
 
 # No generic model-selected handler, permission, URL, SQL or deletion action.
-CLARIFICATION = "Tell me what you would like to change and which room, task or staff member it concerns. I will prepare the details for you to review before anything is applied."
+CLARIFICATION = "Tell me the action you need and the guest, dates, room or staff member it concerns. I will prepare the details for you to review before anything is applied."
 
 KINDS = {
+    "propose_create_guest": (
+        "create_guest",
+        GuestCreate,
+        "guests.manage",
+        "guests",
+        "_create_guest_record",
+    ),
+    "propose_create_stay": (
+        "create_stay",
+        StayCreate,
+        "stays.manage",
+        "stays",
+        "_create_stay_record",
+    ),
+    "propose_create_request": (
+        "create_request",
+        GuestRequestCreate,
+        "requests.manage",
+        "guest_requests",
+        "_create_request_record",
+    ),
+    "propose_create_activity": (
+        "create_activity",
+        ActivityCreate,
+        "activities.manage",
+        "activities",
+        "_create_activity_record",
+    ),
+    "propose_create_transfer": (
+        "create_transfer",
+        TransferCreate,
+        "transfers.manage",
+        "transfers",
+        "_create_transfer_record",
+    ),
     "propose_create_task": (
         "create_task",
         TaskCreate,
@@ -78,6 +124,9 @@ REFERENCES = {
     "inspector_staff_id": StaffProfile,
     "department_id": Department,
     "guest_id": Guest,
+    "stay_id": Stay,
+    "guide_staff_id": StaffProfile,
+    "driver_staff_id": StaffProfile,
     "vehicle_id": Vehicle,
     "asset_id": MaintenanceAsset,
     "maintenance_ticket_id": MaintenanceTicket,
@@ -132,11 +181,92 @@ def available(db, ctx, lodge_id, scope):
                     "name": name,
                     "description": kind.replace("_", " ").capitalize()
                     + ". Propose only; in-app review and confirmation required. Use verified details; ask when uncertain.",
-                    "parameters": compact_schema(schema.model_json_schema()),
+                    "parameters": proposal_schema(kind, schema),
                 },
             }
         )
     return definitions
+
+
+SELECTOR = "select_action"
+
+
+def inference_tools(definitions, selected=None):
+    if selected:
+        return [item for item in definitions if item["function"]["name"] == selected]
+    if len(definitions) <= 4:
+        return definitions
+    names = [item["function"]["name"] for item in definitions]
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": SELECTOR,
+                "description": "Choose an authorised action to obtain its input schema. This never performs a change; the selected propose tool prepares a reviewable proposal. Read tools can resolve record IDs; ask for missing or ambiguous details.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"action": {"type": "string", "enum": names}},
+                    "required": ["action"],
+                    "additionalProperties": False,
+                },
+            },
+        }
+    ]
+
+
+def select_action(arguments, definitions):
+    if not isinstance(arguments, dict) or set(arguments) != {"action"}:
+        raise HTTPException(422, "Select one supported AI action")
+    name = arguments["action"]
+    if not isinstance(name, str) or name not in {
+        item["function"]["name"] for item in definitions
+    }:
+        raise HTTPException(403, "This AI action is not available to your account")
+    return name
+
+
+def proposal_schema(kind, schema):
+    value = compact_schema(schema.model_json_schema())
+    if kind == "create_guest":
+        value["properties"]["email"] = {
+            "type": ["string", "null"],
+            "description": "Copy the exact guest_email_REF reference from the current user message, or omit when none was supplied. Never invent an email address.",
+        }
+    return value
+
+
+def contact_input(content, enabled):
+    """Raw addresses stay in this request, never persisted as chat or sent to inference."""
+    import re
+
+    contacts = {}
+
+    def replace(match):
+        ref = "guest_email_" + secrets.token_hex(8)
+        contacts[ref] = match.group(0)
+        return ref
+
+    safe = (
+        re.sub(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b", replace, content)
+        if enabled
+        else content
+    )
+    return redact(safe), contacts
+
+
+def resolve_contacts(kind, arguments, contacts):
+    if kind != "create_guest" or not isinstance(arguments, dict):
+        return arguments
+    values = dict(arguments)
+    email = values.get("email")
+    if email is not None:
+        if email not in contacts:
+            raise HTTPException(
+                422,
+                "Provide the guest email in your current message, or omit it. Email addresses cannot be invented or reused from chat history.",
+            )
+        values["email"] = contacts[email]
+    return values
 
 
 def authorize(db, user, lodge_id, request, kind):
@@ -179,6 +309,16 @@ def parse(kind, payload):
             and data.scheduled_for.tzinfo is None
         ):
             raise ValueError("scheduled date needs timezone")
+        for key in (
+            "starts_at",
+            "ends_at",
+            "scheduled_at",
+            "expected_end_at",
+            "flight_time",
+        ):
+            value = getattr(data, key, None)
+            if value is not None and value.tzinfo is None:
+                raise ValueError("scheduled date needs timezone")
         return model
     except (ValidationError, ValueError, TypeError):
         raise HTTPException(
@@ -227,6 +367,27 @@ def inspect(db, ctx, lodge_id, kind, model, request):
             {c.name: getattr(task, c.name) for c in Task.__table__.columns}
         )
         fields.append({"key": "task", "value": redact(task.title)})
+    guest_ids = values.pop("guest_ids", None)
+    if guest_ids is not None:
+        labels = []
+        for guest_id in dict.fromkeys(guest_ids):
+            guest = main.ensure_fk(db, Guest, guest_id, str(lodge_id), "Guest")
+            if guest.anonymized_at:
+                raise HTTPException(
+                    409, "Anonymised guest profiles cannot be used for new AI actions"
+                )
+            snapshot["guest:" + guest_id] = digest(
+                {c.name: getattr(guest, c.name) for c in Guest.__table__.columns}
+            )
+            may_name = has_permission(
+                db, ctx.membership, "guests.view"
+            ) and entitlement_enabled(db, str(lodge_id), "guests")
+            labels.append(
+                f"{redact(guest.first_name + ' ' + guest.last_name)} ({guest_id})"
+                if may_name
+                else guest_id
+            )
+        fields.append({"key": "guest_ids", "value": ", ".join(labels) or None})
     for key, value in values.items():
         if value in (None, ""):
             if kind == "update_task" and key in {"vehicle_id", "maintenance_ticket_id"}:
@@ -247,6 +408,10 @@ def inspect(db, ctx, lodge_id, kind, model, request):
                 raise HTTPException(
                     409, "The selected staff member is no longer active"
                 )
+            if isinstance(row, Guest) and row.anonymized_at:
+                raise HTTPException(
+                    409, "Anonymised guest profiles cannot be used for new AI actions"
+                )
             snapshot[key] = digest(
                 {c.name: getattr(row, c.name) for c in row.__table__.columns}
             )
@@ -255,6 +420,7 @@ def inspect(db, ctx, lodge_id, kind, model, request):
                 Unit: ("units.view", "units"),
                 StaffProfile: ("staff.view", "staff"),
                 Guest: ("guests.view", "guests"),
+                Stay: ("stays.view", "stays"),
                 Vehicle: ("vehicles.view", "fleet"),
                 Department: ("departments.view", "departments"),
                 MaintenanceAsset: ("maintenance.view", "maintenance_workshop"),
@@ -278,6 +444,11 @@ def inspect(db, ctx, lodge_id, kind, model, request):
                     or getattr(row, "full_name", None)
                     or getattr(row, "registration", None)
                     or getattr(row, "title", None)
+                    or (
+                        (row.first_name + " " + row.last_name)
+                        if isinstance(row, Guest)
+                        else None
+                    )
                 )
                 if can_name
                 else None
@@ -287,12 +458,27 @@ def inspect(db, ctx, lodge_id, kind, model, request):
         if key in old:
             field["previous"] = redact(str(old[key])) if old[key] is not None else None
         fields.append(field)
-    if kind in {"create_task", "create_maintenance"} and not getattr(
-        data, "department_id", None
-    ):
+    if kind in {
+        "create_task",
+        "create_maintenance",
+        "create_request",
+        "create_activity",
+        "create_transfer",
+    } and not getattr(data, "department_id", None):
         staff = (
-            db.get(StaffProfile, data.assigned_staff_id)
-            if getattr(data, "assigned_staff_id", None)
+            db.get(
+                StaffProfile,
+                (
+                    getattr(data, "assigned_staff_id", None)
+                    or getattr(data, "guide_staff_id", None)
+                    or getattr(data, "driver_staff_id", None)
+                ),
+            )
+            if (
+                getattr(data, "assigned_staff_id", None)
+                or getattr(data, "guide_staff_id", None)
+                or getattr(data, "driver_staff_id", None)
+            )
             else None
         )
         department_id = main._set_department_from_staff_or_context(ctx, staff, None)
@@ -363,7 +549,9 @@ def payload(row):
     }
 
 
-def prepare(db, ctx, lodge_id, conversation, request_id, name, arguments, request):
+def prepare(
+    db, ctx, lodge_id, conversation, request_id, name, arguments, request, contacts=None
+):
     if name not in KINDS:
         raise HTTPException(422, "AI action is not registered")
     kind = KINDS[name][0]
@@ -386,7 +574,7 @@ def prepare(db, ctx, lodge_id, conversation, request_id, name, arguments, reques
         raise HTTPException(
             429, "Review or cancel existing action proposals before creating more"
         )
-    model = parse(kind, arguments)
+    model = parse(kind, resolve_contacts(kind, arguments, contacts or {}))
     preview, snapshot = inspect(db, ctx, lodge_id, kind, model, request)
     row = AIAction(
         lodge_id=lodge_id,
@@ -495,6 +683,8 @@ def confirm(db, ctx, row, lodge_id, token, request):
         .items()
         if k in REFERENCES
     ]
+    if row.action == "create_activity":
+        refs.extend((Guest, str(gid)) for gid in model.guest_ids)
     if row.action == "update_task":
         refs.append((Task, str(model.task_id)))
         refs += [
@@ -527,6 +717,11 @@ def confirm(db, ctx, row, lodge_id, token, request):
     if row.expires_at <= datetime.now(timezone.utc):
         raise HTTPException(409, "The proposal expired. Request a new proposal")
     row.result = apply(db, ctx, lodge_id, row.action, model, request)
+    if row.action == "create_guest":
+        # Do not retain a second copy of guest contact/medical details after creation.
+        row.result = {"id": row.result["id"]}
+        row.payload = {}
+        row.preview = {"fields": [{"key": "guest_id", "value": row.result["id"]}]}
     row.status = "confirmed"
     row.confirmed_at = datetime.now(timezone.utc)
     main_audit(db, ctx, lodge_id, row.id, "confirmed", request)
